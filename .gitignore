@@ -1,0 +1,31 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js
+apps/web/.next/
+apps/web/out/
+
+# expo
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/web-build/
+
+# env files
+.env
+.env.local
+.env*.local
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+.turbo
+
+# typescript
+*.tsbuildinfo
+
+# supabase
+**/supabase/.branches
+**/supabase/.temp
