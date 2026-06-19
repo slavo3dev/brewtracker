@@ -11,7 +11,25 @@ export function SiteFooter() {
 				<div className='flex flex-col items-center justify-between gap-4 text-[12px] text-steam-400 sm:flex-row'>
 					<p>
 						&copy; {new Date().getFullYear()} Reliant. All rights
-						reserved.
+						reserved.{' '}
+						<span className='text-steam-300'>
+							Powered by{' '}
+							<a
+								href='https://prototypenext.com'
+								target='_blank'
+								rel='noopener noreferrer'
+								className='font-medium text-steam-400 transition-colors hover:text-copper-600'>
+								Prototype.NEXT
+							</a>{' '}
+							&amp;{' '}
+							<a
+								href='https://slavo.io'
+								target='_blank'
+								rel='noopener noreferrer'
+								className='font-medium text-steam-400 transition-colors hover:text-copper-600'>
+								Slavo.io
+							</a>
+						</span>
 					</p>
 					<ul className='flex items-center gap-6'>
 						{FOOTER_LINKS.map((link) => (
@@ -25,25 +43,6 @@ export function SiteFooter() {
 						))}
 					</ul>
 				</div>
-
-				<p className='mt-6 text-center text-[11px] text-steam-300'>
-					Powered by &amp;{' '}
-					<a
-						href='https://prototypenext.com'
-						target='_blank'
-						rel='noopener noreferrer'
-						className='font-medium text-steam-400 transition-colors hover:text-copper-600'>
-						Prototype.NEXT
-					</a>
-					&amp;{' '}
-					<a
-						href='https://slavo.io'
-						target='_blank'
-						rel='noopener noreferrer'
-						className='font-medium text-steam-400 transition-colors hover:text-copper-600'>
-						Slavo.io
-					</a>
-				</p>
 			</div>
 		</footer>
 	);
