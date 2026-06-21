@@ -1,26 +1,90 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Espresso / coffee palette — named tokens */
+  --espresso-950: #1c1410; /* near-black roast — primary text, dark surfaces */
+  --espresso-800: #3d2b1f; /* roasted bean brown — strong UI, headings on light */
+  --espresso-700: #54392a;
+  --crema-50: #faf6f0;     /* page background — warm off-white */
+  --crema-0: #fffdfa;      /* card surface, slightly lighter than page */
+  --latte-100: #efe6d8;    /* section backgrounds, dividers */
+  --latte-200: #e2d4c0;
+  --copper-500: #b6692b;   /* the one accent — burnt copper */
+  --copper-600: #9c5621;
+  --copper-100: #f3e2cf;   /* accent tint, for subtle highlights */
+  --steam-400: #8c8076;    /* muted / secondary text */
+  --steam-300: #a89c8f;
+
+  --background: var(--crema-50);
+  --foreground: var(--espresso-950);
+
+  /* Apple-style easing */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Force light coffee scheme regardless of OS/browser dark mode preference */
+  color-scheme: light only;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  --color-espresso-950: var(--espresso-950);
+  --color-espresso-800: var(--espresso-800);
+  --color-espresso-700: var(--espresso-700);
+  --color-crema-50: var(--crema-50);
+  --color-crema-0: var(--crema-0);
+  --color-latte-100: var(--latte-100);
+  --color-latte-200: var(--latte-200);
+  --color-copper-500: var(--copper-500);
+  --color-copper-600: var(--copper-600);
+  --color-copper-100: var(--copper-100);
+  --color-steam-400: var(--steam-400);
+  --color-steam-300: var(--steam-300);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--crema-50);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--background) !important;
+  color: var(--foreground) !important;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Apple-style tight, large display headings */
+.text-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+/* Glass nav surface */
+.glass {
+  background: color-mix(in srgb, var(--crema-50) 72%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* Signature hero glow — used once, in the hero only */
+.pour-glow {
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 0%,
+    color-mix(in srgb, var(--copper-500) 26%, transparent) 0%,
+    transparent 70%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
