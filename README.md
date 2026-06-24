@@ -23,9 +23,11 @@ brewtracker/
    ```
    This installs dependencies for every app/package in the monorepo in one shot — you don't need to `cd` into `apps/web` and install separately.
 3. Set up your Supabase env vars:
+
    ```bash
    cp apps/web/.env.local.example apps/web/.env.local
    ```
+
    Then open `apps/web/.env.local` and fill in the real `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` values. Get these from the Supabase Dashboard → your project → Project Settings → API. Ask whoever set up the Supabase project for these if you don't have access yet.
 
    **`.env.local` is gitignored on purpose — never commit it.** Each dev keeps their own copy.
@@ -33,17 +35,21 @@ brewtracker/
 ## Day-to-day
 
 Run the web app in dev mode:
+
 ```bash
 npm run dev:web
 ```
+
 Opens at http://localhost:3000
 
 Typecheck everything:
+
 ```bash
 npm run typecheck
 ```
 
 Build for production:
+
 ```bash
 npm run build:web
 ```

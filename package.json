@@ -10,9 +10,26 @@
     "build:web": "npm run build --workspace=apps/web",
     "dev:mobile": "npm run start --workspace=apps/mobile",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-simple-import-sort": "^13.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
+    "prettier": "^3.8.4",
     "typescript": "^5.5.4"
+  },
+  "lint-staged": {
+    "apps/web/**/*.{ts,tsx,js,jsx}": [
+      "npm run lint --workspace=apps/web -- --fix",
+      "prettier --write"
+    ],
+    "**/*.{json,md,css}": [
+      "prettier --write"
+    ]
   }
 }

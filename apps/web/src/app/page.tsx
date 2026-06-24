@@ -14,8 +14,8 @@ export default function Home() {
             Every stop. Counted.
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-balance text-lg text-steam-400 sm:text-xl">
-            BrewTracker brings routes, service, and inventory into one system
-            built for the people keeping coffee machines running.
+            BrewTracker brings routes, service, and inventory into one system built for the people
+            keeping coffee machines running.
           </p>
           <div className="mt-9 flex items-center justify-center gap-4">
             <a

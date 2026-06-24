@@ -5,14 +5,14 @@
   --espresso-950: #1c1410; /* near-black roast — primary text, dark surfaces */
   --espresso-800: #3d2b1f; /* roasted bean brown — strong UI, headings on light */
   --espresso-700: #54392a;
-  --crema-50: #faf6f0;     /* page background — warm off-white */
-  --crema-0: #fffdfa;      /* card surface, slightly lighter than page */
-  --latte-100: #efe6d8;    /* section backgrounds, dividers */
+  --crema-50: #faf6f0; /* page background — warm off-white */
+  --crema-0: #fffdfa; /* card surface, slightly lighter than page */
+  --latte-100: #efe6d8; /* section backgrounds, dividers */
   --latte-200: #e2d4c0;
-  --copper-500: #b6692b;   /* the one accent — burnt copper */
+  --copper-500: #b6692b; /* the one accent — burnt copper */
   --copper-600: #9c5621;
-  --copper-100: #f3e2cf;   /* accent tint, for subtle highlights */
-  --steam-400: #8c8076;    /* muted / secondary text */
+  --copper-100: #f3e2cf; /* accent tint, for subtle highlights */
+  --steam-400: #8c8076; /* muted / secondary text */
   --steam-300: #a89c8f;
 
   --background: var(--crema-50);
@@ -42,8 +42,12 @@
   --color-steam-400: var(--steam-400);
   --color-steam-300: var(--steam-300);
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-display:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
 }
 
 html {
@@ -81,7 +85,9 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

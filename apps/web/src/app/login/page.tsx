@@ -1,4 +1,5 @@
 import Link from "next/link";
+
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage({
@@ -15,12 +16,8 @@ export default async function LoginPage({
           <Link href="/" className="mb-5 flex items-center gap-2 text-espresso-950">
             <BrewMark />
           </Link>
-          <h1 className="text-display text-2xl text-espresso-950">
-            Sign in to BrewTracker
-          </h1>
-          <p className="mt-1.5 text-[14px] text-steam-400">
-            Reliant field operations
-          </p>
+          <h1 className="text-display text-2xl text-espresso-950">Sign in to BrewTracker</h1>
+          <p className="mt-1.5 text-[14px] text-steam-400">Reliant field operations</p>
         </div>
 
         <div className="rounded-2xl bg-crema-0 p-7 shadow-[0_2px_8px_rgba(61,43,31,0.07)] ring-1 ring-espresso-950/[0.06]">
@@ -46,11 +43,7 @@ function BrewMark() {
         stroke="currentColor"
         strokeWidth="1.6"
       />
-      <path
-        d="M18 9.5h1.5a2.5 2.5 0 0 1 0 5H18"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
+      <path d="M18 9.5h1.5a2.5 2.5 0 0 1 0 5H18" stroke="currentColor" strokeWidth="1.6" />
       <path
         d="M8 5c0-.7.5-1 .8-1.6M12 5c0-.7.5-1 .8-1.6"
         stroke="currentColor"
