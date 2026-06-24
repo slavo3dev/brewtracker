@@ -1,6 +1,12 @@
 node_modules
 .next
+out
 dist
 build
 coverage
+
+apps/web/.next
+
+package-lock.json
+
 packages/types/src/database.ts
