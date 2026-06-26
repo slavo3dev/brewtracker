@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
 import "./globals.css";
-import { SiteHeader } from "@/components/layout/site-header";
+
+import type { Metadata } from "next";
+
 import { SiteFooter } from "@/components/layout/site-footer";
+import { SiteHeader } from "@/components/layout/site-header";
 
 export const metadata: Metadata = {
   title: "BrewTracker",

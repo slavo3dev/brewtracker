@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+
 import { signIn, type SignInResult } from "./actions";
 
 const initialState: SignInResult = { error: null };
@@ -14,10 +15,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       <input type="hidden" name="redirectTo" value={redirectTo} />
 
       <div>
-        <label
-          htmlFor="email"
-          className="mb-1.5 block text-[13px] font-medium text-espresso-800"
-        >
+        <label htmlFor="email" className="mb-1.5 block text-[13px] font-medium text-espresso-800">
           Email
         </label>
         <input
@@ -50,10 +48,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       </div>
 
       {state.error && (
-        <p
-          role="alert"
-          className="rounded-lg bg-copper-100 px-3 py-2 text-[13px] text-copper-600"
-        >
+        <p role="alert" className="rounded-lg bg-copper-100 px-3 py-2 text-[13px] text-copper-600">
           {state.error}
         </p>
       )}

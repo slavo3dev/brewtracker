@@ -1,16 +1,14 @@
 "use server";
 
 import { redirect } from "next/navigation";
+
 import { createClient } from "@/lib/supabase/server";
 
 export type SignInResult = {
   error: string | null;
 };
 
-export async function signIn(
-  _prevState: SignInResult,
-  formData: FormData
-): Promise<SignInResult> {
+export async function signIn(_prevState: SignInResult, formData: FormData): Promise<SignInResult> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const redirectTo = String(formData.get("redirectTo") ?? "/");

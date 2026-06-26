@@ -1,8 +1,7 @@
 const FEATURES = [
   {
     title: "Routes",
-    description:
-      "Plan stops, assign drivers, and track progress in real time as the day unfolds.",
+    description: "Plan stops, assign drivers, and track progress in real time as the day unfolds.",
   },
   {
     title: "Service workflow",
@@ -31,9 +30,7 @@ export function FeatureGrid() {
               key={feature.title}
               className="rounded-2xl bg-crema-0 p-6 shadow-[0_2px_8px_rgba(61,43,31,0.07)] ring-1 ring-espresso-950/[0.06] transition-shadow hover:shadow-[0_4px_16px_rgba(61,43,31,0.12)]"
             >
-              <h3 className="text-display text-[19px] text-espresso-950">
-                {feature.title}
-              </h3>
+              <h3 className="text-display text-[19px] text-espresso-950">{feature.title}</h3>
               <p className="mt-2 text-[14px] leading-relaxed text-steam-400">
                 {feature.description}
               </p>

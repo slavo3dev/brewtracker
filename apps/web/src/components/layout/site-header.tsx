@@ -22,10 +22,7 @@ export function SiteHeader() {
         <ul className="hidden items-center gap-8 text-[13px] font-medium text-espresso-800 md:flex">
           {NAV_LINKS.map((link) => (
             <li key={link.label}>
-              <Link
-                href={link.href}
-                className="transition-colors hover:text-copper-600"
-              >
+              <Link href={link.href} className="transition-colors hover:text-copper-600">
                 {link.label}
               </Link>
             </li>
@@ -66,11 +63,7 @@ function BrewMark() {
         stroke="currentColor"
         strokeWidth="1.6"
       />
-      <path
-        d="M18 9.5h1.5a2.5 2.5 0 0 1 0 5H18"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
+      <path d="M18 9.5h1.5a2.5 2.5 0 0 1 0 5H18" stroke="currentColor" strokeWidth="1.6" />
       <path
         d="M8 5c0-.7.5-1 .8-1.6M12 5c0-.7.5-1 .8-1.6"
         stroke="currentColor"
