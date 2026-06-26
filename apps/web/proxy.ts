@@ -4,7 +4,7 @@ import { type NextRequest, NextResponse } from "next/server";
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 // Routes that don't require a signed-in session.
-const PUBLIC_PATHS = ["/login", "/auth"];
+const PUBLIC_PATHS = ["/login", "/auth", "/forgot-password", "/reset-password"];
 
 // Keeps the Supabase auth session fresh on every request, and redirects
 // unauthenticated visitors away from protected admin routes.
@@ -44,13 +44,15 @@ export async function proxy(request: NextRequest) {
 
   if (!user && !isPublicPath) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirectTo", request.nextUrl.pathname);
+   loginUrl.searchParams.set(
+      "redirectTo",
+      `${request.nextUrl.pathname}${request.nextUrl.search}`,
+    );
     return NextResponse.redirect(loginUrl);
   }
 
   if (user && request.nextUrl.pathname === "/login") {
-    // Redirect to /dashboard once the dashboard route exists.
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return supabaseResponse;
