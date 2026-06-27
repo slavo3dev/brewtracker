@@ -243,6 +243,85 @@ export type Database = {
           },
         ]
       }
+      time_entries: {
+        Row: {
+          clock_in_at: string
+          clock_in_latitude: number | null
+          clock_in_longitude: number | null
+          clock_in_selfie_url: string | null
+          clock_out_at: string | null
+          clock_out_latitude: number | null
+          clock_out_longitude: number | null
+          created_at: string
+          driver_id: string
+          id: string
+          is_geofence_override: boolean
+          override_by: string | null
+          override_reason: string | null
+          status: Database["public"]["Enums"]["time_entry_status"]
+          updated_at: string
+          warehouse_id: string | null
+        }
+        Insert: {
+          clock_in_at?: string
+          clock_in_latitude?: number | null
+          clock_in_longitude?: number | null
+          clock_in_selfie_url?: string | null
+          clock_out_at?: string | null
+          clock_out_latitude?: number | null
+          clock_out_longitude?: number | null
+          created_at?: string
+          driver_id: string
+          id?: string
+          is_geofence_override?: boolean
+          override_by?: string | null
+          override_reason?: string | null
+          status?: Database["public"]["Enums"]["time_entry_status"]
+          updated_at?: string
+          warehouse_id?: string | null
+        }
+        Update: {
+          clock_in_at?: string
+          clock_in_latitude?: number | null
+          clock_in_longitude?: number | null
+          clock_in_selfie_url?: string | null
+          clock_out_at?: string | null
+          clock_out_latitude?: number | null
+          clock_out_longitude?: number | null
+          created_at?: string
+          driver_id?: string
+          id?: string
+          is_geofence_override?: boolean
+          override_by?: string | null
+          override_reason?: string | null
+          status?: Database["public"]["Enums"]["time_entry_status"]
+          updated_at?: string
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_override_by_fkey"
+            columns: ["override_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           address: string | null
@@ -345,6 +424,7 @@ export type Database = {
         | "completed"
         | "cancelled"
       stop_status: "pending" | "in_progress" | "completed" | "skipped"
+      time_entry_status: "open" | "closed" | "flagged" | "manager_override"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -482,6 +562,7 @@ export const Constants = {
         "cancelled",
       ],
       stop_status: ["pending", "in_progress", "completed", "skipped"],
+      time_entry_status: ["open", "closed", "flagged", "manager_override"],
     },
   },
 } as const
