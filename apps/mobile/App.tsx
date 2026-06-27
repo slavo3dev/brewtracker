@@ -6,8 +6,9 @@ import { supabase } from './src/lib/supabase';
 import LoginScreen from './src/screens/LoginScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ClockInScreen from './src/screens/ClockInScreen';
+import SelfieCaptureScreen from './src/screens/SelfieCaptureScreen';
 
-type Screen = 'home' | 'clockIn';
+type Screen = 'home' | 'clockIn' | 'selfie' | 'clockedIn';
 
 export default function App() {
 	const [session, setSession] = useState<Session | null>(null);
@@ -19,9 +20,7 @@ export default function App() {
 		supabase.auth
 			.getSession()
 			.then(({ data, error }) => {
-				if (error) {
-					setInitError(error.message);
-				}
+				if (error) setInitError(error.message);
 				setSession(data.session);
 				setLoading(false);
 			})
@@ -83,8 +82,42 @@ export default function App() {
 				<LoginScreen onLoggedIn={() => setScreen('home')} />
 			) : screen === 'home' ? (
 				<HomeScreen onClockInPress={() => setScreen('clockIn')} />
+			) : screen === 'clockIn' ? (
+				<ClockInScreen
+					onBack={() => setScreen('home')}
+					onClockedIn={() => setScreen('selfie')}
+				/>
+			) : screen === 'selfie' ? (
+				<SelfieCaptureScreen
+					onBack={() => setScreen('clockIn')}
+					onConfirmed={(_photoUri) => {
+						// TODO (AUTH-5 data layer): upload _photoUri to Supabase
+						// Storage and write the time_entries row. Deferred per
+						// today's scope — UI/flow only for now.
+						setScreen('clockedIn');
+					}}
+				/>
 			) : (
-				<ClockInScreen onBack={() => setScreen('home')} />
+				<View
+					style={{
+						flex: 1,
+						justifyContent: 'center',
+						alignItems: 'center',
+						backgroundColor: '#f5ede1',
+					}}>
+					<Text
+						style={{
+							fontSize: 22,
+							fontWeight: '700',
+							color: '#4a2c1a',
+							marginBottom: 8,
+						}}>
+						Clocked In
+					</Text>
+					<Text style={{ color: '#8a6f53' }}>
+						(time_entries write — coming next)
+					</Text>
+				</View>
 			)}
 		</>
 	);
