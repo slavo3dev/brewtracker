@@ -69,3 +69,7 @@ export function canViewRegion(
   if (isManager(user)) return Boolean(user.region && user.region === region);
   return false;
 }
+
+export function canManageUsers(user: AuthUser | null | undefined) {
+  return Boolean(user?.is_active && isAdmin(user));
+}
