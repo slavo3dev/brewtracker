@@ -251,6 +251,7 @@ export type Database = {
           id: string
           is_active: boolean
           phone: string | null
+          region: string | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
         }
@@ -261,6 +262,7 @@ export type Database = {
           id: string
           is_active?: boolean
           phone?: string | null
+          region?: string | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at?: string
         }
@@ -271,6 +273,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           phone?: string | null
+          region?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
         }
@@ -320,7 +323,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_user_region: { Args: never; Returns: string }
+      current_user_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      is_ceo: { Args: never; Returns: boolean }
+      is_driver: { Args: never; Returns: boolean }
+      is_manager: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "driver" | "tech" | "manager" | "ceo"

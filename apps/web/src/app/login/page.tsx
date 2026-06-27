@@ -24,14 +24,17 @@ export default async function LoginPage({
         </div>
 
         <div className="rounded-2xl bg-crema-0 p-7 shadow-[0_2px_8px_rgba(61,43,31,0.07)] ring-1 ring-espresso-950/[0.06]">
-          <LoginForm redirectTo={redirectTo ?? "/"} />
+          <LoginForm redirectTo={redirectTo ?? "/dashboard"} />
         </div>
 
         <p className="mt-6 text-center text-[13px] text-steam-400">
           Trouble signing in?{" "}
-          <a href="#" className="font-medium text-espresso-800 hover:text-copper-600">
-            Contact your manager
-          </a>
+          <Link
+            href="/forgot-password"
+            className="font-medium text-espresso-800 hover:text-copper-600"
+          >
+            Forgot password?
+          </Link>
         </p>
       </div>
     </div>
