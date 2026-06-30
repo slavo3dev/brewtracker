@@ -412,6 +412,7 @@ export type Database = {
       }
       is_ceo: { Args: never; Returns: boolean }
       is_driver: { Args: never; Returns: boolean }
+      is_field_staff: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
     }
     Enums: {

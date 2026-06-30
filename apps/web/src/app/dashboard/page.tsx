@@ -1,14 +1,9 @@
 import Link from "next/link";
 import { canManageUsers } from "@brewtracker/types";
-import { redirect } from "next/navigation";
-import { getCurrentUserProfile } from "@/lib/auth/get-current-user";
+import { requireAdmin } from "@/lib/auth/require-admin";
 
 export default async function DashboardPage() {
-  const profile = await getCurrentUserProfile();
-
-  if (!profile) {
-    redirect("/login");
-  }
+   const profile = await requireAdmin();
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-10">
@@ -32,25 +27,25 @@ export default async function DashboardPage() {
         <DashboardCard
           title="Routes"
           description="Manage daily routes and assignments."
-          href="#"
+          href="/dashboard/routes"
         />
 
         <DashboardCard
           title="Warehouses"
           description="Manage warehouse locations."
-          href="#"
+          href="dashboard/inventory/warehouses"
         />
 
         <DashboardCard
           title="Machines"
           description="Manage customer machines."
-          href="#"
+          href="/dashboard/inventory/machines"
         />
 
         <DashboardCard
           title="Reports"
           description="View operational reports."
-          href="#"
+          href="/dashboard/reports"
         />
       </section>
     </main>
