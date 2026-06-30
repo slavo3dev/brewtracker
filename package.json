@@ -14,7 +14,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "prepare": "husky"
+    "prepare": "node -e \"if (process.env.VERCEL !== '1') require('child_process').execSync('husky', { stdio: 'inherit' })\""
   },
   "devDependencies": {
     "eslint-config-prettier": "^10.1.8",
