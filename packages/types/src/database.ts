@@ -258,6 +258,11 @@ export type Database = {
           is_geofence_override: boolean
           override_by: string | null
           override_reason: string | null
+          review_note: string | null
+          review_reason: string | null
+          review_status: Database["public"]["Enums"]["time_entry_review_status"]
+          reviewed_at: string | null
+          reviewed_by: string | null
           status: Database["public"]["Enums"]["time_entry_status"]
           updated_at: string
           warehouse_id: string | null
@@ -276,6 +281,11 @@ export type Database = {
           is_geofence_override?: boolean
           override_by?: string | null
           override_reason?: string | null
+          review_note?: string | null
+          review_reason?: string | null
+          review_status?: Database["public"]["Enums"]["time_entry_review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: Database["public"]["Enums"]["time_entry_status"]
           updated_at?: string
           warehouse_id?: string | null
@@ -294,6 +304,11 @@ export type Database = {
           is_geofence_override?: boolean
           override_by?: string | null
           override_reason?: string | null
+          review_note?: string | null
+          review_reason?: string | null
+          review_status?: Database["public"]["Enums"]["time_entry_review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: Database["public"]["Enums"]["time_entry_status"]
           updated_at?: string
           warehouse_id?: string | null
@@ -309,6 +324,13 @@ export type Database = {
           {
             foreignKeyName: "time_entries_override_by_fkey"
             columns: ["override_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_reviewed_by_fkey"
+            columns: ["reviewed_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -425,6 +447,7 @@ export type Database = {
         | "completed"
         | "cancelled"
       stop_status: "pending" | "in_progress" | "completed" | "skipped"
+      time_entry_review_status: "pending" | "approved" | "flagged" | "rejected"
       time_entry_status: "open" | "closed" | "flagged" | "manager_override"
     }
     CompositeTypes: {
@@ -563,6 +586,7 @@ export const Constants = {
         "cancelled",
       ],
       stop_status: ["pending", "in_progress", "completed", "skipped"],
+      time_entry_review_status: ["pending", "approved", "flagged", "rejected"],
       time_entry_status: ["open", "closed", "flagged", "manager_override"],
     },
   },
