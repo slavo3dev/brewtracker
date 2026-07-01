@@ -1,8 +1,7 @@
 import type { Database } from "@brewtracker/types";
 import { createClient } from "@/lib/supabase/server";
 
-export type CurrentUserProfile =
-  Database["public"]["Tables"]["users"]["Row"];
+export type CurrentUserProfile = Database["public"]["Tables"]["users"]["Row"];
 
 export async function getCurrentUserProfile(): Promise<CurrentUserProfile | null> {
   const supabase = await createClient();
@@ -17,7 +16,7 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile | null
 
   const { data: profile, error } = await supabase
     .from("users")
-    .select("id, full_name, email, phone, role, region, is_active")
+    .select("id, full_name, email, phone, role, region, address, is_active")
     .eq("id", user.id)
     .single();
 

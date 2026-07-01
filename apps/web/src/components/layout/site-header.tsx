@@ -3,10 +3,10 @@ import { signOut } from "@/app/login/actions";
 import { getCurrentUserProfile } from "@/lib/auth/get-current-user";
 
 const NAV_LINKS = [
-  { label: "Routes", href: "#" },
-  { label: "Service", href: "#" },
-  { label: "Inventory", href: "#" },
-  { label: "Reports", href: "#" },
+  { label: "Routes", href: "/dashboard/routes" },
+  { label: "Service", href: "/dashboard/service" },
+  { label: "Inventory", href: "/dashboard/inventory" },
+  { label: "Reports", href: "/dashboard/reports" },
 ];
 
 export async function SiteHeader() {
