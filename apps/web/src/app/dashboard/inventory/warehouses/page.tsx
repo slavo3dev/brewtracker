@@ -2,12 +2,11 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { getWarehouses } from "@/lib/warehouses/warehouse-service";
 import { updateWarehouseGeofenceAction } from "./actions";
 
-
 export default async function WarehousesPage() {
   await requireAdmin();
 
-
   const warehouses = await getWarehouses();
+
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
       <h1 className="text-display text-3xl text-espresso-950">

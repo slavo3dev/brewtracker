@@ -43,6 +43,12 @@ export default async function DashboardPage() {
         />
 
         <DashboardCard
+          title="Time Clock"
+          description="Manage employee attendance, reviews and time entries."
+          href="/dashboard/time-clock"
+        />
+
+        <DashboardCard
           title="Reports"
           description="View operational reports."
           href="/dashboard/reports"
