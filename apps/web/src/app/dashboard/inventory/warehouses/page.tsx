@@ -12,7 +12,6 @@ export default async function WarehousesPage() {
       <h1 className="text-display text-3xl text-espresso-950">
         Warehouses
       </h1>
-
       {warehouses.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-latte-200 bg-crema-0 p-6 text-sm text-steam-400">
           No warehouses yet. Add one in Supabase or create warehouse management next.
