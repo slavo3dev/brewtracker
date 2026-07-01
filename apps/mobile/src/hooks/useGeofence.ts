@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
-import { checkGeofences, type GeofenceTarget } from '../lib/geofence';
+import { checkGeofences, type GeofenceTarget } from "@brewtracker/types";
 
 /**
  * TEMPORARY test data (AUTH-3 data layer not built yet — that's
