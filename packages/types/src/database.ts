@@ -245,6 +245,8 @@ export type Database = {
       }
       time_entries: {
         Row: {
+          auto_close_reason: string | null
+          auto_closed_at: string | null
           clock_in_at: string
           clock_in_latitude: number | null
           clock_in_longitude: number | null
@@ -263,11 +265,16 @@ export type Database = {
           review_status: Database["public"]["Enums"]["time_entry_review_status"]
           reviewed_at: string | null
           reviewed_by: string | null
+          route_id: string | null
+          shift_end_at: string | null
           status: Database["public"]["Enums"]["time_entry_status"]
+          stop_id: string | null
           updated_at: string
           warehouse_id: string | null
         }
         Insert: {
+          auto_close_reason?: string | null
+          auto_closed_at?: string | null
           clock_in_at?: string
           clock_in_latitude?: number | null
           clock_in_longitude?: number | null
@@ -286,11 +293,16 @@ export type Database = {
           review_status?: Database["public"]["Enums"]["time_entry_review_status"]
           reviewed_at?: string | null
           reviewed_by?: string | null
+          route_id?: string | null
+          shift_end_at?: string | null
           status?: Database["public"]["Enums"]["time_entry_status"]
+          stop_id?: string | null
           updated_at?: string
           warehouse_id?: string | null
         }
         Update: {
+          auto_close_reason?: string | null
+          auto_closed_at?: string | null
           clock_in_at?: string
           clock_in_latitude?: number | null
           clock_in_longitude?: number | null
@@ -309,7 +321,10 @@ export type Database = {
           review_status?: Database["public"]["Enums"]["time_entry_review_status"]
           reviewed_at?: string | null
           reviewed_by?: string | null
+          route_id?: string | null
+          shift_end_at?: string | null
           status?: Database["public"]["Enums"]["time_entry_status"]
+          stop_id?: string | null
           updated_at?: string
           warehouse_id?: string | null
         }
@@ -333,6 +348,20 @@ export type Database = {
             columns: ["reviewed_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
             referencedColumns: ["id"]
           },
           {
