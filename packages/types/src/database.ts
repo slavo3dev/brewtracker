@@ -243,34 +243,170 @@ export type Database = {
           },
         ]
       }
+      time_entries: {
+        Row: {
+          auto_close_reason: string | null
+          auto_closed_at: string | null
+          clock_in_at: string
+          clock_in_latitude: number | null
+          clock_in_longitude: number | null
+          clock_in_selfie_url: string | null
+          clock_out_at: string | null
+          clock_out_latitude: number | null
+          clock_out_longitude: number | null
+          created_at: string
+          driver_id: string
+          id: string
+          is_geofence_override: boolean
+          override_by: string | null
+          override_reason: string | null
+          review_note: string | null
+          review_reason: string | null
+          review_status: Database["public"]["Enums"]["time_entry_review_status"]
+          reviewed_at: string | null
+          reviewed_by: string | null
+          route_id: string | null
+          shift_end_at: string | null
+          status: Database["public"]["Enums"]["time_entry_status"]
+          stop_id: string | null
+          updated_at: string
+          warehouse_id: string | null
+        }
+        Insert: {
+          auto_close_reason?: string | null
+          auto_closed_at?: string | null
+          clock_in_at?: string
+          clock_in_latitude?: number | null
+          clock_in_longitude?: number | null
+          clock_in_selfie_url?: string | null
+          clock_out_at?: string | null
+          clock_out_latitude?: number | null
+          clock_out_longitude?: number | null
+          created_at?: string
+          driver_id: string
+          id?: string
+          is_geofence_override?: boolean
+          override_by?: string | null
+          override_reason?: string | null
+          review_note?: string | null
+          review_reason?: string | null
+          review_status?: Database["public"]["Enums"]["time_entry_review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          route_id?: string | null
+          shift_end_at?: string | null
+          status?: Database["public"]["Enums"]["time_entry_status"]
+          stop_id?: string | null
+          updated_at?: string
+          warehouse_id?: string | null
+        }
+        Update: {
+          auto_close_reason?: string | null
+          auto_closed_at?: string | null
+          clock_in_at?: string
+          clock_in_latitude?: number | null
+          clock_in_longitude?: number | null
+          clock_in_selfie_url?: string | null
+          clock_out_at?: string | null
+          clock_out_latitude?: number | null
+          clock_out_longitude?: number | null
+          created_at?: string
+          driver_id?: string
+          id?: string
+          is_geofence_override?: boolean
+          override_by?: string | null
+          override_reason?: string | null
+          review_note?: string | null
+          review_reason?: string | null
+          review_status?: Database["public"]["Enums"]["time_entry_review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          route_id?: string | null
+          shift_end_at?: string | null
+          status?: Database["public"]["Enums"]["time_entry_status"]
+          stop_id?: string | null
+          updated_at?: string
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_override_by_fkey"
+            columns: ["override_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
+          address: string | null
           created_at: string
           email: string | null
           full_name: string
           id: string
           is_active: boolean
           phone: string | null
+          region: string | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
         }
         Insert: {
+          address?: string | null
           created_at?: string
           email?: string | null
           full_name: string
           id: string
           is_active?: boolean
           phone?: string | null
+          region?: string | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at?: string
         }
         Update: {
+          address?: string | null
           created_at?: string
           email?: string | null
           full_name?: string
           id?: string
           is_active?: boolean
           phone?: string | null
+          region?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
         }
@@ -320,7 +456,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_user_region: { Args: never; Returns: string }
+      current_user_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      is_ceo: { Args: never; Returns: boolean }
+      is_driver: { Args: never; Returns: boolean }
+      is_field_staff: { Args: never; Returns: boolean }
+      is_manager: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "driver" | "tech" | "manager" | "ceo"
@@ -332,6 +476,8 @@ export type Database = {
         | "completed"
         | "cancelled"
       stop_status: "pending" | "in_progress" | "completed" | "skipped"
+      time_entry_review_status: "pending" | "approved" | "flagged" | "rejected"
+      time_entry_status: "open" | "closed" | "flagged" | "manager_override"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -469,6 +615,8 @@ export const Constants = {
         "cancelled",
       ],
       stop_status: ["pending", "in_progress", "completed", "skipped"],
+      time_entry_review_status: ["pending", "approved", "flagged", "rejected"],
+      time_entry_status: ["open", "closed", "flagged", "manager_override"],
     },
   },
 } as const

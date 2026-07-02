@@ -1,10 +1,11 @@
-import { type CookieOptions, createServerClient } from "@supabase/ssr";
+import { canAccessAdminApp } from "@brewtracker/types";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 // Routes that don't require a signed-in session.
-const PUBLIC_PATHS = ["/login", "/auth"];
+const PUBLIC_PATHS = ["/login", "/auth", "/forgot-password", "/reset-password"];
 
 // Keeps the Supabase auth session fresh on every request, and redirects
 // unauthenticated visitors away from protected admin routes.
@@ -36,17 +37,32 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isPublicPath = PUBLIC_PATHS.some((path) => request.nextUrl.pathname.startsWith(path));
+  const pathname = request.nextUrl.pathname;
+
+  const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+
+  const isDashboardPath = pathname.startsWith("/dashboard");
 
   if (!user && !isPublicPath) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirectTo", request.nextUrl.pathname);
+    loginUrl.searchParams.set("redirectTo", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (user && request.nextUrl.pathname === "/login") {
-    // Redirect to /dashboard once the dashboard route exists.
-    return NextResponse.redirect(new URL("/", request.url));
+  if (user && isDashboardPath) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("id, role, region, is_active")
+      .eq("id", user.id)
+      .single();
+
+    if (!canAccessAdminApp(profile)) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+  }
+
+  if (user && pathname === "/login") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return supabaseResponse;

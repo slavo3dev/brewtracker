@@ -1,13 +1,17 @@
 import Link from "next/link";
+import { signOut } from "@/app/login/actions";
+import { getCurrentUserProfile } from "@/lib/auth/get-current-user";
 
 const NAV_LINKS = [
-  { label: "Routes", href: "#" },
-  { label: "Service", href: "#" },
-  { label: "Inventory", href: "#" },
-  { label: "Reports", href: "#" },
+  { label: "Routes", href: "/dashboard/routes" },
+  { label: "Service", href: "/dashboard/service" },
+  { label: "Inventory", href: "/dashboard/inventory" },
+  { label: "Reports", href: "/dashboard/reports" },
 ];
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const profile = await getCurrentUserProfile();
+
   return (
     <header className="glass sticky top-0 z-50 border-b border-latte-200/60">
       <nav className="mx-auto flex h-12 max-w-6xl items-center justify-between px-4 sm:px-6">
@@ -30,18 +34,45 @@ export function SiteHeader() {
         </ul>
 
         <div className="flex items-center gap-4">
-          <Link
-            href="#"
-            className="hidden text-[13px] font-medium text-espresso-800 transition-colors hover:text-copper-600 sm:block"
-          >
-            Sign in
-          </Link>
-          <Link
-            href="#"
-            className="rounded-full bg-espresso-950 px-4 py-1.5 text-[13px] font-medium text-crema-50 transition-colors hover:bg-copper-600"
-          >
-            Get started
-          </Link>
+          {profile ? (
+            <>
+              <span className="hidden text-[13px] font-medium text-steam-400 sm:block">
+                {profile.full_name}
+              </span>
+
+              <form action={signOut}>
+                <button
+                  type="submit"
+                  className="hidden text-[13px] font-medium text-espresso-800 transition-colors hover:text-copper-600 sm:block"
+                >
+                  Sign out
+                </button>
+              </form>
+
+              <Link
+                href="/dashboard"
+                className="rounded-full bg-espresso-950 px-4 py-1.5 text-[13px] font-medium text-crema-50 transition-colors hover:bg-copper-600"
+              >
+                Dashboard
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="hidden text-[13px] font-medium text-espresso-800 transition-colors hover:text-copper-600 sm:block"
+              >
+                Sign in
+              </Link>
+
+              <Link
+                href="/login"
+                className="rounded-full bg-espresso-950 px-4 py-1.5 text-[13px] font-medium text-crema-50 transition-colors hover:bg-copper-600"
+              >
+                Get started
+              </Link>
+            </>
+          )}
         </div>
       </nav>
     </header>
