@@ -161,3 +161,38 @@ where not exists (
 -- Review queue should NOT show:
 --   1. Approved closed entry
 ------------------------------------------------------------
+
+------------------------------------------------------------
+-- Forgotten clock-out / auto-close candidate
+------------------------------------------------------------
+
+insert into public.time_entries (
+  id,
+  driver_id,
+  warehouse_id,
+  clock_in_at,
+  clock_out_at,
+  review_status,
+  reviewed_by,
+  reviewed_at,
+  review_note,
+  status
+)
+select
+  gen_random_uuid(),
+  '9bbd5f7d-d80f-48bd-a259-d9da7f89b0f6',
+  '1df74005-fb1f-48dc-8e72-d27401773795',
+  now() - interval '2 hours',
+  now() - interval '1 hour',
+  'approved',
+  '03523b9b-50bf-499d-8081-d5dfd8bbb66a',
+  now() - interval '90 minutes',
+  'Clock-in verified.',
+  'closed'
+where not exists (
+  select 1
+  from public.time_entries
+  where driver_id = '9bbd5f7d-d80f-48bd-a259-d9da7f89b0f6'
+    and review_status = 'approved'
+    and status = 'closed'
+);

@@ -135,7 +135,10 @@ export function ReviewCard({ entry }: ReviewCardProps) {
         <div>
           <dt className="text-steam-400">Reason</dt>
           <dd className="text-espresso-950">
-            {entry.review_reason || entry.override_reason || "—"}
+            {entry.review_reason ||
+              entry.override_reason ||
+              entry.auto_close_reason ||
+              "—"}
           </dd>
         </div>
 
