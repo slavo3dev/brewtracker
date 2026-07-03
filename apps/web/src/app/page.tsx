@@ -19,13 +19,13 @@ export default function Home() {
           </p>
           <div className="mt-9 flex items-center justify-center gap-4">
             <a
-              href="#"
+              href="/get-started"
               className="rounded-full bg-espresso-950 px-6 py-3 text-[15px] font-medium text-crema-50 transition-colors hover:bg-copper-600"
             >
               Get started
             </a>
             <a
-              href="#"
+              href="/how-it-works"
               className="text-[15px] font-medium text-espresso-800 transition-colors hover:text-copper-600"
             >
               See how it works &rsaquo;

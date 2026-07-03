@@ -1,21 +1,27 @@
+import Link from "next/link";
+
 const FEATURES = [
   {
     title: "Routes",
+    href: "/dashboard/routes",
     description:
       "Plan stops, assign drivers, and track progress in real time as the day unfolds.",
   },
   {
     title: "Service workflow",
+    href: "/dashboard/service",
     description:
       "An eight-step checklist guides every visit, from arrival to the final quality check.",
   },
   {
     title: "AI quality gate",
+    href: "/ai-quality",
     description:
       "Flag inconsistent service photos automatically, before they ever reach a manager.",
   },
   {
     title: "Inventory",
+    href: "/dashboard/inventory",
     description:
       "Track parts and supplies from warehouse to van to machine, without the guesswork.",
   },
@@ -27,17 +33,19 @@ export function FeatureGrid() {
       <div className="mx-auto max-w-6xl">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map((feature) => (
-            <div
+            <Link
               key={feature.title}
-              className="rounded-2xl bg-crema-0 p-6 shadow-[0_2px_8px_rgba(61,43,31,0.07)] ring-1 ring-espresso-950/[0.06] transition-shadow hover:shadow-[0_4px_16px_rgba(61,43,31,0.12)]"
+              href={feature.href}
+              className="group rounded-2xl bg-crema-0 p-6 shadow-[0_2px_8px_rgba(61,43,31,0.07)] ring-1 ring-espresso-950/[0.06] transition-all hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(61,43,31,0.12)]"
             >
-              <h3 className="text-display text-[19px] text-espresso-950">
+              <h3 className="text-display text-[19px] text-espresso-950 transition-colors group-hover:text-copper-600">
                 {feature.title}
               </h3>
+
               <p className="mt-2 text-[14px] leading-relaxed text-steam-400">
                 {feature.description}
               </p>
-            </div>
+            </Link>
           ))}
         </div>
       </div>
