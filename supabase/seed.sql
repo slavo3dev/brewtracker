@@ -198,26 +198,141 @@ where not exists (
 );
 
 ------------------------------------------------------------
--- LOCATION PINGS / FLEET MAP
+-- DEMO DRIVERS FOR FLEET MAP
+------------------------------------------------------------
+
+insert into public.users (
+  id,
+  full_name,
+  email,
+  role,
+  region,
+  is_active,
+  created_at,
+  updated_at
+)
+values
+(
+  '10000000-0000-4000-8000-000000000001',
+  'John Smith',
+  'john.smith@brewtracker.demo',
+  'driver',
+  'Florida',
+  true,
+  now(),
+  now()
+),
+(
+  '10000000-0000-4000-8000-000000000002',
+  'Michael Johnson',
+  'michael.johnson@brewtracker.demo',
+  'driver',
+  'Florida',
+  true,
+  now(),
+  now()
+),
+(
+  '10000000-0000-4000-8000-000000000003',
+  'David Brown',
+  'david.brown@brewtracker.demo',
+  'driver',
+  'Florida',
+  true,
+  now(),
+  now()
+),
+(
+  '10000000-0000-4000-8000-000000000004',
+  'James Wilson',
+  'james.wilson@brewtracker.demo',
+  'driver',
+  'Florida',
+  true,
+  now(),
+  now()
+)
+on conflict (id) do update
+set
+  full_name = excluded.full_name,
+  email = excluded.email,
+  role = excluded.role,
+  region = excluded.region,
+  is_active = excluded.is_active,
+  updated_at = now();
+
+------------------------------------------------------------
+-- LIVE FLEET DEMO (5 DRIVERS)
 ------------------------------------------------------------
 
 insert into public.location_pings (
-  driver_id,
-  route_id,
-  latitude,
-  longitude,
-  accuracy_meters,
-  heading,
-  speed_meters_per_second,
-  recorded_at
+    driver_id,
+    route_id,
+    latitude,
+    longitude,
+    accuracy_meters,
+    heading,
+    speed_meters_per_second,
+    recorded_at
 )
-values (
-  '9bbd5f7d-d80f-48bd-a259-d9da7f89b0f6',
-  '44444444-4444-4444-8444-444444444444',
-  44.8176,
-  20.4569,
-  12,
-  90,
-  8.5,
-  now()
+values
+
+-- Marko
+(
+    '9bbd5f7d-d80f-48bd-a259-d9da7f89b0f6',
+    '44444444-4444-4444-8444-444444444444',
+    26.2379,
+    -80.1248,
+    6,
+    90,
+    11.5,
+    now()
+),
+
+-- Driver 1
+(
+    '1d7b7c29-f226-4217-acd6-05f65ad4eaa7',
+    '44444444-4444-4444-8444-444444444444',
+    26.2441,
+    -80.1323,
+    7,
+    180,
+    8.2,
+    now()
+),
+
+-- Driver 2
+(
+    '02767627-e618-4bf7-adf3-4181bbb68378',
+    '44444444-4444-4444-8444-444444444444',
+    26.2527,
+    -80.1419,
+    5,
+    250,
+    13.4,
+    now()
+),
+
+-- Driver 3
+(
+    'ba7e7059-a62b-4ec4-9b9b-6f3d3246502d',
+    '44444444-4444-4444-8444-444444444444',
+    26.2603,
+    -80.1515,
+    4,
+    45,
+    10.6,
+    now()
+),
+
+-- Admin User (demo only)
+(
+    '03523b9b-50bf-499d-8081-d5dfd8bbb66a',
+    '44444444-4444-4444-8444-444444444444',
+    26.2685,
+    -80.1608,
+    8,
+    320,
+    9.8,
+    now()
 );
