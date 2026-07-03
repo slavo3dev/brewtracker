@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
+import "leaflet/dist/leaflet.css";
 
 export const metadata: Metadata = {
   title: "BrewTracker",
-  description: "Field operations platform for coffee machine service, routes, and inventory.",
+  description:
+    "Field operations platform for coffee machine service, routes, and inventory.",
 };
 
 export default function RootLayout({
