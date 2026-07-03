@@ -3,7 +3,7 @@ import { canManageUsers } from "@brewtracker/types";
 import { requireAdmin } from "@/lib/auth/require-admin";
 
 export default async function DashboardPage() {
-   const profile = await requireAdmin();
+  const profile = await requireAdmin();
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-10">
@@ -52,6 +52,12 @@ export default async function DashboardPage() {
           title="Reports"
           description="View operational reports."
           href="/dashboard/reports"
+        />
+
+        <DashboardCard
+          title="Live Fleet Map"
+          description="See active drivers and vans on a realtime map."
+          href="/dashboard/fleet"
         />
       </section>
     </main>
