@@ -62,6 +62,60 @@ export type Database = {
         }
         Relationships: []
       }
+      location_pings: {
+        Row: {
+          accuracy_meters: number | null
+          created_at: string
+          driver_id: string
+          heading: number | null
+          id: string
+          latitude: number
+          longitude: number
+          recorded_at: string
+          route_id: string | null
+          speed_meters_per_second: number | null
+        }
+        Insert: {
+          accuracy_meters?: number | null
+          created_at?: string
+          driver_id: string
+          heading?: number | null
+          id?: string
+          latitude: number
+          longitude: number
+          recorded_at?: string
+          route_id?: string | null
+          speed_meters_per_second?: number | null
+        }
+        Update: {
+          accuracy_meters?: number | null
+          created_at?: string
+          driver_id?: string
+          heading?: number | null
+          id?: string
+          latitude?: number
+          longitude?: number
+          recorded_at?: string
+          route_id?: string | null
+          speed_meters_per_second?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_pings_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_pings_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       machines: {
         Row: {
           client_id: string

@@ -196,3 +196,28 @@ where not exists (
     and review_status = 'approved'
     and status = 'closed'
 );
+
+------------------------------------------------------------
+-- LOCATION PINGS / FLEET MAP
+------------------------------------------------------------
+
+insert into public.location_pings (
+  driver_id,
+  route_id,
+  latitude,
+  longitude,
+  accuracy_meters,
+  heading,
+  speed_meters_per_second,
+  recorded_at
+)
+values (
+  '9bbd5f7d-d80f-48bd-a259-d9da7f89b0f6',
+  '44444444-4444-4444-8444-444444444444',
+  44.8176,
+  20.4569,
+  12,
+  90,
+  8.5,
+  now()
+);
