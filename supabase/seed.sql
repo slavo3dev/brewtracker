@@ -420,3 +420,40 @@ set
   notes = excluded.notes,
   updated_at = now();
 
+------------------------------------------------------------
+-- AUTH-4 MOBILE CLOCK-IN TEST DATA
+------------------------------------------------------------
+
+-- Ensure the demo driver starts with NO open shift.
+
+delete from public.time_entries
+where driver_id = '0d6aa3f3-63ec-4262-b811-3e28edf6384e'
+  and status in ('open', 'manager_override');
+
+------------------------------------------------------------
+-- Ensure today's route exists
+------------------------------------------------------------
+
+insert into public.routes (
+  id,
+  driver_id,
+  warehouse_id,
+  route_date,
+  status,
+  notes,
+  created_by
+)
+values (
+  '44444444-4444-4444-8444-444444444444',
+  '9bbd5f7d-d80f-48bd-a259-d9da7f89b0f6',
+  '1df74005-fb1f-48dc-8e72-d27401773795',
+  current_date,
+  'scheduled',
+  'AUTH-4 mobile testing route.',
+  '03523b9b-50bf-499d-8081-d5dfd8bbb66a'
+)
+on conflict (id) do update
+set
+  route_date = current_date,
+  status = 'scheduled',
+  updated_at = now();

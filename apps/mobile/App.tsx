@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider, useAuth } from "./src/features/auth/AuthProvider";
 import AccessDeniedScreen from "./src/screens/AccessDeniedScreen";
+import ClockedInScreen from "./src/screens/ClockedInScreen";
 import ClockInScreen from "./src/screens/ClockInScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import LoginScreen from "./src/screens/LoginScreen";
@@ -27,6 +28,7 @@ function ErrorScreen() {
   return (
     <View style={styles.centeredScreen}>
       <Text style={styles.errorTitle}>Unable to load account</Text>
+
       <Text style={styles.errorText}>
         {errorMessage ?? "An unexpected error occurred."}
       </Text>
@@ -54,7 +56,12 @@ function ErrorScreen() {
 
 function AppContent() {
   const { status } = useAuth();
+
   const [screen, setScreen] = useState<Screen>("home");
+  const [currentTimeEntryId, setCurrentTimeEntryId] = useState<string | null>(
+    null,
+  );
+  const [homeRefreshKey, setHomeRefreshKey] = useState(0);
 
   if (status === "initializing") {
     return <LoadingScreen message="Restoring your session…" />;
@@ -77,14 +84,29 @@ function AppContent() {
   }
 
   if (screen === "home") {
-    return <HomeScreen onClockInPress={() => setScreen("clockIn")} />;
+    return (
+      <HomeScreen
+        refreshKey={homeRefreshKey}
+        onClockInPress={() => {
+          setScreen("clockIn");
+        }}
+      />
+    );
   }
 
   if (screen === "clockIn") {
     return (
       <ClockInScreen
-        onBack={() => setScreen("home")}
-        onClockedIn={() => setScreen("selfie")}
+        onBack={() => {
+          setScreen("home");
+        }}
+        onClockedIn={(timeEntryId) => {
+          setCurrentTimeEntryId(timeEntryId);
+
+          // The time_entries row now exists.
+          // AUTH-5 will upload the selfie and attach it to this row.
+          setScreen("selfie");
+        }}
       />
     );
   }
@@ -92,10 +114,21 @@ function AppContent() {
   if (screen === "selfie") {
     return (
       <SelfieCaptureScreen
-        onBack={() => setScreen("clockIn")}
-        onConfirmed={(_photoUri) => {
-          // AUTH-5 will upload the photo and create/update
-          // the time_entries record.
+        onBack={() => {
+          /*
+           * The shift already exists at this point.
+           * Until AUTH-5 adds required selfie handling, continue to the
+           * clocked-in confirmation screen rather than allowing a second
+           * clock-in attempt.
+           */
+          setScreen("clockedIn");
+        }}
+        onConfirmed={(photoUri) => {
+          console.log("Pending AUTH-5 selfie upload", {
+            photoUri,
+            timeEntryId: currentTimeEntryId,
+          });
+
           setScreen("clockedIn");
         }}
       />
@@ -103,12 +136,12 @@ function AppContent() {
   }
 
   return (
-    <View style={styles.centeredScreen}>
-      <Text style={styles.clockedInTitle}>Clocked In</Text>
-      <Text style={styles.clockedInSubtitle}>
-        Time-entry persistence will be completed in AUTH-4.
-      </Text>
-    </View>
+    <ClockedInScreen
+      onContinue={() => {
+        setHomeRefreshKey((currentValue) => currentValue + 1);
+        setScreen("home");
+      }}
+    />
   );
 }
 
@@ -159,15 +192,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginTop: 16,
-  },
-  clockedInTitle: {
-    color: "#4a2c1a",
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-  clockedInSubtitle: {
-    color: "#8a6f53",
-    textAlign: "center",
   },
 });
