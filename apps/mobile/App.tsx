@@ -1,124 +1,173 @@
-import { useEffect, useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, View, Text } from 'react-native';
-import type { Session } from '@supabase/supabase-js';
-import { supabase } from './src/lib/supabase';
-import LoginScreen from './src/screens/LoginScreen';
-import HomeScreen from './src/screens/HomeScreen';
-import ClockInScreen from './src/screens/ClockInScreen';
-import SelfieCaptureScreen from './src/screens/SelfieCaptureScreen';
+import { StatusBar } from "expo-status-bar";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-type Screen = 'home' | 'clockIn' | 'selfie' | 'clockedIn';
+import { AuthProvider, useAuth } from "./src/features/auth/AuthProvider";
+import AccessDeniedScreen from "./src/screens/AccessDeniedScreen";
+import ClockInScreen from "./src/screens/ClockInScreen";
+import HomeScreen from "./src/screens/HomeScreen";
+import LoginScreen from "./src/screens/LoginScreen";
+import SelfieCaptureScreen from "./src/screens/SelfieCaptureScreen";
+
+type Screen = "home" | "clockIn" | "selfie" | "clockedIn";
+
+function LoadingScreen({ message }: { message: string }) {
+  return (
+    <View style={styles.centeredScreen}>
+      <ActivityIndicator color="#7a3f2c" size="large" />
+      <Text style={styles.loadingText}>{message}</Text>
+    </View>
+  );
+}
+
+function ErrorScreen() {
+  const { errorMessage, retryProfile, signOut } = useAuth();
+
+  return (
+    <View style={styles.centeredScreen}>
+      <Text style={styles.errorTitle}>Unable to load account</Text>
+      <Text style={styles.errorText}>
+        {errorMessage ?? "An unexpected error occurred."}
+      </Text>
+
+      <Text
+        style={styles.action}
+        onPress={() => {
+          void retryProfile();
+        }}
+      >
+        Try again
+      </Text>
+
+      <Text
+        style={styles.secondaryAction}
+        onPress={() => {
+          void signOut();
+        }}
+      >
+        Log out
+      </Text>
+    </View>
+  );
+}
+
+function AppContent() {
+  const { status } = useAuth();
+  const [screen, setScreen] = useState<Screen>("home");
+
+  if (status === "initializing") {
+    return <LoadingScreen message="Restoring your session…" />;
+  }
+
+  if (status === "loading_profile") {
+    return <LoadingScreen message="Loading your employee profile…" />;
+  }
+
+  if (status === "signed_out") {
+    return <LoginScreen />;
+  }
+
+  if (status === "access_denied") {
+    return <AccessDeniedScreen />;
+  }
+
+  if (status === "error") {
+    return <ErrorScreen />;
+  }
+
+  if (screen === "home") {
+    return <HomeScreen onClockInPress={() => setScreen("clockIn")} />;
+  }
+
+  if (screen === "clockIn") {
+    return (
+      <ClockInScreen
+        onBack={() => setScreen("home")}
+        onClockedIn={() => setScreen("selfie")}
+      />
+    );
+  }
+
+  if (screen === "selfie") {
+    return (
+      <SelfieCaptureScreen
+        onBack={() => setScreen("clockIn")}
+        onConfirmed={(_photoUri) => {
+          // AUTH-5 will upload the photo and create/update
+          // the time_entries record.
+          setScreen("clockedIn");
+        }}
+      />
+    );
+  }
+
+  return (
+    <View style={styles.centeredScreen}>
+      <Text style={styles.clockedInTitle}>Clocked In</Text>
+      <Text style={styles.clockedInSubtitle}>
+        Time-entry persistence will be completed in AUTH-4.
+      </Text>
+    </View>
+  );
+}
 
 export default function App() {
-	const [session, setSession] = useState<Session | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [screen, setScreen] = useState<Screen>('home');
-	const [initError, setInitError] = useState<string | null>(null);
-
-	useEffect(() => {
-		supabase.auth
-			.getSession()
-			.then(({ data, error }) => {
-				if (error) setInitError(error.message);
-				setSession(data.session);
-				setLoading(false);
-			})
-			.catch((err) => {
-				setInitError(
-					err?.message ?? 'Unknown error initializing Supabase',
-				);
-				setLoading(false);
-			});
-
-		const { data: listener } = supabase.auth.onAuthStateChange(
-			(_event, session) => {
-				setSession(session);
-			},
-		);
-
-		return () => listener.subscription.unsubscribe();
-	}, []);
-
-	if (loading) {
-		return (
-			<View
-				style={{
-					flex: 1,
-					justifyContent: 'center',
-					alignItems: 'center',
-				}}>
-				<ActivityIndicator size='large' color='#7a3f2c' />
-			</View>
-		);
-	}
-
-	if (initError) {
-		return (
-			<View
-				style={{
-					flex: 1,
-					justifyContent: 'center',
-					alignItems: 'center',
-					padding: 24,
-				}}>
-				<Text
-					style={{
-						color: '#b3413e',
-						fontSize: 16,
-						textAlign: 'center',
-					}}>
-					Supabase init error:{'\n'}
-					{initError}
-				</Text>
-			</View>
-		);
-	}
-
-	return (
-		<>
-			<StatusBar style='dark' />
-			{!session ? (
-				<LoginScreen onLoggedIn={() => setScreen('home')} />
-			) : screen === 'home' ? (
-				<HomeScreen onClockInPress={() => setScreen('clockIn')} />
-			) : screen === 'clockIn' ? (
-				<ClockInScreen
-					onBack={() => setScreen('home')}
-					onClockedIn={() => setScreen('selfie')}
-				/>
-			) : screen === 'selfie' ? (
-				<SelfieCaptureScreen
-					onBack={() => setScreen('clockIn')}
-					onConfirmed={(_photoUri) => {
-						// TODO (AUTH-5 data layer): upload _photoUri to Supabase
-						// Storage and write the time_entries row. Deferred per
-						// today's scope — UI/flow only for now.
-						setScreen('clockedIn');
-					}}
-				/>
-			) : (
-				<View
-					style={{
-						flex: 1,
-						justifyContent: 'center',
-						alignItems: 'center',
-						backgroundColor: '#f5ede1',
-					}}>
-					<Text
-						style={{
-							fontSize: 22,
-							fontWeight: '700',
-							color: '#4a2c1a',
-							marginBottom: 8,
-						}}>
-						Clocked In
-					</Text>
-					<Text style={{ color: '#8a6f53' }}>
-						(time_entries write — coming next)
-					</Text>
-				</View>
-			)}
-		</>
-	);
+  return (
+    <SafeAreaProvider>
+      <AuthProvider>
+        <StatusBar style="dark" />
+        <AppContent />
+      </AuthProvider>
+    </SafeAreaProvider>
+  );
 }
+
+const styles = StyleSheet.create({
+  centeredScreen: {
+    alignItems: "center",
+    backgroundColor: "#f5ede1",
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  loadingText: {
+    color: "#8a6f53",
+    fontSize: 14,
+    marginTop: 14,
+  },
+  errorTitle: {
+    color: "#4a2c1a",
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 10,
+  },
+  errorText: {
+    color: "#9f302d",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
+  },
+  action: {
+    color: "#7a3f2c",
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 24,
+  },
+  secondaryAction: {
+    color: "#8a6f53",
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 16,
+  },
+  clockedInTitle: {
+    color: "#4a2c1a",
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  clockedInSubtitle: {
+    color: "#8a6f53",
+    textAlign: "center",
+  },
+});
