@@ -510,15 +510,43 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      client_is_in_current_user_region: {
+        Args: { target_client_id: string }
+        Returns: boolean
+      }
+      current_user_has_client_stop: {
+        Args: { target_client_id: string }
+        Returns: boolean
+      }
+      current_user_has_machine_stop: {
+        Args: { target_machine_id: string }
+        Returns: boolean
+      }
+      current_user_has_route: {
+        Args: { target_route_id: string }
+        Returns: boolean
+      }
+      current_user_has_route_for_warehouse: {
+        Args: { target_warehouse_id: string }
+        Returns: boolean
+      }
       current_user_region: { Args: never; Returns: string }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      driver_has_route_at_warehouse: {
+        Args: { target_warehouse_id: string }
+        Returns: boolean
+      }
       is_ceo: { Args: never; Returns: boolean }
       is_driver: { Args: never; Returns: boolean }
       is_field_staff: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
+      warehouse_is_in_current_user_region: {
+        Args: { target_warehouse_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "driver" | "tech" | "manager" | "ceo"
