@@ -1,6 +1,33 @@
 import type { Database } from "@brewtracker/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+const TIME_ENTRY_SELFIES_BUCKET = "time-entry-selfies";
+
+async function createSelfieSignedUrl(
+  storagePath: string | null,
+): Promise<string | null> {
+  if (!storagePath) {
+    return null;
+  }
+
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase.storage
+    .from(TIME_ENTRY_SELFIES_BUCKET)
+    .createSignedUrl(storagePath, 60 * 10);
+
+  if (error) {
+    console.error("Unable to create clock-in selfie signed URL:", {
+      storagePath,
+      error: error.message,
+    });
+
+    return null;
+  }
+
+  return data.signedUrl;
+}
+
 export type TimeEntryReviewStatus =
   Database["public"]["Enums"]["time_entry_review_status"];
 
@@ -20,6 +47,7 @@ export type ReviewQueueItem =
       | "longitude"
       | "geofence_radius_meters"
     > | null;
+    clock_in_selfie_signed_url: string | null;
   };
 
 export type TimeEntryListItem =
@@ -74,7 +102,16 @@ export async function getTimeEntryReviewQueue(): Promise<ReviewQueueItem[]> {
     throw new Error(error.message);
   }
 
-  return data as ReviewQueueItem[];
+  const entries = data as Omit<ReviewQueueItem, "clock_in_selfie_signed_url">[];
+
+  return Promise.all(
+    entries.map(async (entry) => ({
+      ...entry,
+      clock_in_selfie_signed_url: await createSelfieSignedUrl(
+        entry.clock_in_selfie_url,
+      ),
+    })),
+  );
 }
 
 export async function reviewTimeEntry(input: {
