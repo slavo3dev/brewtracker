@@ -112,23 +112,32 @@ function AppContent() {
   }
 
   if (screen === "selfie") {
+    if (!currentTimeEntryId) {
+      return (
+        <View style={styles.centeredScreen}>
+          <Text style={styles.errorTitle}>Clock-in record unavailable</Text>
+
+          <Text style={styles.errorText}>
+            The active time entry could not be identified. Return home and try
+            again.
+          </Text>
+
+          <Text
+            style={styles.action}
+            onPress={() => {
+              setScreen("home");
+            }}
+          >
+            Return Home
+          </Text>
+        </View>
+      );
+    }
+
     return (
       <SelfieCaptureScreen
-        onBack={() => {
-          /*
-           * The shift already exists at this point.
-           * Until AUTH-5 adds required selfie handling, continue to the
-           * clocked-in confirmation screen rather than allowing a second
-           * clock-in attempt.
-           */
-          setScreen("clockedIn");
-        }}
-        onConfirmed={(photoUri) => {
-          console.log("Pending AUTH-5 selfie upload", {
-            photoUri,
-            timeEntryId: currentTimeEntryId,
-          });
-
+        timeEntryId={currentTimeEntryId}
+        onCompleted={() => {
           setScreen("clockedIn");
         }}
       />
@@ -139,6 +148,7 @@ function AppContent() {
     <ClockedInScreen
       onContinue={() => {
         setHomeRefreshKey((currentValue) => currentValue + 1);
+        setCurrentTimeEntryId(null);
         setScreen("home");
       }}
     />
