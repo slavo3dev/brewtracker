@@ -566,7 +566,7 @@ set
 -- Ensure the demo driver starts with NO open shift.
 
 delete from public.time_entries
-where driver_id = '0d6aa3f3-63ec-4262-b811-3e28edf6384e'
+where driver_id = '9bbd5f7d-d80f-48bd-a259-d9da7f89b0f6'
   and status in ('open', 'manager_override');
 
 ------------------------------------------------------------
