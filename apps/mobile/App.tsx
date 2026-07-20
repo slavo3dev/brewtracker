@@ -10,8 +10,10 @@ import ClockInScreen from "./src/screens/ClockInScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import SelfieCaptureScreen from "./src/screens/SelfieCaptureScreen";
+import type { TodayRouteStop } from "./src/features/routes/route.types";
+import StopDetailsScreen from "./src/screens/StopDetailsScreen";
 
-type Screen = "home" | "clockIn" | "selfie" | "clockedIn";
+type Screen = "home" | "clockIn" | "selfie" | "clockedIn" | "stopDetails";
 
 function LoadingScreen({ message }: { message: string }) {
   return (
@@ -62,6 +64,7 @@ function AppContent() {
     null,
   );
   const [homeRefreshKey, setHomeRefreshKey] = useState(0);
+  const [selectedStop, setSelectedStop] = useState<TodayRouteStop | null>(null);
 
   if (status === "initializing") {
     return <LoadingScreen message="Restoring your session…" />;
@@ -91,7 +94,41 @@ function AppContent() {
           setScreen("clockIn");
         }}
         onStopPress={(stop) => {
-          console.log("Selected route stop:", stop);
+          setSelectedStop(stop);
+          setScreen("stopDetails");
+        }}
+      />
+    );
+  }
+
+  if (screen === "stopDetails") {
+    if (!selectedStop) {
+      return (
+        <View style={styles.centeredScreen}>
+          <Text style={styles.errorTitle}>Stop unavailable</Text>
+
+          <Text style={styles.errorText}>
+            The selected route stop could not be loaded.
+          </Text>
+
+          <Text
+            style={styles.action}
+            onPress={() => {
+              setScreen("home");
+            }}
+          >
+            Return Home
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <StopDetailsScreen
+        stop={selectedStop}
+        onBack={() => {
+          setSelectedStop(null);
+          setScreen("home");
         }}
       />
     );
