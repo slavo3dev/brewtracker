@@ -90,6 +90,9 @@ function AppContent() {
         onClockInPress={() => {
           setScreen("clockIn");
         }}
+        onStopPress={(stop) => {
+          console.log("Selected route stop:", stop);
+        }}
       />
     );
   }
