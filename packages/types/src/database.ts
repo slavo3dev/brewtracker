@@ -320,6 +320,7 @@ export type Database = {
           reviewed_at: string | null
           reviewed_by: string | null
           route_id: string | null
+          selfie_status: Database["public"]["Enums"]["selfie_verification_status"]
           shift_end_at: string | null
           status: Database["public"]["Enums"]["time_entry_status"]
           stop_id: string | null
@@ -348,6 +349,7 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           route_id?: string | null
+          selfie_status?: Database["public"]["Enums"]["selfie_verification_status"]
           shift_end_at?: string | null
           status?: Database["public"]["Enums"]["time_entry_status"]
           stop_id?: string | null
@@ -376,6 +378,7 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           route_id?: string | null
+          selfie_status?: Database["public"]["Enums"]["selfie_verification_status"]
           shift_end_at?: string | null
           status?: Database["public"]["Enums"]["time_entry_status"]
           stop_id?: string | null
@@ -557,6 +560,7 @@ export type Database = {
         | "in_progress"
         | "completed"
         | "cancelled"
+      selfie_verification_status: "required" | "uploaded" | "missing" | "waived"
       stop_status: "pending" | "in_progress" | "completed" | "skipped"
       time_entry_review_status: "pending" | "approved" | "flagged" | "rejected"
       time_entry_status: "open" | "closed" | "flagged" | "manager_override"
@@ -696,6 +700,7 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
+      selfie_verification_status: ["required", "uploaded", "missing", "waived"],
       stop_status: ["pending", "in_progress", "completed", "skipped"],
       time_entry_review_status: ["pending", "approved", "flagged", "rejected"],
       time_entry_status: ["open", "closed", "flagged", "manager_override"],

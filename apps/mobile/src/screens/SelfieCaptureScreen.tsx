@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -10,7 +11,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { uploadClockInSelfie } from "../features/time-clock/selfie.service";
+import { uploadClockInSelfie, type SelfieUploadPhase, } from "../features/time-clock/selfie.service";
+import { prepareSelfie } from "../features/time-clock/selfie-image.service";
 
 type Props = {
   timeEntryId: string;
@@ -18,6 +20,76 @@ type Props = {
 };
 
 type ScreenState = "camera" | "preview" | "uploading";
+
+function getUploadPhaseLabel(
+  phase: SelfieUploadPhase | null,
+): string {
+  switch (phase) {
+    case "preparing":
+      return "Preparing selfie…";
+
+    case "uploading":
+      return "Uploading selfie…";
+
+    case "attaching":
+      return "Finalizing clock-in…";
+
+    default:
+      return "Processing selfie…";
+  }
+}
+
+function getSelfieErrorMessage(error: unknown): string {
+  const originalMessage =
+    error instanceof Error ? error.message : "";
+
+  const normalizedMessage = originalMessage.toLowerCase();
+
+  if (
+    normalizedMessage.includes("network") ||
+    normalizedMessage.includes("fetch") ||
+    normalizedMessage.includes("failed to connect")
+  ) {
+    return "The selfie could not be uploaded because of a network problem. Check your connection and try again.";
+  }
+
+  if (
+    normalizedMessage.includes("too large") ||
+    normalizedMessage.includes("file size") ||
+    normalizedMessage.includes("maximum allowed size")
+  ) {
+    return "The selfie is too large to upload. Retake the photo and try again.";
+  }
+
+  if (
+    normalizedMessage.includes("permission") ||
+    normalizedMessage.includes("not authorized") ||
+    normalizedMessage.includes("row-level security") ||
+    normalizedMessage.includes("rls")
+  ) {
+    return "You do not have permission to upload this selfie. Log in again or contact your manager.";
+  }
+
+  if (
+    normalizedMessage.includes("clock-in record could not be found") ||
+    normalizedMessage.includes("no longer active")
+  ) {
+    return "Your active clock-in record could not be found. Return home and check your shift.";
+  }
+
+  if (
+    normalizedMessage.includes("captured selfie file could not be found") ||
+    normalizedMessage.includes("captured selfie file is empty")
+  ) {
+    return "The captured photo could not be processed. Retake the selfie and try again.";
+  }
+
+  if (originalMessage) {
+    return originalMessage;
+  }
+
+  return "Unable to upload selfie. Please try again.";
+}
 
 export default function SelfieCaptureScreen({
   timeEntryId,
@@ -29,6 +101,8 @@ export default function SelfieCaptureScreen({
   const [screenState, setScreenState] = useState<ScreenState>("camera");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [uploadPhase, setUploadPhase] =
+  useState<SelfieUploadPhase | null>(null);
 
   const cameraType: CameraType = "front";
   const isUploading = screenState === "uploading";
@@ -42,7 +116,7 @@ export default function SelfieCaptureScreen({
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.7,
+        quality: 0.8,
         skipProcessing: false,
       });
 
@@ -50,12 +124,12 @@ export default function SelfieCaptureScreen({
         throw new Error("The camera did not return a photo.");
       }
 
-      setPhotoUri(photo.uri);
+      const preparedSelfie = await prepareSelfie(photo.uri);
+      setPhotoUri(preparedSelfie.uri);
       setScreenState("preview");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Unable to capture selfie.",
-      );
+      console.error("Selfie capture failed:", error);
+      setErrorMessage(getSelfieErrorMessage(error));
     }
   }
 
@@ -75,26 +149,23 @@ export default function SelfieCaptureScreen({
     }
 
     setScreenState("uploading");
+    setUploadPhase("preparing");
     setErrorMessage(null);
 
     try {
       await uploadClockInSelfie({
         timeEntryId,
         photoUri,
+        onPhaseChange: setUploadPhase,
       });
 
       onCompleted();
     } catch (error) {
       setScreenState("preview");
-
-      setErrorMessage(
-        error instanceof Error ? error.message : "Unable to upload selfie.",
-      );
+      setErrorMessage(getSelfieErrorMessage(error));
+    } finally {
+      setUploadPhase(null);
     }
-  }
-
-  function handleRequestPermission(): void {
-    void requestPermission();
   }
 
   if (!permission) {
@@ -107,19 +178,34 @@ export default function SelfieCaptureScreen({
   }
 
   if (!permission.granted) {
+    const canAskAgain = permission.canAskAgain;
+
     return (
       <SafeAreaView style={styles.centeredContainer}>
-        <Text style={styles.permissionTitle}>Camera access required</Text>
+        <Text style={styles.permissionTitle}>
+          Camera access required
+        </Text>
 
         <Text style={styles.permissionMessage}>
-          CupCount needs camera access to capture your clock-in selfie.
+          {canAskAgain
+            ? "BrewTracker needs camera access to capture your clock-in selfie."
+            : "Camera permission is disabled. Open device settings and allow camera access to continue."}
         </Text>
 
         <Pressable
           style={styles.primaryButton}
-          onPress={handleRequestPermission}
+          onPress={() => {
+            if (canAskAgain) {
+              void requestPermission();
+              return;
+            }
+
+            void Linking.openSettings();
+          }}
         >
-          <Text style={styles.primaryButtonText}>Allow Camera Access</Text>
+          <Text style={styles.primaryButtonText}>
+            {canAskAgain ? "Allow Camera Access" : "Open Settings"}
+          </Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -147,7 +233,9 @@ export default function SelfieCaptureScreen({
             <View style={styles.uploadOverlay}>
               <ActivityIndicator color="#ffffff" size="large" />
 
-              <Text style={styles.uploadText}>Uploading selfie…</Text>
+              <Text style={styles.uploadText}>
+                {getUploadPhaseLabel(uploadPhase)}
+              </Text>
             </View>
           ) : null}
         </View>

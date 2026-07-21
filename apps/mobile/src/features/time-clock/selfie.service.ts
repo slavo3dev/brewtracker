@@ -5,9 +5,15 @@ import { supabase } from "../../lib/supabase";
 
 const SELFIE_BUCKET = "time-entry-selfies";
 
+export type SelfieUploadPhase =
+  | "preparing"
+  | "uploading"
+  | "attaching";
+
 export type UploadClockInSelfieInput = {
   timeEntryId: string;
   photoUri: string;
+  onPhaseChange?: (phase: SelfieUploadPhase) => void;
 };
 
 export type UploadClockInSelfieResult = {
@@ -37,7 +43,7 @@ async function verifyTimeEntryOwnership(
 ): Promise<void> {
   const { data, error } = await supabase
     .from("time_entries")
-    .select("id, driver_id, status")
+    .select("id, driver_id, status, selfie_status")
     .eq("id", timeEntryId)
     .eq("driver_id", userId)
     .maybeSingle();
@@ -53,6 +59,18 @@ async function verifyTimeEntryOwnership(
   if (data.status !== "open" && data.status !== "manager_override") {
     throw new Error(
       "A selfie can only be attached to an active clock-in record.",
+    );
+  }
+
+  if (data.selfie_status === "uploaded") {
+    throw new Error(
+      "A clock-in selfie has already been uploaded for this shift.",
+    );
+  }
+
+  if (data.selfie_status === "waived") {
+    throw new Error(
+      "The selfie requirement has already been waived by a manager.",
     );
   }
 }
@@ -79,6 +97,72 @@ function createStoragePath(userId: string, timeEntryId: string): string {
   return `${userId}/${timeEntryId}/clock-in-${Date.now()}.jpg`;
 }
 
+async function uploadSelfieObject(
+  storagePath: string,
+  imageArrayBuffer: ArrayBuffer,
+): Promise<void> {
+  const { error } = await supabase.storage
+    .from(SELFIE_BUCKET)
+    .upload(storagePath, imageArrayBuffer, {
+      contentType: "image/jpeg",
+      cacheControl: "3600",
+      upsert: false,
+    });
+
+  if (error) {
+    throw new Error(`Unable to upload selfie: ${error.message}`);
+  }
+}
+
+/**
+ * Updates the active time entry after a successful upload.
+ *
+ * TODO(Admin Review):
+ * Managers will eventually be able to waive the selfie requirement
+ * from the Time Entry Review screen by setting:
+ *
+ *   selfie_status = "waived"
+ *
+ * together with:
+ * - reviewed_by
+ * - reviewed_at
+ * - review_note (required)
+ *
+ * Drivers must never be able to set this state.
+ */
+
+async function attachSelfiePathToTimeEntry(
+  timeEntryId: string,
+  userId: string,
+  storagePath: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("time_entries")
+    .update({
+      // This stores a private Supabase Storage object path.
+      clock_in_selfie_url: storagePath,
+      selfie_status: "uploaded",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", timeEntryId)
+    .eq("driver_id", userId)
+    .in("status", ["open", "manager_override"])
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `The selfie was uploaded, but the clock-in record could not be updated: ${error.message}`,
+    );
+  }
+
+  if (!data) {
+    throw new Error(
+      "The selfie was uploaded, but the clock-in record is no longer active.",
+    );
+  }
+}
+
 async function removeUploadedFile(storagePath: string): Promise<void> {
   const { error } = await supabase.storage
     .from(SELFIE_BUCKET)
@@ -95,47 +179,33 @@ async function removeUploadedFile(storagePath: string): Promise<void> {
 export async function uploadClockInSelfie({
   timeEntryId,
   photoUri,
+  onPhaseChange,
 }: UploadClockInSelfieInput): Promise<UploadClockInSelfieResult> {
   const userId = await requireAuthenticatedUserId();
 
   await verifyTimeEntryOwnership(timeEntryId, userId);
 
+  onPhaseChange?.("preparing");
+
   const base64Photo = await readPhotoAsBase64(photoUri);
   const imageArrayBuffer = decode(base64Photo);
   const storagePath = createStoragePath(userId, timeEntryId);
 
-  const { error: uploadError } = await supabase.storage
-    .from(SELFIE_BUCKET)
-    .upload(storagePath, imageArrayBuffer, {
-      contentType: "image/jpeg",
-      cacheControl: "3600",
-      upsert: false,
-    });
+  onPhaseChange?.("uploading");
 
-  if (uploadError) {
-    throw new Error(`Unable to upload selfie: ${uploadError.message}`);
-  }
+  await uploadSelfieObject(storagePath, imageArrayBuffer);
 
-  const { data: updatedEntry, error: updateError } = await supabase
-    .from("time_entries")
-    .update({
-      clock_in_selfie_url: storagePath,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", timeEntryId)
-    .eq("driver_id", userId)
-    .in("status", ["open", "manager_override"])
-    .select("id")
-    .maybeSingle();
+  try {
+    onPhaseChange?.("attaching");
 
-  if (updateError || !updatedEntry) {
-    await removeUploadedFile(storagePath);
-
-    throw new Error(
-      updateError
-        ? `Selfie uploaded, but the clock-in record could not be updated: ${updateError.message}`
-        : "Selfie uploaded, but the clock-in record is no longer active.",
+    await attachSelfiePathToTimeEntry(
+      timeEntryId,
+      userId,
+      storagePath,
     );
+  } catch (error) {
+    await removeUploadedFile(storagePath);
+    throw error;
   }
 
   return {
