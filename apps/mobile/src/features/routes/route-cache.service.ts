@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import type { TodayRouteSnapshot } from "./route.types";
 
-const ROUTE_CACHE_PREFIX = "@cupcount/today-route";
+const ROUTE_CACHE_PREFIX = "@brewtracker/today-route";
 
 function createCacheKey(userId: string, routeDate: string): string {
   return `${ROUTE_CACHE_PREFIX}:${userId}:${routeDate}`;
@@ -30,10 +30,7 @@ export async function readTodayRouteSnapshot(
   try {
     const parsedValue = JSON.parse(storedValue) as TodayRouteSnapshot;
 
-    if (
-      parsedValue.userId !== userId ||
-      parsedValue.routeDate !== routeDate
-    ) {
+    if (parsedValue.userId !== userId || parsedValue.routeDate !== routeDate) {
       await AsyncStorage.removeItem(key);
       return null;
     }

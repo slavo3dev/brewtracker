@@ -204,9 +204,9 @@ export async function getClockContext(): Promise<ClockContext> {
   };
 }
 
-export async function getOpenTimeEntry(): Promise<TimeEntry | null> {
-  const userId = await requireAuthenticatedUserId();
-
+async function loadOpenTimeEntryForUser(
+  userId: string,
+): Promise<TimeEntry | null> {
   const { data, error } = await supabase
     .from("time_entries")
     .select("*")
@@ -217,10 +217,18 @@ export async function getOpenTimeEntry(): Promise<TimeEntry | null> {
     .maybeSingle();
 
   if (error) {
-    throw new Error(`Unable to load your current shift: ${error.message}`);
+    throw new Error(
+      `Unable to load your current shift: ${error.message}`,
+    );
   }
 
   return data;
+}
+
+export async function getOpenTimeEntry(): Promise<TimeEntry | null> {
+  const userId = await requireAuthenticatedUserId();
+
+  return loadOpenTimeEntryForUser(userId);
 }
 
 export async function createClockIn({
@@ -232,7 +240,7 @@ export async function createClockIn({
 }): Promise<ClockInResult> {
   const userId = await requireAuthenticatedUserId();
 
-  const existingEntry = await getOpenTimeEntry();
+  const existingEntry = await loadOpenTimeEntryForUser(userId);
 
   if (existingEntry) {
     throw new Error("You already have an open shift.");
@@ -244,12 +252,16 @@ export async function createClockIn({
       driver_id: userId,
       warehouse_id: target.warehouseId,
       route_id: target.routeId,
-      stop_id: target.kind === "scheduled_stop" ? target.stopId : null,
+      stop_id:
+        target.kind === "scheduled_stop"
+          ? target.stopId
+          : null,
       clock_in_at: new Date().toISOString(),
       clock_in_latitude: position.latitude,
       clock_in_longitude: position.longitude,
       status: "open",
       review_status: "pending",
+      selfie_status: "required",
       is_geofence_override: false,
     })
     .select("*")
@@ -285,8 +297,48 @@ export async function requestCurrentPosition(): Promise<GeoPoint> {
   };
 }
 
-export async function clockOut(timeEntryId: string): Promise<ClockOutResult> {
+async function assertTimeEntryReadyForClockOut(
+  timeEntryId: string,
+  userId: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("time_entries")
+    .select("id, selfie_status, status")
+    .eq("id", timeEntryId)
+    .eq("driver_id", userId)
+    .in("status", ["open", "manager_override"])
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Unable to verify the active shift: ${error.message}`,
+    );
+  }
+
+  if (!data) {
+    throw new Error("The active shift could not be found.");
+  }
+
+  if (
+    data.selfie_status !== "uploaded" &&
+    data.selfie_status !== "waived"
+  ) {
+    throw new Error(
+      "Complete the required clock-in selfie before clocking out.",
+    );
+  }
+}
+
+export async function clockOut(
+  timeEntryId: string,
+): Promise<ClockOutResult> {
   const userId = await requireAuthenticatedUserId();
+
+  await assertTimeEntryReadyForClockOut(
+    timeEntryId,
+    userId,
+  );
+
   const position = await requestCurrentPosition();
 
   const { data, error } = await supabase
@@ -300,12 +352,18 @@ export async function clockOut(timeEntryId: string): Promise<ClockOutResult> {
     })
     .eq("id", timeEntryId)
     .eq("driver_id", userId)
-    .eq("status", "open")
+    .in("status", ["open", "manager_override"])
     .select("*")
-    .single();
+    .maybeSingle();
 
   if (error) {
     throw new Error(`Unable to clock out: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error(
+      "The shift is no longer active. Refresh the app and try again.",
+    );
   }
 
   return {

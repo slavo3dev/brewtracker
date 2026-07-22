@@ -51,7 +51,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.content}>
-        <Text style={styles.logo}>☕ CupCount</Text>
+        <Text style={styles.logo}>☕ BrewTracker</Text>
         <Text style={styles.subtitle}>Driver & Tech Login</Text>
 
         <View style={styles.form}>

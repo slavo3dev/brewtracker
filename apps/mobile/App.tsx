@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider, useAuth } from "./src/features/auth/AuthProvider";
@@ -66,6 +66,15 @@ function AppContent() {
   const [homeRefreshKey, setHomeRefreshKey] = useState(0);
   const [selectedStop, setSelectedStop] = useState<TodayRouteStop | null>(null);
 
+  useEffect(() => {
+    if (status === "signed_out") {
+      setScreen("home");
+      setCurrentTimeEntryId(null);
+      setSelectedStop(null);
+      setHomeRefreshKey(0);
+    }
+  }, [status]);
+  
   if (status === "initializing") {
     return <LoadingScreen message="Restoring your session…" />;
   }
@@ -93,6 +102,10 @@ function AppContent() {
         onClockInPress={() => {
           setScreen("clockIn");
         }}
+        onResumeSelfie={(timeEntryId) => {
+          setCurrentTimeEntryId(timeEntryId);
+          setScreen("selfie");
+        }}
         onStopPress={(stop) => {
           setSelectedStop(stop);
           setScreen("stopDetails");
@@ -114,6 +127,7 @@ function AppContent() {
           <Text
             style={styles.action}
             onPress={() => {
+              setSelectedStop(null);
               setScreen("home");
             }}
           >
@@ -143,8 +157,8 @@ function AppContent() {
         onClockedIn={(timeEntryId) => {
           setCurrentTimeEntryId(timeEntryId);
 
-          // The time_entries row now exists.
-          // AUTH-5 will upload the selfie and attach it to this row.
+          // The time entry now exists with selfie_status = "required".
+          //Continue to selfie capture using the same record.
           setScreen("selfie");
         }}
       />
@@ -165,6 +179,7 @@ function AppContent() {
           <Text
             style={styles.action}
             onPress={() => {
+              setCurrentTimeEntryId(null);
               setScreen("home");
             }}
           >

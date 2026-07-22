@@ -21,6 +21,7 @@ import type { TimeEntry } from "../features/time-clock/time-clock.types";
 
 type Props = {
   onClockInPress: () => void;
+  onResumeSelfie: (timeEntryId: string) => void;
   refreshKey: number;
   onStopPress?: (stop: TodayRouteStop) => void;
 };
@@ -34,6 +35,7 @@ function formatClockTime(value: string): string {
 
 export default function HomeScreen({
   onClockInPress,
+  onResumeSelfie,
   refreshKey,
   onStopPress,
 }: Props) {
@@ -42,9 +44,7 @@ export default function HomeScreen({
   const [openEntry, setOpenEntry] = useState<TimeEntry | null>(null);
   const [loadingEntry, setLoadingEntry] = useState(true);
   const [clockingOut, setClockingOut] = useState(false);
-  const [timeClockError, setTimeClockError] = useState<string | null>(
-    null,
-  );
+  const [timeClockError, setTimeClockError] = useState<string | null>(null);
 
   const {
     route,
@@ -79,6 +79,16 @@ export default function HomeScreen({
     void loadOpenEntry();
   }, [loadOpenEntry, refreshKey]);
 
+  const requiresSelfie =
+    openEntry?.selfie_status === "required" ||
+    openEntry?.selfie_status === "missing";
+
+  const canAccessRouteStops =
+    openEntry !== null &&
+    !requiresSelfie &&
+    (openEntry.selfie_status === "uploaded" ||
+      openEntry.selfie_status === "waived");
+
   async function handleClockOut(): Promise<void> {
     if (!openEntry || clockingOut) {
       return;
@@ -89,12 +99,11 @@ export default function HomeScreen({
 
     try {
       await clockOut(openEntry.id);
-      setOpenEntry(null);
+      await loadOpenEntry();
+      await refreshRoute();
     } catch (error) {
       setTimeClockError(
-        error instanceof Error
-          ? error.message
-          : "Unable to clock out.",
+        error instanceof Error ? error.message : "Unable to clock out.",
       );
     } finally {
       setClockingOut(false);
@@ -106,9 +115,7 @@ export default function HomeScreen({
       await signOut();
     } catch (error) {
       setTimeClockError(
-        error instanceof Error
-          ? error.message
-          : "Unable to log out.",
+        error instanceof Error ? error.message : "Unable to log out.",
       );
     }
   }
@@ -125,9 +132,7 @@ export default function HomeScreen({
               Good morning{profile ? `, ${profile.role}` : ""} ☕
             </Text>
 
-            <Text style={styles.subtitle}>
-              Your field operations for today
-            </Text>
+            <Text style={styles.subtitle}>Your field operations for today</Text>
           </View>
 
           <Pressable
@@ -149,40 +154,67 @@ export default function HomeScreen({
           <View style={styles.loadingCard}>
             <ActivityIndicator color="#7a3f2c" />
 
-            <Text style={styles.loadingText}>
-              Checking your shift…
-            </Text>
+            <Text style={styles.loadingText}>Checking your shift…</Text>
           </View>
         ) : openEntry ? (
-          <View style={styles.activeShiftCard}>
-            <Text style={styles.activeShiftLabel}>
-              Active shift
-            </Text>
+          requiresSelfie ? (
+            <View style={styles.selfieRequiredCard}>
+              <Text style={styles.selfieRequiredLabel}>Selfie required</Text>
 
-            <Text style={styles.activeShiftTime}>
-              Clocked in at {formatClockTime(openEntry.clock_in_at)}
-            </Text>
+              <Text style={styles.selfieRequiredTitle}>
+                Finish your clock-in
+              </Text>
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.clockOutButton,
-                pressed && styles.buttonPressed,
-                clockingOut && styles.buttonDisabled,
-              ]}
-              disabled={clockingOut}
-              onPress={() => {
-                void handleClockOut();
-              }}
-            >
-              {clockingOut ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.clockOutButtonText}>
-                  Clock Out
+              <Text style={styles.selfieRequiredText}>
+                Your clock-in was recorded, but the required selfie has not been
+                completed. Capture it before continuing your shift.
+              </Text>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.resumeSelfieButton,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={() => {
+                  onResumeSelfie(openEntry.id);
+                }}
+              >
+                <Text style={styles.resumeSelfieButtonText}>Resume Selfie</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.activeShiftCard}>
+              <Text style={styles.activeShiftLabel}>Active shift</Text>
+
+              <Text style={styles.activeShiftTime}>
+                Clocked in at {formatClockTime(openEntry.clock_in_at)}
+              </Text>
+
+              {openEntry.selfie_status === "waived" ? (
+                <Text style={styles.waivedText}>
+                  Selfie requirement waived by a manager
                 </Text>
-              )}
-            </Pressable>
-          </View>
+              ) : null}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.clockOutButton,
+                  pressed && styles.buttonPressed,
+                  clockingOut && styles.buttonDisabled,
+                ]}
+                disabled={clockingOut}
+                onPress={() => {
+                  void handleClockOut();
+                }}
+              >
+                {clockingOut ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.clockOutButtonText}>Clock Out</Text>
+                )}
+              </Pressable>
+            </View>
+          )
         ) : (
           <Pressable
             style={({ pressed }) => [
@@ -199,6 +231,19 @@ export default function HomeScreen({
           </Pressable>
         )}
 
+        {!loadingEntry && !canAccessRouteStops ? (
+          <View style={styles.routeAccessNotice}>
+            <Text style={styles.routeAccessNoticeTitle}>Route preview</Text>
+
+            <Text style={styles.routeAccessNoticeText}>
+              {!openEntry
+                ? "You can review today's stops now. Clock in to open stop details and navigation."
+                : requiresSelfie
+                  ? "Complete your clock-in selfie to open stop details and navigation."
+                  : "Complete your clock-in verification to open stop details and navigation."}
+            </Text>
+          </View>
+        ) : null}
         <TodayRouteCard
           route={route}
           source={source}
@@ -210,7 +255,7 @@ export default function HomeScreen({
           onRefresh={() => {
             void refreshRoute();
           }}
-          onStopPress={onStopPress}
+          onStopPress={canAccessRouteStops ? onStopPress : undefined}
         />
       </ScrollView>
     </SafeAreaView>
@@ -341,5 +386,73 @@ const styles = StyleSheet.create({
     color: "#9f302d",
     fontSize: 13,
     lineHeight: 18,
+  },
+  selfieRequiredCard: {
+    backgroundColor: "#f7eadc",
+    borderColor: "#e4cdb4",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 18,
+    padding: 20,
+  },
+  selfieRequiredLabel: {
+    color: "#9c5621",
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  selfieRequiredTitle: {
+    color: "#4a2c1a",
+    fontSize: 19,
+    fontWeight: "700",
+    marginTop: 6,
+  },
+  selfieRequiredText: {
+    color: "#725b48",
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 7,
+  },
+  resumeSelfieButton: {
+    alignItems: "center",
+    backgroundColor: "#7a3f2c",
+    borderRadius: 12,
+    justifyContent: "center",
+    marginTop: 18,
+    minHeight: 50,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  resumeSelfieButtonText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  waivedText: {
+    color: "#8a6f53",
+    fontSize: 12,
+    marginBottom: 14,
+    marginTop: -8,
+  },
+  routeAccessNotice: {
+    backgroundColor: "#f7eadc",
+    borderColor: "#e4cdb4",
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  routeAccessNoticeTitle: {
+    color: "#9c5621",
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  routeAccessNoticeText: {
+    color: "#725b48",
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
   },
 });
