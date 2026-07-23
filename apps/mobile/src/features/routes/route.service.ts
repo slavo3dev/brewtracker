@@ -340,10 +340,10 @@ async function fetchTodayRouteFromNetwork(
   return snapshot;
 }
 
-export async function loadTodayRoute(): Promise<LoadTodayRouteResult> {
-  const userId = await requireAuthenticatedUserId();
-  const routeDate = getLocalDateString();
-
+async function loadRouteWithCacheFallback(
+  userId: string,
+  routeDate: string,
+): Promise<LoadTodayRouteResult> {
   try {
     const snapshot = await fetchTodayRouteFromNetwork(
       userId,
@@ -357,40 +357,42 @@ export async function loadTodayRoute(): Promise<LoadTodayRouteResult> {
       warningMessage: null,
     };
   } catch (networkError) {
+    console.warn(
+      "Unable to fetch today's route; attempting cached fallback:",
+      networkError,
+    );
+
     const cachedSnapshot = await readTodayRouteSnapshot(
       userId,
       routeDate,
     );
 
-    if (cachedSnapshot) {
-      return {
-        route: cachedSnapshot.route,
-        source: "cache",
-        syncedAt: cachedSnapshot.syncedAt,
-        warningMessage:
-          networkError instanceof Error
-            ? `Showing saved route. ${networkError.message}`
-            : "Showing the last saved route because the network is unavailable.",
-      };
+    if (!cachedSnapshot) {
+      throw networkError;
     }
 
-    throw networkError;
+    return {
+      route: cachedSnapshot.route,
+      source: "cache",
+      syncedAt: cachedSnapshot.syncedAt,
+      warningMessage:
+        networkError instanceof Error &&
+        /network request failed/i.test(networkError.message)
+          ? "You're offline. Showing the last saved version of today's route."
+          : "Unable to fetch the latest route. Showing the last saved version of today's route.",
   }
+}
+
+export async function loadTodayRoute(): Promise<LoadTodayRouteResult> {
+  const userId = await requireAuthenticatedUserId();
+  const routeDate = getLocalDateString();
+
+  return loadRouteWithCacheFallback(userId, routeDate);
 }
 
 export async function refreshTodayRoute(): Promise<LoadTodayRouteResult> {
   const userId = await requireAuthenticatedUserId();
   const routeDate = getLocalDateString();
 
-  const snapshot = await fetchTodayRouteFromNetwork(
-    userId,
-    routeDate,
-  );
-
-  return {
-    route: snapshot.route,
-    source: "network",
-    syncedAt: snapshot.syncedAt,
-    warningMessage: null,
-  };
+  return loadRouteWithCacheFallback(userId, routeDate);
 }
