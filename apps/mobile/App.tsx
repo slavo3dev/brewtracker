@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider, useAuth } from "./src/features/auth/AuthProvider";
+import {
+  ServiceVisitProvider,
+  useServiceVisit,
+} from "./src/features/service-visit/ServiceVisitProvider";
 import AccessDeniedScreen from "./src/screens/AccessDeniedScreen";
 import ClockedInScreen from "./src/screens/ClockedInScreen";
 import ClockInScreen from "./src/screens/ClockInScreen";
@@ -11,9 +15,15 @@ import HomeScreen from "./src/screens/HomeScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import SelfieCaptureScreen from "./src/screens/SelfieCaptureScreen";
 import type { TodayRouteStop } from "./src/features/routes/route.types";
+import ServiceVisitScreen from "./src/screens/ServiceVisitScreen";
 import StopDetailsScreen from "./src/screens/StopDetailsScreen";
 
-type Screen = "home" | "clockIn" | "selfie" | "clockedIn" | "stopDetails";
+type Screen = "home" | "clockIn" | "selfie" | "clockedIn" | "stopDetails" | "serviceVisit";
+
+type SelectedStop = {
+  routeId: string;
+  stop: TodayRouteStop;
+};
 
 function LoadingScreen({ message }: { message: string }) {
   return (
@@ -59,12 +69,18 @@ function ErrorScreen() {
 function AppContent() {
   const { status } = useAuth();
 
+  const {
+    activeVisit,
+    restoringVisit,
+    errorMessage: serviceVisitError,
+  } = useServiceVisit();
+
   const [screen, setScreen] = useState<Screen>("home");
   const [currentTimeEntryId, setCurrentTimeEntryId] = useState<string | null>(
     null,
   );
   const [homeRefreshKey, setHomeRefreshKey] = useState(0);
-  const [selectedStop, setSelectedStop] = useState<TodayRouteStop | null>(null);
+  const [selectedStop, setSelectedStop] = useState<SelectedStop  | null>(null);
 
   useEffect(() => {
     if (status === "signed_out") {
@@ -74,6 +90,16 @@ function AppContent() {
       setHomeRefreshKey(0);
     }
   }, [status]);
+
+  useEffect(() => {
+    if (
+      status === "authenticated" &&
+      !restoringVisit &&
+      activeVisit?.status === "in_progress"
+    ) {
+      setScreen("serviceVisit");
+    }
+  }, [activeVisit, restoringVisit, status]);
   
   if (status === "initializing") {
     return <LoadingScreen message="Restoring your session…" />;
@@ -95,6 +121,26 @@ function AppContent() {
     return <ErrorScreen />;
   }
 
+  if (restoringVisit) {
+    return (
+      <LoadingScreen message="Restoring service visit…" />
+    );
+  }
+
+  if (serviceVisitError) {
+    return (
+      <View style={styles.centeredScreen}>
+        <Text style={styles.errorTitle}>
+          Unable to restore service visit
+        </Text>
+
+        <Text style={styles.errorText}>
+          {serviceVisitError}
+        </Text>
+      </View>
+    );
+  }
+
   if (screen === "home") {
     return (
       <HomeScreen
@@ -106,8 +152,12 @@ function AppContent() {
           setCurrentTimeEntryId(timeEntryId);
           setScreen("selfie");
         }}
-        onStopPress={(stop) => {
-          setSelectedStop(stop);
+         onStopPress={(routeId, stop) => {
+          setSelectedStop({
+            routeId,
+            stop,
+          });
+
           setScreen("stopDetails");
         }}
       />
@@ -139,9 +189,36 @@ function AppContent() {
 
     return (
       <StopDetailsScreen
-        stop={selectedStop}
+        routeId={selectedStop.routeId}
+        stop={selectedStop.stop}
         onBack={() => {
           setSelectedStop(null);
+          setScreen("home");
+        }}
+        onServiceStarted={() => {
+          setScreen("serviceVisit");
+        }}
+      />
+    );
+  }
+
+  if (screen === "serviceVisit") {
+    return (
+      <ServiceVisitScreen
+        onBack={() => {
+          if (
+            selectedStop &&
+            activeVisit?.stopId === selectedStop.stop.id
+          ) {
+            setScreen("stopDetails");
+            return;
+          }
+
+          setScreen("home");
+        }}
+        onVisitCompleted={() => {
+          setSelectedStop(null);
+          setHomeRefreshKey((currentValue) => currentValue + 1);
           setScreen("home");
         }}
       />
@@ -214,8 +291,10 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <StatusBar style="dark" />
-        <AppContent />
+        <ServiceVisitProvider>
+          <StatusBar style="dark" />
+          <AppContent />
+        </ServiceVisitProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

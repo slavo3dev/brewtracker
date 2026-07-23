@@ -14,10 +14,13 @@ import StopMapCard from "../features/maps/StopMapCard";
 import { openExternalNavigation } from "../features/maps/navigation.service";
 import { useCurrentLocation } from "../features/maps/useCurrentLocation";
 import type { TodayRouteStop } from "../features/routes/route.types";
+import { useServiceVisit } from "../features/service-visit/ServiceVisitProvider";
 
 type Props = {
+  routeId: string;
   stop: TodayRouteStop;
   onBack: () => void;
+  onServiceStarted: () => void;
 };
 
 function formatScheduleTime(value: string | null): string | null {
@@ -58,13 +61,36 @@ function getStatusLabel(status: TodayRouteStop["status"]): string {
   }
 }
 
-export default function StopDetailsScreen({ stop, onBack }: Props) {
+export default function StopDetailsScreen({ 
+  routeId,
+  stop,
+  onBack,
+  onServiceStarted, 
+}: Props) {
   const {
     position,
     status: locationStatus,
     errorMessage: locationErrorMessage,
     retry: retryLocation,
   } = useCurrentLocation();
+
+  const {
+    activeVisit,
+    startVisit,
+    isVisitForStop,
+  } = useServiceVisit();
+
+  const [startingService, setStartingService] = useState(false);
+
+  const [serviceError, setServiceError] = useState<string | null>(
+    null,
+  );
+
+  const hasVisitForThisStop = isVisitForStop(stop.id);
+
+  const hasDifferentActiveVisit =
+    activeVisit?.status === "in_progress" &&
+    activeVisit.stopId !== stop.id;
 
   const [openingNavigation, setOpeningNavigation] = useState(false);
   const [navigationError, setNavigationError] = useState<string | null>(null);
@@ -112,6 +138,39 @@ export default function StopDetailsScreen({ stop, onBack }: Props) {
       );
     } finally {
       setOpeningNavigation(false);
+    }
+  }
+
+  async function handleStartService(): Promise<void> {
+    if (startingService) {
+      return;
+    }
+
+    if (hasVisitForThisStop) {
+      onServiceStarted();
+      return;
+    }
+
+    setStartingService(true);
+    setServiceError(null);
+
+    try {
+      await startVisit({
+        routeId,
+        stopId: stop.id,
+        clientId: stop.clientId,
+        machineId: stop.machineId,
+      });
+
+      onServiceStarted();
+    } catch (error) {
+      setServiceError(
+        error instanceof Error
+          ? error.message
+          : "Unable to start the service visit.",
+      );
+    } finally {
+      setStartingService(false);
     }
   }
 
@@ -262,15 +321,49 @@ export default function StopDetailsScreen({ stop, onBack }: Props) {
           <Text style={styles.serviceTitle}>Service workflow</Text>
 
           <Text style={styles.serviceText}>
-            Arrival verification and service steps will be added in the FLOW
-            stories.
+            Complete all eight required service steps in sequence. Your
+            progress is saved automatically on this device.
           </Text>
 
+          {hasDifferentActiveVisit ? (
+            <View style={styles.activeVisitWarning}>
+              <Text style={styles.activeVisitWarningText}>
+                Another service visit is currently in progress. Complete or
+                cancel it before starting this stop.
+              </Text>
+            </View>
+          ) : null}
+
+          {serviceError ? (
+            <View style={styles.serviceErrorCard}>
+              <Text style={styles.serviceErrorText}>{serviceError}</Text>
+            </View>
+          ) : null}
+
           <Pressable
-            style={[styles.serviceButton, styles.buttonDisabled]}
-            disabled
+            style={({ pressed }) => [
+              styles.serviceButton,
+              hasDifferentActiveVisit && styles.buttonDisabled,
+              startingService && styles.buttonDisabled,
+              pressed &&
+                !hasDifferentActiveVisit &&
+                !startingService &&
+                styles.buttonPressed,
+            ]}
+            disabled={hasDifferentActiveVisit || startingService}
+            onPress={() => {
+              void handleStartService();
+            }}
           >
-            <Text style={styles.serviceButtonText}>Start Service</Text>
+            {startingService ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.serviceButtonText}>
+                {hasVisitForThisStop
+                  ? "Resume Service"
+                  : "Start Service"}
+              </Text>
+            )}
           </Pressable>
         </View>
       </ScrollView>
@@ -477,5 +570,31 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 14,
     fontWeight: "700",
+  },
+  activeVisitWarning: {
+    backgroundColor: "#f7eadc",
+    borderColor: "#e4cdb4",
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 12,
+  },
+  activeVisitWarningText: {
+    color: "#8a5a3c",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  serviceErrorCard: {
+    backgroundColor: "#f8e4e1",
+    borderColor: "#e6bab4",
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 12,
+  },
+  serviceErrorText: {
+    color: "#9f302d",
+    fontSize: 12,
+    lineHeight: 18,
   },
 });
