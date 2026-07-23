@@ -160,6 +160,12 @@ export default function StopDetailsScreen({
         stopId: stop.id,
         clientId: stop.clientId,
         machineId: stop.machineId,
+        target: {
+          clientName: stop.client.name,
+          latitude: stop.client.latitude,
+          longitude: stop.client.longitude,
+          geofenceRadiusMeters: stop.client.geofenceRadiusMeters,
+        },
       });
 
       onServiceStarted();

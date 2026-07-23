@@ -18,6 +18,7 @@ import {
   createInitialStepStates,
   getServiceVisitStepIndex,
   SERVICE_VISIT_STEPS,
+  type CompleteArrivalInput,
   type ServiceVisit,
   type ServiceVisitStepId,
   type StartServiceVisitInput,
@@ -32,8 +33,12 @@ type ServiceVisitContextValue = {
     input: Omit<StartServiceVisitInput, "userId">,
   ) => Promise<ServiceVisit>;
 
+  completeArrival: (
+    input: CompleteArrivalInput,
+  ) => Promise<ServiceVisit>;
+
   completeCurrentStep: (
-    stepId: ServiceVisitStepId,
+    stepId: Exclude<ServiceVisitStepId, "arrival">,
   ) => Promise<ServiceVisit>;
 
   cancelVisit: () => Promise<void>;
@@ -63,6 +68,17 @@ function validateRestoredVisit(
     return null;
   }
 
+  if (!visit.target) {
+    return null;
+  }
+
+  if (
+    typeof visit.target.clientName !== "string" ||
+    typeof visit.target.geofenceRadiusMeters !== "number"
+  ) {
+    return null;
+  }
+
   const currentStepExists = SERVICE_VISIT_STEPS.some(
     (step) => step.id === visit.currentStep,
   );
@@ -89,6 +105,63 @@ function validateRestoredVisit(
   }
 
   return visit;
+}
+
+function transitionToNextStep(
+  visit: ServiceVisit,
+  stepId: ServiceVisitStepId,
+  timestamp: string,
+): ServiceVisit {
+  if (visit.status !== "in_progress") {
+    throw new Error(
+      "Only an in-progress service visit can be updated.",
+    );
+  }
+
+  if (visit.currentStep !== stepId) {
+    throw new Error(
+      `Step "${stepId}" cannot be completed yet. The current required step is "${visit.currentStep}".`,
+    );
+  }
+
+  const currentIndex = getServiceVisitStepIndex(stepId);
+
+  if (currentIndex < 0) {
+    throw new Error("The requested service step is invalid.");
+  }
+
+  const isFinalStep =
+    currentIndex === SERVICE_VISIT_STEPS.length - 1;
+
+  const updatedSteps = visit.steps.map((step, index) => {
+    if (index === currentIndex) {
+      return {
+        ...step,
+        status: "completed" as const,
+        completedAt: timestamp,
+      };
+    }
+
+    if (!isFinalStep && index === currentIndex + 1) {
+      return {
+        ...step,
+        status: "current" as const,
+      };
+    }
+
+    return step;
+  });
+
+  return {
+    ...visit,
+    status: isFinalStep ? "completed" : "in_progress",
+    currentStep: isFinalStep
+      ? visit.currentStep
+      : SERVICE_VISIT_STEPS[currentIndex + 1].id,
+    steps: updatedSteps,
+    updatedAt: timestamp,
+    completedAt: isFinalStep ? timestamp : null,
+  };
 }
 
 export function ServiceVisitProvider({
@@ -196,6 +269,21 @@ export function ServiceVisitProvider({
         );
       }
 
+      if (
+        input.target.latitude == null ||
+        input.target.longitude == null
+      ) {
+        throw new Error(
+          "This client has no valid geofence coordinates. Ask a manager to update the client location.",
+        );
+      }
+
+      if (input.target.geofenceRadiusMeters <= 0) {
+        throw new Error(
+          "This client has an invalid geofence radius.",
+        );
+      }
+
       const now = new Date().toISOString();
 
       const visit: ServiceVisit = {
@@ -206,10 +294,14 @@ export function ServiceVisitProvider({
         clientId: input.clientId,
         machineId: input.machineId,
 
+        target: input.target,
+
         status: "in_progress",
         currentStep: SERVICE_VISIT_STEPS[0].id,
 
         steps: createInitialStepStates(),
+
+        arrivalVerification: null,
 
         startedAt: now,
         updatedAt: now,
@@ -227,67 +319,105 @@ export function ServiceVisitProvider({
     [activeVisit, userId],
   );
 
-  const completeCurrentStep = useCallback(
+  const completeArrival = useCallback(
     async (
-      stepId: ServiceVisitStepId,
+      input: CompleteArrivalInput,
     ): Promise<ServiceVisit> => {
       if (!activeVisit) {
         throw new Error("There is no active service visit.");
       }
 
-      if (activeVisit.status !== "in_progress") {
+      if (activeVisit.currentStep !== "arrival") {
         throw new Error(
-          "Only an in-progress service visit can be updated.",
+          "Arrival verification can only be completed during Step 1.",
         );
       }
 
-      if (activeVisit.currentStep !== stepId) {
-        throw new Error(
-          `Step "${stepId}" cannot be completed yet. The current required step is "${activeVisit.currentStep}".`,
-        );
+      if (input.geofenceRadiusMeters <= 0) {
+        throw new Error("The geofence radius is invalid.");
       }
 
-      const currentIndex = getServiceVisitStepIndex(stepId);
+      if (input.method === "geofence") {
+        if (!input.driverPosition || !input.targetPosition) {
+          throw new Error(
+            "A valid GPS position is required to confirm arrival.",
+          );
+        }
 
-      if (currentIndex < 0) {
-        throw new Error("The requested service step is invalid.");
+        if (input.distanceMeters == null) {
+          throw new Error(
+            "The distance from the client could not be calculated.",
+          );
+        }
+
+        if (input.distanceMeters > input.geofenceRadiusMeters) {
+          throw new Error(
+            "You are outside the client geofence.",
+          );
+        }
+      }
+
+      const normalizedOverrideReason =
+        input.overrideReason?.trim() ?? "";
+
+      if (
+        input.method === "manual_override" &&
+        normalizedOverrideReason.length < 10
+      ) {
+        throw new Error(
+          "Enter a clear override reason of at least 10 characters.",
+        );
       }
 
       const now = new Date().toISOString();
-      const isFinalStep =
-        currentIndex === SERVICE_VISIT_STEPS.length - 1;
 
-      const updatedSteps = activeVisit.steps.map(
-        (step, index) => {
-          if (index === currentIndex) {
-            return {
-              ...step,
-              status: "completed" as const,
-              completedAt: now,
-            };
-          }
-
-          if (!isFinalStep && index === currentIndex + 1) {
-            return {
-              ...step,
-              status: "current" as const,
-            };
-          }
-
-          return step;
+      const visitWithArrival: ServiceVisit = {
+        ...activeVisit,
+        arrivalVerification: {
+          method: input.method,
+          driverPosition: input.driverPosition,
+          targetPosition: input.targetPosition,
+          distanceMeters: input.distanceMeters,
+          geofenceRadiusMeters: input.geofenceRadiusMeters,
+          overrideReason:
+            input.method === "manual_override"
+              ? normalizedOverrideReason
+              : null,
+          verifiedAt: now,
         },
+      };
+
+      const updatedVisit = transitionToNextStep(
+        visitWithArrival,
+        "arrival",
+        now,
       );
 
-      const updatedVisit: ServiceVisit = {
-        ...activeVisit,
-        status: isFinalStep ? "completed" : "in_progress",
-        currentStep: isFinalStep
-          ? activeVisit.currentStep
-          : SERVICE_VISIT_STEPS[currentIndex + 1].id,
-        steps: updatedSteps,
-        updatedAt: now,
-        completedAt: isFinalStep ? now : null,
-      };
+      await saveServiceVisit(updatedVisit);
+
+      setActiveVisit(updatedVisit);
+      setErrorMessage(null);
+
+      return updatedVisit;
+    },
+    [activeVisit],
+  );
+
+  const completeCurrentStep = useCallback(
+    async (
+      stepId: Exclude<ServiceVisitStepId, "arrival">,
+    ): Promise<ServiceVisit> => {
+      if (!activeVisit) {
+        throw new Error("There is no active service visit.");
+      }
+
+      const now = new Date().toISOString();
+
+      const updatedVisit = transitionToNextStep(
+        activeVisit,
+        stepId,
+        now,
+      );
 
       await saveServiceVisit(updatedVisit);
 
@@ -351,6 +481,7 @@ export function ServiceVisitProvider({
       restoringVisit,
       errorMessage,
       startVisit,
+      completeArrival,
       completeCurrentStep,
       cancelVisit,
       clearCompletedVisit,
@@ -361,6 +492,7 @@ export function ServiceVisitProvider({
       restoringVisit,
       errorMessage,
       startVisit,
+      completeArrival,
       completeCurrentStep,
       cancelVisit,
       clearCompletedVisit,

@@ -1,3 +1,5 @@
+import type { GeoPoint } from "@brewtracker/types";
+
 export const SERVICE_VISIT_STEPS = [
   {
     id: "arrival",
@@ -68,6 +70,30 @@ export type ServiceVisitStepState = {
   completedAt: string | null;
 };
 
+export type ServiceVisitTarget = {
+  clientName: string;
+  latitude: number | null;
+  longitude: number | null;
+  geofenceRadiusMeters: number;
+};
+
+export type ArrivalVerificationMethod =
+  | "geofence"
+  | "manual_override";
+
+export type ArrivalVerification = {
+  method: ArrivalVerificationMethod;
+
+  driverPosition: GeoPoint | null;
+  targetPosition: GeoPoint | null;
+
+  distanceMeters: number | null;
+  geofenceRadiusMeters: number;
+
+  overrideReason: string | null;
+  verifiedAt: string;
+};
+
 export type ServiceVisit = {
   id: string;
   userId: string;
@@ -76,10 +102,14 @@ export type ServiceVisit = {
   clientId: string;
   machineId: string | null;
 
+  target: ServiceVisitTarget;
+
   status: ServiceVisitStatus;
   currentStep: ServiceVisitStepId;
 
   steps: ServiceVisitStepState[];
+
+  arrivalVerification: ArrivalVerification | null;
 
   startedAt: string;
   updatedAt: string;
@@ -93,6 +123,19 @@ export type StartServiceVisitInput = {
   stopId: string;
   clientId: string;
   machineId: string | null;
+   target: ServiceVisitTarget;
+};
+
+export type CompleteArrivalInput = {
+  method: ArrivalVerificationMethod;
+
+  driverPosition: GeoPoint | null;
+  targetPosition: GeoPoint | null;
+
+  distanceMeters: number | null;
+  geofenceRadiusMeters: number;
+
+  overrideReason?: string | null;
 };
 
 export function getServiceVisitStepIndex(

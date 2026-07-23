@@ -14,12 +14,25 @@ import { useServiceVisit } from "../features/service-visit/ServiceVisitProvider"
 import {
   getServiceVisitStep,
   SERVICE_VISIT_STEPS,
+  type ServiceVisitStepId,
 } from "../features/service-visit/service-visit.types";
+import ArrivalStep from "../features/service-visit/ArrivalStep";
 
 type Props = {
   onBack: () => void;
   onVisitCompleted: () => void;
 };
+
+type PostArrivalStepId = Exclude<
+  ServiceVisitStepId,
+  "arrival"
+>;
+
+function isPostArrivalStep(
+  stepId: ServiceVisitStepId,
+): stepId is PostArrivalStepId {
+  return stepId !== "arrival";
+}
 
 function getStepStatusLabel(
   status: "locked" | "current" | "completed",
@@ -81,6 +94,14 @@ export default function ServiceVisitScreen({
 
   async function handleCompleteCurrentStep(): Promise<void> {
     if (!activeVisit || submitting) {
+      return;
+    }
+
+    if (!isPostArrivalStep(activeVisit.currentStep)) {
+      setErrorMessage(
+        "Arrival must be completed through geofence verification.",
+      );
+
       return;
     }
 
@@ -179,6 +200,100 @@ export default function ServiceVisitScreen({
           </View>
         ) : null}
 
+        {activeVisit.arrivalVerification ? (
+          <View style={styles.arrivalSummaryCard}>
+            <Text style={styles.arrivalSummaryTitle}>
+              Arrival verified
+            </Text>
+
+            <Text style={styles.arrivalSummaryText}>
+              {activeVisit.arrivalVerification.method ===
+              "manual_override"
+                ? "Verified using a manual override."
+                : `Verified inside the ${
+                    activeVisit.arrivalVerification
+                      .geofenceRadiusMeters
+                  } m geofence.`}
+            </Text>
+
+            {activeVisit.arrivalVerification.distanceMeters != null ? (
+              <Text style={styles.arrivalSummaryDetail}>
+                Recorded distance:{" "}
+                {Math.round(
+                  activeVisit.arrivalVerification.distanceMeters,
+                )}{" "}
+                m
+              </Text>
+            ) : null}
+
+            {activeVisit.arrivalVerification.overrideReason ? (
+              <Text style={styles.arrivalSummaryDetail}>
+                Reason:{" "}
+                {activeVisit.arrivalVerification.overrideReason}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        {activeVisit.status === "completed" ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.buttonPressed,
+              submitting && styles.buttonDisabled,
+            ]}
+            disabled={submitting}
+            onPress={() => {
+              void handleFinish();
+            }}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.primaryButtonText}>
+                Finish and Return Home
+              </Text>
+            )}
+          </Pressable>
+        ) : activeVisit.currentStep === "arrival" ? (
+          <View style={styles.activeStepContainer}>
+            <ArrivalStep />
+          </View>
+        ) : (
+          <>
+            <View style={styles.developmentNotice}>
+              <Text style={styles.developmentNoticeTitle}>
+                Upcoming FLOW story
+              </Text>
+
+              <Text style={styles.developmentNoticeText}>
+                Step {currentStepIndex + 1} is not implemented yet.
+                This temporary control remains available for testing the
+                FLOW-1 state machine until its dedicated story is added.
+              </Text>
+            </View>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.primaryButton,
+                pressed && styles.buttonPressed,
+                submitting && styles.buttonDisabled,
+              ]}
+              disabled={submitting}
+              onPress={() => {
+                void handleCompleteCurrentStep();
+              }}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>
+                  Complete Current Step
+                </Text>
+              )}
+            </Pressable>
+          </>
+        )}
         <View style={styles.stepsCard}>
           {activeVisit.steps.map((stepState, index) => {
             const definition = SERVICE_VISIT_STEPS[index];
@@ -241,62 +356,6 @@ export default function ServiceVisitScreen({
             );
           })}
         </View>
-
-        {activeVisit.status === "completed" ? (
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && styles.buttonPressed,
-              submitting && styles.buttonDisabled,
-            ]}
-            disabled={submitting}
-            onPress={() => {
-              void handleFinish();
-            }}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text style={styles.primaryButtonText}>
-                Finish and Return Home
-              </Text>
-            )}
-          </Pressable>
-        ) : (
-          <>
-            <View style={styles.developmentNotice}>
-              <Text style={styles.developmentNoticeTitle}>
-                FLOW-1 test control
-              </Text>
-
-              <Text style={styles.developmentNoticeText}>
-                This button temporarily represents successful completion
-                of the current step. Each following FLOW story will replace
-                it with the real screen and validation.
-              </Text>
-            </View>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.buttonPressed,
-                submitting && styles.buttonDisabled,
-              ]}
-              disabled={submitting}
-              onPress={() => {
-                void handleCompleteCurrentStep();
-              }}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.primaryButtonText}>
-                  Complete Current Step
-                </Text>
-              )}
-            </Pressable>
-          </>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -502,5 +561,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
     textAlign: "center",
+  },
+  arrivalSummaryCard: {
+    backgroundColor: "#e8f2e5",
+    borderColor: "#c8ddc3",
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 14,
+  },
+  arrivalSummaryTitle: {
+    color: "#3a6b3e",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  arrivalSummaryText: {
+    color: "#4c7050",
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  arrivalSummaryDetail: {
+    color: "#5e7c61",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  activeStepContainer: {
+    marginTop: 18,
   },
 });
