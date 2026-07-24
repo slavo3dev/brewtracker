@@ -238,7 +238,7 @@ function confirmDiscardLocalServiceVisit(): void {
             recoveryPending && styles.recoveryButtonDisabled,
           ]}
           disabled={recoveryPending}
-          onPress={() => {confirmDiscardLocalServiceVisit}}
+          onPress={confirmDiscardLocalServiceVisit}
         >
           {serviceVisitRecoveryAction === "discard" ? (
             <ActivityIndicator color="#7a3f2c" />

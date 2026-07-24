@@ -49,6 +49,9 @@ type ServiceVisitContextValue = {
   cancelVisit: () => Promise<void>;
   clearCompletedVisit: () => Promise<void>;
 
+  retryRestore: () => Promise<void>;
+  clearLocalVisit: () => Promise<void>;
+
   isVisitForStop: (stopId: string) => boolean;
 };
 
