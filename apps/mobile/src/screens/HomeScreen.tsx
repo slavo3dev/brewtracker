@@ -23,7 +23,10 @@ type Props = {
   onClockInPress: () => void;
   onResumeSelfie: (timeEntryId: string) => void;
   refreshKey: number;
-  onStopPress?: (stop: TodayRouteStop) => void;
+  onStopPress?: (
+    routeId: string,
+    stop: TodayRouteStop,
+  ) => void;
 };
 
 function formatClockTime(value: string): string {

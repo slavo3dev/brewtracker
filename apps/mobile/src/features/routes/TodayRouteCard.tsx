@@ -21,7 +21,10 @@ type Props = {
   errorMessage: string | null;
   warningMessage: string | null;
   onRefresh: () => void;
-  onStopPress?: (stop: TodayRouteStop) => void;
+  onStopPress?: (
+    routeId: string,
+    stop: TodayRouteStop,
+  ) => void;
 };
 
 function formatTime(value: string | null): string | null {
@@ -245,7 +248,7 @@ export default function TodayRouteCard({
               onPress={
                 onStopPress
                   ? () => {
-                      onStopPress(stop);
+                      onStopPress(route.id, stop);
                     }
                   : undefined
               }

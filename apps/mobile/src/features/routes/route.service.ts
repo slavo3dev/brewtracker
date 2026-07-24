@@ -376,10 +376,8 @@ async function loadRouteWithCacheFallback(
       source: "cache",
       syncedAt: cachedSnapshot.syncedAt,
       warningMessage:
-        networkError instanceof Error &&
-        /network request failed/i.test(networkError.message)
-          ? "You're offline. Showing the last saved version of today's route."
-          : "Unable to fetch the latest route. Showing the last saved version of today's route.",
+        "You're offline. Showing the last saved version of today's route.",
+    };
   }
 }
 
