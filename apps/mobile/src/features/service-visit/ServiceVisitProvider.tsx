@@ -24,6 +24,11 @@ import {
   type StartServiceVisitInput,
 } from "./service-visit.types";
 
+type PostArrivalStepId = Exclude<
+  ServiceVisitStepId,
+  "arrival"
+>;
+
 type ServiceVisitContextValue = {
   activeVisit: ServiceVisit | null;
   restoringVisit: boolean;
@@ -38,7 +43,7 @@ type ServiceVisitContextValue = {
   ) => Promise<ServiceVisit>;
 
   completeCurrentStep: (
-    stepId: Exclude<ServiceVisitStepId, "arrival">,
+    stepId: PostArrivalStepId,
   ) => Promise<ServiceVisit>;
 
   cancelVisit: () => Promise<void>;
@@ -72,9 +77,29 @@ function validateRestoredVisit(
     return null;
   }
 
+  const hasValidLatitude =
+  typeof visit.target.latitude === "number" &&
+  Number.isFinite(visit.target.latitude) &&
+  visit.target.latitude >= -90 &&
+  visit.target.latitude <= 90;
+
+  const hasValidLongitude =
+    typeof visit.target.longitude === "number" &&
+    Number.isFinite(visit.target.longitude) &&
+    visit.target.longitude >= -180 &&
+    visit.target.longitude <= 180;
+
+  const hasValidRadius =
+    typeof visit.target.geofenceRadiusMeters === "number" &&
+    Number.isFinite(visit.target.geofenceRadiusMeters) &&
+    visit.target.geofenceRadiusMeters > 0;
+
   if (
     typeof visit.target.clientName !== "string" ||
-    typeof visit.target.geofenceRadiusMeters !== "number"
+    visit.target.clientName.trim().length === 0 ||
+    !hasValidLatitude ||
+    !hasValidLongitude ||
+    !hasValidRadius
   ) {
     return null;
   }
@@ -180,74 +205,84 @@ export function ServiceVisitProvider({
 
   const userId = session?.user.id ?? null;
 
-  useEffect(() => {
-    let mounted = true;
+  const restoreVisit = useCallback(async (): Promise<void> => {
+  if (authStatus !== "authenticated" || !userId) {
+    setActiveVisit(null);
+    setRestoringVisit(false);
+    setErrorMessage(null);
+    return;
+  }
 
-    async function restoreVisit(): Promise<void> {
-      if (authStatus !== "authenticated" || !userId) {
-        if (mounted) {
-          setActiveVisit(null);
-          setRestoringVisit(false);
-          setErrorMessage(null);
-        }
+  setRestoringVisit(true);
+  setErrorMessage(null);
 
-        return;
-      }
+  try {
+    const storedVisit = await loadServiceVisit(userId);
 
-      setRestoringVisit(true);
-      setErrorMessage(null);
-
-      try {
-        const storedVisit = await loadServiceVisit(userId);
-
-        if (!mounted) {
-          return;
-        }
-
-        if (!storedVisit) {
-          setActiveVisit(null);
-          return;
-        }
-
-        const validVisit = validateRestoredVisit(
-          storedVisit,
-          userId,
-        );
-
-        if (!validVisit) {
-          await removeServiceVisit(userId);
-
-          if (mounted) {
-            setActiveVisit(null);
-          }
-
-          return;
-        }
-
-        setActiveVisit(validVisit);
-      } catch (error) {
-        if (!mounted) {
-          return;
-        }
-
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Unable to restore the active service visit.",
-        );
-      } finally {
-        if (mounted) {
-          setRestoringVisit(false);
-        }
-      }
+    if (!storedVisit) {
+      setActiveVisit(null);
+      return;
     }
 
-    void restoreVisit();
+    const validVisit = validateRestoredVisit(
+      storedVisit,
+      userId,
+    );
 
-    return () => {
-      mounted = false;
-    };
-  }, [authStatus, userId]);
+    if (!validVisit) {
+      throw new Error(
+        "The saved service visit is invalid or uses an unsupported local format.",
+      );
+    }
+
+    setActiveVisit(validVisit);
+  } catch (error) {
+    setActiveVisit(null);
+
+    setErrorMessage(
+      error instanceof Error
+        ? error.message
+        : "Unable to restore the active service visit.",
+    );
+  } finally {
+    setRestoringVisit(false);
+  }
+}, [authStatus, userId]);
+
+useEffect(() => {
+  void restoreVisit();
+}, [restoreVisit]);
+
+const retryRestore = useCallback(async (): Promise<void> => {
+  await restoreVisit();
+}, [restoreVisit]);
+
+const clearLocalVisit =
+  useCallback(async (): Promise<void> => {
+    if (!userId) {
+      setActiveVisit(null);
+      setErrorMessage(null);
+      setRestoringVisit(false);
+      return;
+    }
+
+    setRestoringVisit(true);
+
+    try {
+      await removeServiceVisit(userId);
+
+      setActiveVisit(null);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to discard the saved service visit.",
+      );
+    } finally {
+      setRestoringVisit(false);
+    }
+  }, [userId]);
 
   const startVisit = useCallback(
     async (
@@ -333,8 +368,13 @@ export function ServiceVisitProvider({
         );
       }
 
-      if (input.geofenceRadiusMeters <= 0) {
-        throw new Error("The geofence radius is invalid.");
+      const expectedRadius =
+        activeVisit.target.geofenceRadiusMeters;
+
+      if (expectedRadius <= 0) {
+        throw new Error(
+          "The client geofence radius is invalid.",
+        );
       }
 
       if (input.method === "geofence") {
@@ -350,7 +390,7 @@ export function ServiceVisitProvider({
           );
         }
 
-        if (input.distanceMeters > input.geofenceRadiusMeters) {
+        if (input.distanceMeters > expectedRadius) {
           throw new Error(
             "You are outside the client geofence.",
           );
@@ -378,7 +418,7 @@ export function ServiceVisitProvider({
           driverPosition: input.driverPosition,
           targetPosition: input.targetPosition,
           distanceMeters: input.distanceMeters,
-          geofenceRadiusMeters: input.geofenceRadiusMeters,
+          geofenceRadiusMeters: expectedRadius,
           overrideReason:
             input.method === "manual_override"
               ? normalizedOverrideReason
@@ -405,7 +445,7 @@ export function ServiceVisitProvider({
 
   const completeCurrentStep = useCallback(
     async (
-      stepId: Exclude<ServiceVisitStepId, "arrival">,
+      stepId: PostArrivalStepId,
     ): Promise<ServiceVisit> => {
       if (!activeVisit) {
         throw new Error("There is no active service visit.");
@@ -444,7 +484,9 @@ export function ServiceVisitProvider({
     };
 
     await saveServiceVisit(cancelledVisit);
+
     setActiveVisit(cancelledVisit);
+    setErrorMessage(null);
   }, [activeVisit]);
 
   const clearCompletedVisit =
@@ -485,6 +527,8 @@ export function ServiceVisitProvider({
       completeCurrentStep,
       cancelVisit,
       clearCompletedVisit,
+      retryRestore,
+      clearLocalVisit,
       isVisitForStop,
     }),
     [
@@ -496,6 +540,8 @@ export function ServiceVisitProvider({
       completeCurrentStep,
       cancelVisit,
       clearCompletedVisit,
+      retryRestore,
+      clearLocalVisit,
       isVisitForStop,
     ],
   );
