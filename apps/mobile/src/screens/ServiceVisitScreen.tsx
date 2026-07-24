@@ -17,21 +17,25 @@ import {
   type ServiceVisitStepId,
 } from "../features/service-visit/service-visit.types";
 import ArrivalStep from "../features/service-visit/ArrivalStep";
+import MachineScanStep from "../features/service-visit/MachineScanStep";
 
 type Props = {
   onBack: () => void;
   onVisitCompleted: () => void;
 };
 
-type PostArrivalStepId = Exclude<
+type PlaceholderStepId = Exclude<
   ServiceVisitStepId,
-  "arrival"
+  "arrival" | "machine_scan"
 >;
 
-function isPostArrivalStep(
+function isPlaceholderStep(
   stepId: ServiceVisitStepId,
-): stepId is PostArrivalStepId {
-  return stepId !== "arrival";
+): stepId is PlaceholderStepId {
+  return (
+    stepId !== "arrival" &&
+    stepId !== "machine_scan"
+  );
 }
 
 function getStepStatusLabel(
@@ -92,14 +96,17 @@ export default function ServiceVisitScreen({
     (step) => step.id === activeVisit.currentStep,
   );
 
+  const currentStepNumber =
+    currentStepIndex >= 0 ? currentStepIndex + 1 : 1;
+
   async function handleCompleteCurrentStep(): Promise<void> {
     if (!activeVisit || submitting) {
       return;
     }
 
-    if (!isPostArrivalStep(activeVisit.currentStep)) {
+    if (!isPlaceholderStep(activeVisit.currentStep)) {
       setErrorMessage(
-        "Arrival must be completed through geofence verification.",
+        "This step must be completed through its dedicated verification screen.",
       );
 
       return;
@@ -172,7 +179,7 @@ export default function ServiceVisitScreen({
           <Text style={styles.progressLabel}>
             {activeVisit.status === "completed"
               ? "Service complete"
-              : `Step ${currentStepIndex + 1} of ${
+              : `Step ${currentStepNumber} of ${
                   SERVICE_VISIT_STEPS.length
                 }`}
           </Text>
@@ -235,6 +242,26 @@ export default function ServiceVisitScreen({
           </View>
         ) : null}
 
+        {activeVisit.machineScanVerification ? (
+          <View style={styles.machineScanSummaryCard}>
+            <Text style={styles.machineScanSummaryTitle}>
+              Machine verified
+            </Text>
+
+            <Text style={styles.machineScanSummaryText}>
+              {activeVisit.machineTarget.name ??
+                activeVisit.machineTarget.model ??
+                "Assigned machine"}
+            </Text>
+
+            {activeVisit.machineTarget.serialNumber ? (
+              <Text style={styles.machineScanSummaryDetail}>
+                Serial: {activeVisit.machineTarget.serialNumber}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
         {activeVisit.status === "completed" ? (
           <Pressable
             style={({ pressed }) => [
@@ -259,6 +286,10 @@ export default function ServiceVisitScreen({
           <View style={styles.activeStepContainer}>
             <ArrivalStep />
           </View>
+        ) : activeVisit.currentStep === "machine_scan" ? (
+          <View style={styles.activeStepContainer}>
+            <MachineScanStep />
+          </View>
         ) : (
           <>
             <View style={styles.developmentNotice}>
@@ -267,7 +298,7 @@ export default function ServiceVisitScreen({
               </Text>
 
               <Text style={styles.developmentNoticeText}>
-                Step {currentStepIndex + 1} is not implemented yet.
+                Step {currentStepNumber} is not implemented yet.
                 This temporary control remains available for testing the
                 FLOW-1 state machine until its dedicated story is added.
               </Text>
@@ -294,6 +325,7 @@ export default function ServiceVisitScreen({
             </Pressable>
           </>
         )}
+        
         <View style={styles.stepsCard}>
           {activeVisit.steps.map((stepState, index) => {
             const definition = SERVICE_VISIT_STEPS[index];
@@ -589,5 +621,29 @@ const styles = StyleSheet.create({
   },
   activeStepContainer: {
     marginTop: 18,
+  },
+  machineScanSummaryCard: {
+    backgroundColor: "#e8f2e5",
+    borderColor: "#c8ddc3",
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 14,
+  },
+  machineScanSummaryTitle: {
+    color: "#3a6b3e",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  machineScanSummaryText: {
+    color: "#4c7050",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  machineScanSummaryDetail: {
+    color: "#5e7c61",
+    fontSize: 12,
+    marginTop: 4,
   },
 });
