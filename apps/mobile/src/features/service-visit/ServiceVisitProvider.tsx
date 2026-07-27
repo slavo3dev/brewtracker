@@ -22,11 +22,12 @@ import {
   type ServiceVisit,
   type ServiceVisitStepId,
   type StartServiceVisitInput,
+  type CompleteMachineScanInput,
 } from "./service-visit.types";
 
-type PostArrivalStepId = Exclude<
+type PlaceholderStepId = Exclude<
   ServiceVisitStepId,
-  "arrival"
+  "arrival" | "machine_scan"
 >;
 
 type ServiceVisitContextValue = {
@@ -42,8 +43,12 @@ type ServiceVisitContextValue = {
     input: CompleteArrivalInput,
   ) => Promise<ServiceVisit>;
 
+  completeMachineScan: (
+    input: CompleteMachineScanInput,
+  ) => Promise<ServiceVisit>;
+
   completeCurrentStep: (
-    stepId: PostArrivalStepId,
+    stepId: PlaceholderStepId,
   ) => Promise<ServiceVisit>;
 
   cancelVisit: () => Promise<void>;
@@ -77,6 +82,20 @@ function validateRestoredVisit(
   }
 
   if (!visit.target) {
+    return null;
+  }
+
+  if (!visit.machineTarget) {
+    return null;
+  }
+
+  if (
+    typeof visit.machineTarget.id !== "string" ||
+    visit.machineTarget.id.trim().length === 0 ||
+    typeof visit.machineTarget.qrCode !== "string" ||
+    visit.machineTarget.qrCode.trim().length === 0 ||
+    visit.machineTarget.id !== visit.machineId
+  ) {
     return null;
   }
 
@@ -322,6 +341,21 @@ const clearLocalVisit =
         );
       }
 
+      if (!input.machineId) {
+        throw new Error(
+          "A machine must be assigned before starting service.",
+        );
+      }
+
+      if (
+        input.machineTarget.id !== input.machineId ||
+        !input.machineTarget.qrCode.trim()
+      ) {
+        throw new Error(
+          "The assigned machine has invalid QR verification data.",
+        );
+      }
+
       const now = new Date().toISOString();
 
       const visit: ServiceVisit = {
@@ -333,6 +367,10 @@ const clearLocalVisit =
         machineId: input.machineId,
 
         target: input.target,
+        machineTarget: {
+          ...input.machineTarget,
+          qrCode: input.machineTarget.qrCode.trim(),
+        },
 
         status: "in_progress",
         currentStep: SERVICE_VISIT_STEPS[0].id,
@@ -340,6 +378,7 @@ const clearLocalVisit =
         steps: createInitialStepStates(),
 
         arrivalVerification: null,
+        machineScanVerification: null,
 
         startedAt: now,
         updatedAt: now,
@@ -446,9 +485,72 @@ const clearLocalVisit =
     [activeVisit],
   );
 
+  const completeMachineScan = useCallback(
+    async (
+      input: CompleteMachineScanInput,
+    ): Promise<ServiceVisit> => {
+      if (!activeVisit) {
+        throw new Error("There is no active service visit.");
+      }
+
+      if (activeVisit.currentStep !== "machine_scan") {
+        throw new Error(
+          "Machine scanning can only be completed during Step 2.",
+        );
+      }
+
+      const scannedValue = input.scannedValue.trim();
+
+      if (!scannedValue) {
+        throw new Error("The scanned QR code is empty.");
+      }
+
+      const expectedQrCode =
+        activeVisit.machineTarget.qrCode.trim();
+
+      if (!expectedQrCode) {
+        throw new Error(
+          "The assigned machine has no valid QR code.",
+        );
+      }
+
+      if (scannedValue !== expectedQrCode) {
+        throw new Error(
+          "This QR code belongs to a different machine. Scan the machine assigned to this stop.",
+        );
+      }
+
+      const now = new Date().toISOString();
+
+      const visitWithScan: ServiceVisit = {
+        ...activeVisit,
+        machineScanVerification: {
+          scannedValue,
+          expectedQrCode,
+          machineId: activeVisit.machineTarget.id,
+          verifiedAt: now,
+        },
+      };
+
+      const updatedVisit = transitionToNextStep(
+        visitWithScan,
+        "machine_scan",
+        now,
+      );
+
+      await saveServiceVisit(updatedVisit);
+
+      setActiveVisit(updatedVisit);
+      setErrorMessage(null);
+
+      return updatedVisit;
+    },
+    [activeVisit],
+  );
+
   const completeCurrentStep = useCallback(
     async (
-      stepId: PostArrivalStepId,
+      stepId: PlaceholderStepId,
     ): Promise<ServiceVisit> => {
       if (!activeVisit) {
         throw new Error("There is no active service visit.");
@@ -527,6 +629,7 @@ const clearLocalVisit =
       errorMessage,
       startVisit,
       completeArrival,
+      completeMachineScan,
       completeCurrentStep,
       cancelVisit,
       clearCompletedVisit,
@@ -540,6 +643,7 @@ const clearLocalVisit =
       errorMessage,
       startVisit,
       completeArrival,
+      completeMachineScan,
       completeCurrentStep,
       cancelVisit,
       clearCompletedVisit,

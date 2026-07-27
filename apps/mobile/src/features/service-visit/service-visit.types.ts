@@ -77,6 +77,14 @@ export type ServiceVisitTarget = {
   geofenceRadiusMeters: number;
 };
 
+export type ServiceVisitMachineTarget = {
+  id: string;
+  name: string | null;
+  model: string | null;
+  serialNumber: string | null;
+  qrCode: string;
+};
+
 export type ArrivalVerificationMethod =
   | "geofence"
   | "manual_override";
@@ -94,15 +102,27 @@ export type ArrivalVerification = {
   verifiedAt: string;
 };
 
+export type MachineScanVerification = {
+  scannedValue: string;
+  expectedQrCode: string;
+  machineId: string;
+  verifiedAt: string;
+};
+
+export type CompleteMachineScanInput = {
+  scannedValue: string;
+};
+
 export type ServiceVisit = {
   id: string;
   userId: string;
   routeId: string;
   stopId: string;
   clientId: string;
-  machineId: string | null;
+  machineId: string;
 
   target: ServiceVisitTarget;
+  machineTarget: ServiceVisitMachineTarget;
 
   status: ServiceVisitStatus;
   currentStep: ServiceVisitStepId;
@@ -110,6 +130,7 @@ export type ServiceVisit = {
   steps: ServiceVisitStepState[];
 
   arrivalVerification: ArrivalVerification | null;
+  machineScanVerification: MachineScanVerification | null;
 
   startedAt: string;
   updatedAt: string;
@@ -122,8 +143,9 @@ export type StartServiceVisitInput = {
   routeId: string;
   stopId: string;
   clientId: string;
-  machineId: string | null;
-   target: ServiceVisitTarget;
+  machineId: string;
+  target: ServiceVisitTarget;
+  machineTarget: ServiceVisitMachineTarget;
 };
 
 export type CompleteArrivalInput = {

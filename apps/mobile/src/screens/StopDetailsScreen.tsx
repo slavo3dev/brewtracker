@@ -154,17 +154,38 @@ export default function StopDetailsScreen({
     setStartingService(true);
     setServiceError(null);
 
+    if (!stop.machine) {
+      throw new Error(
+        "No machine is assigned to this service stop.",
+      );
+    }
+
+    if (!stop.machine.qrCode?.trim()) {
+      throw new Error(
+        "The assigned machine does not have a QR code. Ask a manager to update the machine record.",
+      );
+    }
+
     try {
       await startVisit({
         routeId,
         stopId: stop.id,
         clientId: stop.clientId,
-        machineId: stop.machineId,
+        machineId: stop.machine.id,
+
         target: {
           clientName: stop.client.name,
           latitude: stop.client.latitude,
           longitude: stop.client.longitude,
           geofenceRadiusMeters: stop.client.geofenceRadiusMeters,
+        },
+
+        machineTarget: {
+          id: stop.machine.id,
+          name: stop.machine.name,
+          model: stop.machine.model,
+          serialNumber: stop.machine.serialNumber,
+          qrCode: stop.machine.qrCode.trim(),
         },
       });
 
