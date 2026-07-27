@@ -14,12 +14,7 @@ import type {
 
 type RouteRow = Pick<
   Database["public"]["Tables"]["routes"]["Row"],
-  | "id"
-  | "warehouse_id"
-  | "route_date"
-  | "status"
-  | "notes"
-  | "created_at"
+  "id" | "warehouse_id" | "route_date" | "status" | "notes" | "created_at"
 >;
 
 type WarehouseRow = Pick<
@@ -55,7 +50,14 @@ type ClientRow = Pick<
 
 type MachineRow = Pick<
   Database["public"]["Tables"]["machines"]["Row"],
-  "id" | "name" | "model" | "serial_number" | "qr_code"
+  | "id"
+  | "name"
+  | "model"
+  | "serial_number"
+  | "qr_code"
+  | "status"
+  | "installed_at"
+  | "last_service_at"
 >;
 
 export type LoadTodayRouteResult = {
@@ -96,9 +98,7 @@ async function fetchTodayRouteRow(
 ): Promise<RouteRow | null> {
   const { data, error } = await supabase
     .from("routes")
-    .select(
-      "id, warehouse_id, route_date, status, notes, created_at",
-    )
+    .select("id, warehouse_id, route_date, status, notes, created_at")
     .eq("driver_id", userId)
     .eq("route_date", routeDate)
     .in("status", ["draft", "scheduled", "in_progress"])
@@ -127,9 +127,7 @@ async function fetchWarehouse(
     .maybeSingle();
 
   if (error) {
-    throw new Error(
-      `Unable to load the route warehouse: ${error.message}`,
-    );
+    throw new Error(`Unable to load the route warehouse: ${error.message}`);
   }
 
   return data;
@@ -190,16 +188,16 @@ async function fetchClients(clientIds: string[]): Promise<ClientRow[]> {
   return data;
 }
 
-async function fetchMachines(
-  machineIds: string[],
-): Promise<MachineRow[]> {
+async function fetchMachines(machineIds: string[]): Promise<MachineRow[]> {
   if (machineIds.length === 0) {
     return [];
   }
 
   const { data, error } = await supabase
     .from("machines")
-    .select("id, name, model, serial_number, qr_code")
+    .select(
+      "id, name, model, serial_number, qr_code, status, installed_at, last_service_at",
+    )
     .in("id", machineIds);
 
   if (error) {
@@ -218,9 +216,7 @@ function buildTodayRouteStops(
   clients: ClientRow[],
   machines: MachineRow[],
 ): TodayRouteStop[] {
-  const clientsById = new Map(
-    clients.map((client) => [client.id, client]),
-  );
+  const clientsById = new Map(clients.map((client) => [client.id, client]));
 
   const machinesById = new Map(
     machines.map((machine) => [machine.id, machine]),
@@ -239,7 +235,7 @@ function buildTodayRouteStops(
     }
 
     const machine = stop.machine_id
-      ? machinesById.get(stop.machine_id) ?? null
+      ? (machinesById.get(stop.machine_id) ?? null)
       : null;
 
     const routeStop: TodayRouteStop = {
@@ -272,6 +268,9 @@ function buildTodayRouteStops(
             model: machine.model,
             serialNumber: machine.serial_number,
             qrCode: machine.qr_code,
+            status: machine.status,
+            installedAt: machine.installed_at,
+            lastServiceAt: machine.last_service_at,
           }
         : null,
     };
@@ -304,14 +303,10 @@ async function fetchTodayRouteFromNetwork(
     fetchRouteStops(routeRow.id),
   ]);
 
-  const clientIds = removeDuplicates(
-    stops.map((stop) => stop.client_id),
-  );
+  const clientIds = removeDuplicates(stops.map((stop) => stop.client_id));
 
   const machineIds = removeDuplicates(
-    stops.flatMap((stop) =>
-      stop.machine_id ? [stop.machine_id] : [],
-    ),
+    stops.flatMap((stop) => (stop.machine_id ? [stop.machine_id] : [])),
   );
 
   const [clients, machines] = await Promise.all([
@@ -345,10 +340,7 @@ async function loadRouteWithCacheFallback(
   routeDate: string,
 ): Promise<LoadTodayRouteResult> {
   try {
-    const snapshot = await fetchTodayRouteFromNetwork(
-      userId,
-      routeDate,
-    );
+    const snapshot = await fetchTodayRouteFromNetwork(userId, routeDate);
 
     return {
       route: snapshot.route,
@@ -362,10 +354,7 @@ async function loadRouteWithCacheFallback(
       networkError,
     );
 
-    const cachedSnapshot = await readTodayRouteSnapshot(
-      userId,
-      routeDate,
-    );
+    const cachedSnapshot = await readTodayRouteSnapshot(userId, routeDate);
 
     if (!cachedSnapshot) {
       throw networkError;

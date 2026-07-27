@@ -39,17 +39,13 @@ type ServiceVisitContextValue = {
     input: Omit<StartServiceVisitInput, "userId">,
   ) => Promise<ServiceVisit>;
 
-  completeArrival: (
-    input: CompleteArrivalInput,
-  ) => Promise<ServiceVisit>;
+  completeArrival: (input: CompleteArrivalInput) => Promise<ServiceVisit>;
 
   completeMachineScan: (
     input: CompleteMachineScanInput,
   ) => Promise<ServiceVisit>;
 
-  completeCurrentStep: (
-    stepId: PlaceholderStepId,
-  ) => Promise<ServiceVisit>;
+  completeCurrentStep: (stepId: PlaceholderStepId) => Promise<ServiceVisit>;
 
   cancelVisit: () => Promise<void>;
   clearCompletedVisit: () => Promise<void>;
@@ -60,13 +56,12 @@ type ServiceVisitContextValue = {
   isVisitForStop: (stopId: string) => boolean;
 };
 
-const ServiceVisitContext =
-  createContext<ServiceVisitContextValue | null>(null);
+const ServiceVisitContext = createContext<ServiceVisitContextValue | null>(
+  null,
+);
 
 function createVisitId(): string {
-  return `visit-${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 10)}`;
+  return `visit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function validateRestoredVisit(
@@ -89,21 +84,33 @@ function validateRestoredVisit(
     return null;
   }
 
+  const validMachineStatuses = [
+    "active",
+    "inactive",
+    "maintenance",
+    "retired",
+  ] as const;
+
+  const hasValidMachineStatus = validMachineStatuses.includes(
+    visit.machineTarget.status as (typeof validMachineStatuses)[number],
+  );
+
   if (
     typeof visit.machineTarget.id !== "string" ||
     visit.machineTarget.id.trim().length === 0 ||
     typeof visit.machineTarget.qrCode !== "string" ||
     visit.machineTarget.qrCode.trim().length === 0 ||
-    visit.machineTarget.id !== visit.machineId
+    visit.machineTarget.id !== visit.machineId ||
+    !hasValidMachineStatus
   ) {
     return null;
   }
 
   const hasValidLatitude =
-  typeof visit.target.latitude === "number" &&
-  Number.isFinite(visit.target.latitude) &&
-  visit.target.latitude >= -90 &&
-  visit.target.latitude <= 90;
+    typeof visit.target.latitude === "number" &&
+    Number.isFinite(visit.target.latitude) &&
+    visit.target.latitude >= -90 &&
+    visit.target.latitude <= 90;
 
   const hasValidLongitude =
     typeof visit.target.longitude === "number" &&
@@ -143,8 +150,7 @@ function validateRestoredVisit(
   }
 
   const hasExpectedSteps = SERVICE_VISIT_STEPS.every(
-    (expectedStep, index) =>
-      visit.steps[index]?.id === expectedStep.id,
+    (expectedStep, index) => visit.steps[index]?.id === expectedStep.id,
   );
 
   if (!hasExpectedSteps) {
@@ -160,9 +166,7 @@ function transitionToNextStep(
   timestamp: string,
 ): ServiceVisit {
   if (visit.status !== "in_progress") {
-    throw new Error(
-      "Only an in-progress service visit can be updated.",
-    );
+    throw new Error("Only an in-progress service visit can be updated.");
   }
 
   if (visit.currentStep !== stepId) {
@@ -177,8 +181,7 @@ function transitionToNextStep(
     throw new Error("The requested service step is invalid.");
   }
 
-  const isFinalStep =
-    currentIndex === SERVICE_VISIT_STEPS.length - 1;
+  const isFinalStep = currentIndex === SERVICE_VISIT_STEPS.length - 1;
 
   const updatedSteps = visit.steps.map((step, index) => {
     if (index === currentIndex) {
@@ -211,76 +214,67 @@ function transitionToNextStep(
   };
 }
 
-export function ServiceVisitProvider({
-  children,
-}: PropsWithChildren) {
+export function ServiceVisitProvider({ children }: PropsWithChildren) {
   const { session, status: authStatus } = useAuth();
 
-  const [activeVisit, setActiveVisit] =
-    useState<ServiceVisit | null>(null);
+  const [activeVisit, setActiveVisit] = useState<ServiceVisit | null>(null);
 
   const [restoringVisit, setRestoringVisit] = useState(true);
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(
-    null,
-  );
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const userId = session?.user.id ?? null;
 
   const restoreVisit = useCallback(async (): Promise<void> => {
-  if (authStatus !== "authenticated" || !userId) {
-    setActiveVisit(null);
-    setRestoringVisit(false);
-    setErrorMessage(null);
-    return;
-  }
-
-  setRestoringVisit(true);
-  setErrorMessage(null);
-
-  try {
-    const storedVisit = await loadServiceVisit(userId);
-
-    if (!storedVisit) {
+    if (authStatus !== "authenticated" || !userId) {
       setActiveVisit(null);
+      setRestoringVisit(false);
+      setErrorMessage(null);
       return;
     }
 
-    const validVisit = validateRestoredVisit(
-      storedVisit,
-      userId,
-    );
+    setRestoringVisit(true);
+    setErrorMessage(null);
 
-    if (!validVisit) {
-      throw new Error(
-        "The saved service visit is invalid or uses an unsupported local format.",
+    try {
+      const storedVisit = await loadServiceVisit(userId);
+
+      if (!storedVisit) {
+        setActiveVisit(null);
+        return;
+      }
+
+      const validVisit = validateRestoredVisit(storedVisit, userId);
+
+      if (!validVisit) {
+        throw new Error(
+          "The saved service visit is invalid or uses an unsupported local format.",
+        );
+      }
+
+      setActiveVisit(validVisit);
+    } catch (error) {
+      setActiveVisit(null);
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to restore the active service visit.",
       );
+    } finally {
+      setRestoringVisit(false);
     }
+  }, [authStatus, userId]);
 
-    setActiveVisit(validVisit);
-  } catch (error) {
-    setActiveVisit(null);
+  useEffect(() => {
+    void restoreVisit();
+  }, [restoreVisit]);
 
-    setErrorMessage(
-      error instanceof Error
-        ? error.message
-        : "Unable to restore the active service visit.",
-    );
-  } finally {
-    setRestoringVisit(false);
-  }
-}, [authStatus, userId]);
+  const retryRestore = useCallback(async (): Promise<void> => {
+    await restoreVisit();
+  }, [restoreVisit]);
 
-useEffect(() => {
-  void restoreVisit();
-}, [restoreVisit]);
-
-const retryRestore = useCallback(async (): Promise<void> => {
-  await restoreVisit();
-}, [restoreVisit]);
-
-const clearLocalVisit =
-  useCallback(async (): Promise<void> => {
+  const clearLocalVisit = useCallback(async (): Promise<void> => {
     if (!userId) {
       setActiveVisit(null);
       setErrorMessage(null);
@@ -311,9 +305,7 @@ const clearLocalVisit =
       input: Omit<StartServiceVisitInput, "userId">,
     ): Promise<ServiceVisit> => {
       if (!userId) {
-        throw new Error(
-          "You must be signed in to start a service visit.",
-        );
+        throw new Error("You must be signed in to start a service visit.");
       }
 
       if (activeVisit?.status === "in_progress") {
@@ -326,25 +318,18 @@ const clearLocalVisit =
         );
       }
 
-      if (
-        input.target.latitude == null ||
-        input.target.longitude == null
-      ) {
+      if (input.target.latitude == null || input.target.longitude == null) {
         throw new Error(
           "This client has no valid geofence coordinates. Ask a manager to update the client location.",
         );
       }
 
       if (input.target.geofenceRadiusMeters <= 0) {
-        throw new Error(
-          "This client has an invalid geofence radius.",
-        );
+        throw new Error("This client has an invalid geofence radius.");
       }
 
       if (!input.machineId) {
-        throw new Error(
-          "A machine must be assigned before starting service.",
-        );
+        throw new Error("A machine must be assigned before starting service.");
       }
 
       if (
@@ -397,9 +382,7 @@ const clearLocalVisit =
   );
 
   const completeArrival = useCallback(
-    async (
-      input: CompleteArrivalInput,
-    ): Promise<ServiceVisit> => {
+    async (input: CompleteArrivalInput): Promise<ServiceVisit> => {
       if (!activeVisit) {
         throw new Error("There is no active service visit.");
       }
@@ -410,13 +393,10 @@ const clearLocalVisit =
         );
       }
 
-      const expectedRadius =
-        activeVisit.target.geofenceRadiusMeters;
+      const expectedRadius = activeVisit.target.geofenceRadiusMeters;
 
       if (expectedRadius <= 0) {
-        throw new Error(
-          "The client geofence radius is invalid.",
-        );
+        throw new Error("The client geofence radius is invalid.");
       }
 
       if (input.method === "geofence") {
@@ -433,14 +413,11 @@ const clearLocalVisit =
         }
 
         if (input.distanceMeters > expectedRadius) {
-          throw new Error(
-            "You are outside the client geofence.",
-          );
+          throw new Error("You are outside the client geofence.");
         }
       }
 
-      const normalizedOverrideReason =
-        input.overrideReason?.trim() ?? "";
+      const normalizedOverrideReason = input.overrideReason?.trim() ?? "";
 
       if (
         input.method === "manual_override" &&
@@ -486,9 +463,7 @@ const clearLocalVisit =
   );
 
   const completeMachineScan = useCallback(
-    async (
-      input: CompleteMachineScanInput,
-    ): Promise<ServiceVisit> => {
+    async (input: CompleteMachineScanInput): Promise<ServiceVisit> => {
       if (!activeVisit) {
         throw new Error("There is no active service visit.");
       }
@@ -505,13 +480,10 @@ const clearLocalVisit =
         throw new Error("The scanned QR code is empty.");
       }
 
-      const expectedQrCode =
-        activeVisit.machineTarget.qrCode.trim();
+      const expectedQrCode = activeVisit.machineTarget.qrCode.trim();
 
       if (!expectedQrCode) {
-        throw new Error(
-          "The assigned machine has no valid QR code.",
-        );
+        throw new Error("The assigned machine has no valid QR code.");
       }
 
       if (scannedValue !== expectedQrCode) {
@@ -549,20 +521,14 @@ const clearLocalVisit =
   );
 
   const completeCurrentStep = useCallback(
-    async (
-      stepId: PlaceholderStepId,
-    ): Promise<ServiceVisit> => {
+    async (stepId: PlaceholderStepId): Promise<ServiceVisit> => {
       if (!activeVisit) {
         throw new Error("There is no active service visit.");
       }
 
       const now = new Date().toISOString();
 
-      const updatedVisit = transitionToNextStep(
-        activeVisit,
-        stepId,
-        now,
-      );
+      const updatedVisit = transitionToNextStep(activeVisit, stepId, now);
 
       await saveServiceVisit(updatedVisit);
 
@@ -594,31 +560,24 @@ const clearLocalVisit =
     setErrorMessage(null);
   }, [activeVisit]);
 
-  const clearCompletedVisit =
-    useCallback(async (): Promise<void> => {
-      if (!userId) {
-        setActiveVisit(null);
-        return;
-      }
-
-      if (
-        activeVisit &&
-        activeVisit.status === "in_progress"
-      ) {
-        throw new Error(
-          "An in-progress visit cannot be removed.",
-        );
-      }
-
-      await removeServiceVisit(userId);
+  const clearCompletedVisit = useCallback(async (): Promise<void> => {
+    if (!userId) {
       setActiveVisit(null);
-      setErrorMessage(null);
-    }, [activeVisit, userId]);
+      return;
+    }
+
+    if (activeVisit && activeVisit.status === "in_progress") {
+      throw new Error("An in-progress visit cannot be removed.");
+    }
+
+    await removeServiceVisit(userId);
+    setActiveVisit(null);
+    setErrorMessage(null);
+  }, [activeVisit, userId]);
 
   const isVisitForStop = useCallback(
     (stopId: string): boolean =>
-      activeVisit?.status === "in_progress" &&
-      activeVisit.stopId === stopId,
+      activeVisit?.status === "in_progress" && activeVisit.stopId === stopId,
     [activeVisit],
   );
 

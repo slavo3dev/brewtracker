@@ -61,11 +61,11 @@ function getStatusLabel(status: TodayRouteStop["status"]): string {
   }
 }
 
-export default function StopDetailsScreen({ 
+export default function StopDetailsScreen({
   routeId,
   stop,
   onBack,
-  onServiceStarted, 
+  onServiceStarted,
 }: Props) {
   const {
     position,
@@ -74,23 +74,16 @@ export default function StopDetailsScreen({
     retry: retryLocation,
   } = useCurrentLocation();
 
-  const {
-    activeVisit,
-    startVisit,
-    isVisitForStop,
-  } = useServiceVisit();
+  const { activeVisit, startVisit, isVisitForStop } = useServiceVisit();
 
   const [startingService, setStartingService] = useState(false);
 
-  const [serviceError, setServiceError] = useState<string | null>(
-    null,
-  );
+  const [serviceError, setServiceError] = useState<string | null>(null);
 
   const hasVisitForThisStop = isVisitForStop(stop.id);
 
   const hasDifferentActiveVisit =
-    activeVisit?.status === "in_progress" &&
-    activeVisit.stopId !== stop.id;
+    activeVisit?.status === "in_progress" && activeVisit.stopId !== stop.id;
 
   const [openingNavigation, setOpeningNavigation] = useState(false);
   const [navigationError, setNavigationError] = useState<string | null>(null);
@@ -155,9 +148,7 @@ export default function StopDetailsScreen({
     setServiceError(null);
 
     if (!stop.machine) {
-      throw new Error(
-        "No machine is assigned to this service stop.",
-      );
+      throw new Error("No machine is assigned to this service stop.");
     }
 
     if (!stop.machine.qrCode?.trim()) {
@@ -186,6 +177,9 @@ export default function StopDetailsScreen({
           model: stop.machine.model,
           serialNumber: stop.machine.serialNumber,
           qrCode: stop.machine.qrCode.trim(),
+          status: stop.machine.status,
+          installedAt: stop.machine.installedAt,
+          lastServiceAt: stop.machine.lastServiceAt,
         },
       });
 
@@ -348,8 +342,8 @@ export default function StopDetailsScreen({
           <Text style={styles.serviceTitle}>Service workflow</Text>
 
           <Text style={styles.serviceText}>
-            Complete all eight required service steps in sequence. Your
-            progress is saved automatically on this device.
+            Complete all eight required service steps in sequence. Your progress
+            is saved automatically on this device.
           </Text>
 
           {hasDifferentActiveVisit ? (
@@ -386,9 +380,7 @@ export default function StopDetailsScreen({
               <ActivityIndicator color="#ffffff" />
             ) : (
               <Text style={styles.serviceButtonText}>
-                {hasVisitForThisStop
-                  ? "Resume Service"
-                  : "Start Service"}
+                {hasVisitForThisStop ? "Resume Service" : "Start Service"}
               </Text>
             )}
           </Pressable>
