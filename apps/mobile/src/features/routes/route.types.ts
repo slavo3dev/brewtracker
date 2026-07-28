@@ -1,10 +1,8 @@
 import type { Database } from "@brewtracker/types";
 
-export type RouteStatus =
-  Database["public"]["Enums"]["route_status"];
+export type RouteStatus = Database["public"]["Enums"]["route_status"];
 
-export type StopStatus =
-  Database["public"]["Enums"]["stop_status"];
+export type StopStatus = Database["public"]["Enums"]["stop_status"];
 
 export type TodayRouteStop = {
   id: string;
@@ -35,6 +33,9 @@ export type TodayRouteStop = {
     model: string | null;
     serialNumber: string | null;
     qrCode: string | null;
+    status: Database["public"]["Enums"]["machine_status"];
+    installedAt: string | null;
+    lastServiceAt: string | null;
   } | null;
 };
 

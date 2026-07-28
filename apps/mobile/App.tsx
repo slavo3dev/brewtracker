@@ -1,5 +1,12 @@
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -17,8 +24,16 @@ import SelfieCaptureScreen from "./src/screens/SelfieCaptureScreen";
 import type { TodayRouteStop } from "./src/features/routes/route.types";
 import ServiceVisitScreen from "./src/screens/ServiceVisitScreen";
 import StopDetailsScreen from "./src/screens/StopDetailsScreen";
+import { getOpenTimeEntry } from "./src/features/time-clock/time-clock.service";
+import { requiresClockInSelfie } from "./src/features/time-clock/time-clock.types";
 
-type Screen = "home" | "clockIn" | "selfie" | "clockedIn" | "stopDetails" | "serviceVisit";
+type Screen =
+  | "home"
+  | "clockIn"
+  | "selfie"
+  | "clockedIn"
+  | "stopDetails"
+  | "serviceVisit";
 
 type SelectedStop = {
   routeId: string;
@@ -82,9 +97,11 @@ function AppContent() {
     null,
   );
   const [homeRefreshKey, setHomeRefreshKey] = useState(0);
-  const [selectedStop, setSelectedStop] = useState<SelectedStop  | null>(null);
-  const [serviceVisitRecoveryAction, setServiceVisitRecoveryAction] =
-  useState<"retry" | "discard" | null>(null);
+  const [selectedStop, setSelectedStop] = useState<SelectedStop | null>(null);
+  const [serviceVisitRecoveryAction, setServiceVisitRecoveryAction] = useState<
+    "retry" | "discard" | null
+  >(null);
+  const [restoringTimeClock, setRestoringTimeClock] = useState(true);
 
   useEffect(() => {
     if (status === "signed_out") {
@@ -104,61 +121,102 @@ function AppContent() {
       setScreen("serviceVisit");
     }
   }, [activeVisit, restoringVisit, status]);
-  
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function restoreIncompleteClockIn(): Promise<void> {
+      if (status !== "authenticated") {
+        if (mounted) {
+          setRestoringTimeClock(false);
+        }
+
+        return;
+      }
+
+      setRestoringTimeClock(true);
+
+      try {
+        const openEntry = await getOpenTimeEntry();
+
+        if (!mounted) {
+          return;
+        }
+
+        if (openEntry && requiresClockInSelfie(openEntry)) {
+          setCurrentTimeEntryId(openEntry.id);
+          setScreen("selfie");
+        }
+      } catch (error) {
+        console.error("Unable to restore incomplete clock-in:", error);
+      } finally {
+        if (mounted) {
+          setRestoringTimeClock(false);
+        }
+      }
+    }
+
+    void restoreIncompleteClockIn();
+
+    return () => {
+      mounted = false;
+    };
+  }, [status]);
+
   async function handleRetryServiceVisitRestore(): Promise<void> {
-  if (serviceVisitRecoveryAction) {
-    return;
+    if (serviceVisitRecoveryAction) {
+      return;
+    }
+
+    setServiceVisitRecoveryAction("retry");
+
+    try {
+      await retryRestore();
+    } finally {
+      setServiceVisitRecoveryAction(null);
+    }
   }
 
-  setServiceVisitRecoveryAction("retry");
+  async function handleDiscardLocalServiceVisit(): Promise<void> {
+    if (serviceVisitRecoveryAction) {
+      return;
+    }
 
-  try {
-    await retryRestore();
-  } finally {
-    setServiceVisitRecoveryAction(null);
-  }
-}
+    setServiceVisitRecoveryAction("discard");
 
-async function handleDiscardLocalServiceVisit(): Promise<void> {
-  if (serviceVisitRecoveryAction) {
-    return;
-  }
+    try {
+      await clearLocalVisit();
 
-  setServiceVisitRecoveryAction("discard");
-
-  try {
-    await clearLocalVisit();
-
-    setSelectedStop(null);
-    setScreen("home");
-  } finally {
-    setServiceVisitRecoveryAction(null);
-  }
-}
-
-function confirmDiscardLocalServiceVisit(): void {
-  if (serviceVisitRecoveryAction) {
-    return;
+      setSelectedStop(null);
+      setScreen("home");
+    } finally {
+      setServiceVisitRecoveryAction(null);
+    }
   }
 
-  Alert.alert(
-    "Discard saved visit?",
-    "This removes the locally saved service visit from this device. This action cannot be undone.",
-    [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Discard",
-        style: "destructive",
-        onPress: () => {
-          void handleDiscardLocalServiceVisit();
+  function confirmDiscardLocalServiceVisit(): void {
+    if (serviceVisitRecoveryAction) {
+      return;
+    }
+
+    Alert.alert(
+      "Discard saved visit?",
+      "This removes the locally saved service visit from this device. This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
         },
-      },
-    ],
-  );
-}
+        {
+          text: "Discard",
+          style: "destructive",
+          onPress: () => {
+            void handleDiscardLocalServiceVisit();
+          },
+        },
+      ],
+    );
+  }
 
   if (status === "initializing") {
     return <LoadingScreen message="Restoring your session…" />;
@@ -180,38 +238,33 @@ function confirmDiscardLocalServiceVisit(): void {
     return <ErrorScreen />;
   }
 
+  if (restoringTimeClock) {
+    return <LoadingScreen message="Checking your clock-in status…" />;
+  }
+
   if (restoringVisit) {
-    return (
-      <LoadingScreen message="Restoring service visit…" />
-    );
+    return <LoadingScreen message="Restoring service visit…" />;
   }
 
   if (serviceVisitError) {
-    const recoveryPending =
-      serviceVisitRecoveryAction !== null;
+    const recoveryPending = serviceVisitRecoveryAction !== null;
 
     return (
       <View style={styles.centeredScreen}>
-        <Text style={styles.errorTitle}>
-          Unable to restore service visit
-        </Text>
+        <Text style={styles.errorTitle}>Unable to restore service visit</Text>
 
-        <Text style={styles.errorText}>
-          {serviceVisitError}
-        </Text>
+        <Text style={styles.errorText}>{serviceVisitError}</Text>
 
         <Text style={styles.recoveryDescription}>
-          You can try loading the saved visit again or discard the local
-          copy and continue to the app.
+          You can try loading the saved visit again or discard the local copy
+          and continue to the app.
         </Text>
 
         <Pressable
           accessibilityRole="button"
           style={({ pressed }) => [
             styles.recoveryPrimaryButton,
-            pressed &&
-              !recoveryPending &&
-              styles.recoveryButtonPressed,
+            pressed && !recoveryPending && styles.recoveryButtonPressed,
             recoveryPending && styles.recoveryButtonDisabled,
           ]}
           disabled={recoveryPending}
@@ -222,9 +275,7 @@ function confirmDiscardLocalServiceVisit(): void {
           {serviceVisitRecoveryAction === "retry" ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={styles.recoveryPrimaryButtonText}>
-              Try Again
-            </Text>
+            <Text style={styles.recoveryPrimaryButtonText}>Try Again</Text>
           )}
         </Pressable>
 
@@ -232,9 +283,7 @@ function confirmDiscardLocalServiceVisit(): void {
           accessibilityRole="button"
           style={({ pressed }) => [
             styles.recoverySecondaryButton,
-            pressed &&
-              !recoveryPending &&
-              styles.recoveryButtonPressed,
+            pressed && !recoveryPending && styles.recoveryButtonPressed,
             recoveryPending && styles.recoveryButtonDisabled,
           ]}
           disabled={recoveryPending}
@@ -267,7 +316,7 @@ function confirmDiscardLocalServiceVisit(): void {
           setCurrentTimeEntryId(timeEntryId);
           setScreen("selfie");
         }}
-         onStopPress={(routeId, stop) => {
+        onStopPress={(routeId, stop) => {
           setSelectedStop({
             routeId,
             stop,
@@ -321,10 +370,7 @@ function confirmDiscardLocalServiceVisit(): void {
     return (
       <ServiceVisitScreen
         onBack={() => {
-          if (
-            selectedStop &&
-            activeVisit?.stopId === selectedStop.stop.id
-          ) {
+          if (selectedStop && activeVisit?.stopId === selectedStop.stop.id) {
             setScreen("stopDetails");
             return;
           }
@@ -385,6 +431,8 @@ function confirmDiscardLocalServiceVisit(): void {
       <SelfieCaptureScreen
         timeEntryId={currentTimeEntryId}
         onCompleted={() => {
+          setHomeRefreshKey((currentValue) => currentValue + 1);
+
           setScreen("clockedIn");
         }}
       />
@@ -453,13 +501,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   recoveryDescription: {
-  color: "#8a6f53",
-  fontSize: 14,
-  lineHeight: 20,
-  marginTop: 12,
-  maxWidth: 360,
-  textAlign: "center",
-},
+    color: "#8a6f53",
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 12,
+    maxWidth: 360,
+    textAlign: "center",
+  },
   recoveryPrimaryButton: {
     alignItems: "center",
     backgroundColor: "#7a3f2c",

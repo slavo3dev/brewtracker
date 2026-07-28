@@ -18,6 +18,7 @@ import {
 } from "../features/service-visit/service-visit.types";
 import ArrivalStep from "../features/service-visit/ArrivalStep";
 import MachineScanStep from "../features/service-visit/MachineScanStep";
+import MachineDigitalPassportCard from "../features/service-visit/MachineDigitalPassportCard";
 
 type Props = {
   onBack: () => void;
@@ -32,10 +33,7 @@ type PlaceholderStepId = Exclude<
 function isPlaceholderStep(
   stepId: ServiceVisitStepId,
 ): stepId is PlaceholderStepId {
-  return (
-    stepId !== "arrival" &&
-    stepId !== "machine_scan"
-  );
+  return stepId !== "arrival" && stepId !== "machine_scan";
 }
 
 function getStepStatusLabel(
@@ -55,49 +53,37 @@ export default function ServiceVisitScreen({
   onBack,
   onVisitCompleted,
 }: Props) {
-  const {
-    activeVisit,
-    completeCurrentStep,
-    clearCompletedVisit,
-  } = useServiceVisit();
+  const { activeVisit, completeCurrentStep, clearCompletedVisit } =
+    useServiceVisit();
 
   const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(
-    null,
-  );
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!activeVisit) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>
-            No active service visit
-          </Text>
+          <Text style={styles.emptyTitle}>No active service visit</Text>
 
           <Text style={styles.emptyText}>
             Return to the route and select a stop.
           </Text>
 
           <Pressable style={styles.primaryButton} onPress={onBack}>
-            <Text style={styles.primaryButtonText}>
-              Return to Route
-            </Text>
+            <Text style={styles.primaryButtonText}>Return to Route</Text>
           </Pressable>
         </View>
       </SafeAreaView>
     );
   }
 
-  const currentStep = getServiceVisitStep(
-    activeVisit.currentStep,
-  );
+  const currentStep = getServiceVisitStep(activeVisit.currentStep);
 
   const currentStepIndex = SERVICE_VISIT_STEPS.findIndex(
     (step) => step.id === activeVisit.currentStep,
   );
 
-  const currentStepNumber =
-    currentStepIndex >= 0 ? currentStepIndex + 1 : 1;
+  const currentStepNumber = currentStepIndex >= 0 ? currentStepIndex + 1 : 1;
 
   async function handleCompleteCurrentStep(): Promise<void> {
     if (!activeVisit || submitting) {
@@ -116,9 +102,7 @@ export default function ServiceVisitScreen({
     setErrorMessage(null);
 
     try {
-      const updatedVisit = await completeCurrentStep(
-        activeVisit.currentStep,
-      );
+      const updatedVisit = await completeCurrentStep(activeVisit.currentStep);
 
       if (updatedVisit.status === "completed") {
         Alert.alert(
@@ -179,15 +163,13 @@ export default function ServiceVisitScreen({
           <Text style={styles.progressLabel}>
             {activeVisit.status === "completed"
               ? "Service complete"
-              : `Step ${currentStepNumber} of ${
-                  SERVICE_VISIT_STEPS.length
-                }`}
+              : `Step ${currentStepNumber} of ${SERVICE_VISIT_STEPS.length}`}
           </Text>
 
           <Text style={styles.progressTitle}>
             {activeVisit.status === "completed"
               ? "All steps completed"
-              : currentStep?.title ?? "Service visit"}
+              : (currentStep?.title ?? "Service visit")}
           </Text>
 
           <Text style={styles.progressDescription}>
@@ -196,9 +178,7 @@ export default function ServiceVisitScreen({
               : currentStep?.description}
           </Text>
 
-          <Text style={styles.visitReference}>
-            Visit ID: {activeVisit.id}
-          </Text>
+          <Text style={styles.visitReference}>Visit ID: {activeVisit.id}</Text>
         </View>
 
         {errorMessage ? (
@@ -209,56 +189,34 @@ export default function ServiceVisitScreen({
 
         {activeVisit.arrivalVerification ? (
           <View style={styles.arrivalSummaryCard}>
-            <Text style={styles.arrivalSummaryTitle}>
-              Arrival verified
-            </Text>
+            <Text style={styles.arrivalSummaryTitle}>Arrival verified</Text>
 
             <Text style={styles.arrivalSummaryText}>
-              {activeVisit.arrivalVerification.method ===
-              "manual_override"
+              {activeVisit.arrivalVerification.method === "manual_override"
                 ? "Verified using a manual override."
                 : `Verified inside the ${
-                    activeVisit.arrivalVerification
-                      .geofenceRadiusMeters
+                    activeVisit.arrivalVerification.geofenceRadiusMeters
                   } m geofence.`}
             </Text>
 
             {activeVisit.arrivalVerification.distanceMeters != null ? (
               <Text style={styles.arrivalSummaryDetail}>
                 Recorded distance:{" "}
-                {Math.round(
-                  activeVisit.arrivalVerification.distanceMeters,
-                )}{" "}
-                m
+                {Math.round(activeVisit.arrivalVerification.distanceMeters)} m
               </Text>
             ) : null}
 
             {activeVisit.arrivalVerification.overrideReason ? (
               <Text style={styles.arrivalSummaryDetail}>
-                Reason:{" "}
-                {activeVisit.arrivalVerification.overrideReason}
+                Reason: {activeVisit.arrivalVerification.overrideReason}
               </Text>
             ) : null}
           </View>
         ) : null}
 
         {activeVisit.machineScanVerification ? (
-          <View style={styles.machineScanSummaryCard}>
-            <Text style={styles.machineScanSummaryTitle}>
-              Machine verified
-            </Text>
-
-            <Text style={styles.machineScanSummaryText}>
-              {activeVisit.machineTarget.name ??
-                activeVisit.machineTarget.model ??
-                "Assigned machine"}
-            </Text>
-
-            {activeVisit.machineTarget.serialNumber ? (
-              <Text style={styles.machineScanSummaryDetail}>
-                Serial: {activeVisit.machineTarget.serialNumber}
-              </Text>
-            ) : null}
+          <View style={styles.passportContainer}>
+            <MachineDigitalPassportCard machine={activeVisit.machineTarget} />
           </View>
         ) : null}
 
@@ -298,9 +256,9 @@ export default function ServiceVisitScreen({
               </Text>
 
               <Text style={styles.developmentNoticeText}>
-                Step {currentStepNumber} is not implemented yet.
-                This temporary control remains available for testing the
-                FLOW-1 state machine until its dedicated story is added.
+                Step {currentStepNumber} is not implemented yet. This temporary
+                control remains available for testing the FLOW-1 state machine
+                until its dedicated story is added.
               </Text>
             </View>
 
@@ -325,7 +283,7 @@ export default function ServiceVisitScreen({
             </Pressable>
           </>
         )}
-        
+
         <View style={styles.stepsCard}>
           {activeVisit.steps.map((stepState, index) => {
             const definition = SERVICE_VISIT_STEPS[index];
@@ -335,8 +293,7 @@ export default function ServiceVisitScreen({
                 key={stepState.id}
                 style={[
                   styles.stepRow,
-                  index === activeVisit.steps.length - 1 &&
-                    styles.stepRowLast,
+                  index === activeVisit.steps.length - 1 && styles.stepRowLast,
                 ]}
               >
                 <View
@@ -344,8 +301,7 @@ export default function ServiceVisitScreen({
                     styles.stepNumber,
                     stepState.status === "completed" &&
                       styles.stepNumberCompleted,
-                    stepState.status === "current" &&
-                      styles.stepNumberCurrent,
+                    stepState.status === "current" && styles.stepNumberCurrent,
                   ]}
                 >
                   <Text
@@ -355,9 +311,7 @@ export default function ServiceVisitScreen({
                         styles.stepNumberTextActive,
                     ]}
                   >
-                    {stepState.status === "completed"
-                      ? "✓"
-                      : definition.number}
+                    {stepState.status === "completed" ? "✓" : definition.number}
                   </Text>
                 </View>
 
@@ -365,8 +319,7 @@ export default function ServiceVisitScreen({
                   <Text
                     style={[
                       styles.stepTitle,
-                      stepState.status === "locked" &&
-                        styles.stepTitleLocked,
+                      stepState.status === "locked" && styles.stepTitleLocked,
                     ]}
                   >
                     {definition.title}
@@ -622,28 +575,7 @@ const styles = StyleSheet.create({
   activeStepContainer: {
     marginTop: 18,
   },
-  machineScanSummaryCard: {
-    backgroundColor: "#e8f2e5",
-    borderColor: "#c8ddc3",
-    borderRadius: 12,
-    borderWidth: 1,
+  passportContainer: {
     marginTop: 16,
-    padding: 14,
-  },
-  machineScanSummaryTitle: {
-    color: "#3a6b3e",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  machineScanSummaryText: {
-    color: "#4c7050",
-    fontSize: 13,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  machineScanSummaryDetail: {
-    color: "#5e7c61",
-    fontSize: 12,
-    marginTop: 4,
   },
 });

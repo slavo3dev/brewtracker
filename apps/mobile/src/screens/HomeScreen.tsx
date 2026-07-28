@@ -17,16 +17,17 @@ import {
   clockOut,
   getOpenTimeEntry,
 } from "../features/time-clock/time-clock.service";
-import type { TimeEntry } from "../features/time-clock/time-clock.types";
+import {
+  hasCompletedClockInSelfie,
+  requiresClockInSelfie,
+  type TimeEntry,
+} from "../features/time-clock/time-clock.types";
 
 type Props = {
   onClockInPress: () => void;
   onResumeSelfie: (timeEntryId: string) => void;
   refreshKey: number;
-  onStopPress?: (
-    routeId: string,
-    stop: TodayRouteStop,
-  ) => void;
+  onStopPress?: (routeId: string, stop: TodayRouteStop) => void;
 };
 
 function formatClockTime(value: string): string {
@@ -82,15 +83,10 @@ export default function HomeScreen({
     void loadOpenEntry();
   }, [loadOpenEntry, refreshKey]);
 
-  const requiresSelfie =
-    openEntry?.selfie_status === "required" ||
-    openEntry?.selfie_status === "missing";
+  const requiresSelfie = openEntry !== null && requiresClockInSelfie(openEntry);
 
   const canAccessRouteStops =
-    openEntry !== null &&
-    !requiresSelfie &&
-    (openEntry.selfie_status === "uploaded" ||
-      openEntry.selfie_status === "waived");
+    openEntry !== null && hasCompletedClockInSelfie(openEntry);
 
   async function handleClockOut(): Promise<void> {
     if (!openEntry || clockingOut) {

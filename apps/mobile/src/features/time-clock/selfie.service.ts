@@ -5,10 +5,7 @@ import { supabase } from "../../lib/supabase";
 
 const SELFIE_BUCKET = "time-entry-selfies";
 
-export type SelfieUploadPhase =
-  | "preparing"
-  | "uploading"
-  | "attaching";
+export type SelfieUploadPhase = "preparing" | "uploading" | "attaching";
 
 export type UploadClockInSelfieInput = {
   timeEntryId: string;
@@ -198,11 +195,7 @@ export async function uploadClockInSelfie({
   try {
     onPhaseChange?.("attaching");
 
-    await attachSelfiePathToTimeEntry(
-      timeEntryId,
-      userId,
-      storagePath,
-    );
+    await attachSelfiePathToTimeEntry(timeEntryId, userId, storagePath);
   } catch (error) {
     await removeUploadedFile(storagePath);
     throw error;

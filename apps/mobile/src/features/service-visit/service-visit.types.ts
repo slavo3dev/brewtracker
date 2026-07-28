@@ -1,4 +1,4 @@
-import type { GeoPoint } from "@brewtracker/types";
+import type { Database, GeoPoint } from "@brewtracker/types";
 
 export const SERVICE_VISIT_STEPS = [
   {
@@ -51,18 +51,11 @@ export const SERVICE_VISIT_STEPS = [
   },
 ] as const;
 
-export type ServiceVisitStepId =
-  (typeof SERVICE_VISIT_STEPS)[number]["id"];
+export type ServiceVisitStepId = (typeof SERVICE_VISIT_STEPS)[number]["id"];
 
-export type ServiceVisitStatus =
-  | "in_progress"
-  | "completed"
-  | "cancelled";
+export type ServiceVisitStatus = "in_progress" | "completed" | "cancelled";
 
-export type ServiceVisitStepStatus =
-  | "locked"
-  | "current"
-  | "completed";
+export type ServiceVisitStepStatus = "locked" | "current" | "completed";
 
 export type ServiceVisitStepState = {
   id: ServiceVisitStepId;
@@ -83,11 +76,13 @@ export type ServiceVisitMachineTarget = {
   model: string | null;
   serialNumber: string | null;
   qrCode: string;
+
+  status: Database["public"]["Enums"]["machine_status"];
+  installedAt: string | null;
+  lastServiceAt: string | null;
 };
 
-export type ArrivalVerificationMethod =
-  | "geofence"
-  | "manual_override";
+export type ArrivalVerificationMethod = "geofence" | "manual_override";
 
 export type ArrivalVerification = {
   method: ArrivalVerificationMethod;
@@ -160,15 +155,11 @@ export type CompleteArrivalInput = {
   overrideReason?: string | null;
 };
 
-export function getServiceVisitStepIndex(
-  stepId: ServiceVisitStepId,
-): number {
+export function getServiceVisitStepIndex(stepId: ServiceVisitStepId): number {
   return SERVICE_VISIT_STEPS.findIndex((step) => step.id === stepId);
 }
 
-export function getServiceVisitStep(
-  stepId: ServiceVisitStepId,
-) {
+export function getServiceVisitStep(stepId: ServiceVisitStepId) {
   return SERVICE_VISIT_STEPS.find((step) => step.id === stepId);
 }
 

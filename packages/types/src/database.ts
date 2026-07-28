@@ -116,6 +116,61 @@ export type Database = {
           },
         ]
       }
+      machine_meter_readings: {
+        Row: {
+          created_at: string
+          id: string
+          machine_id: string
+          notes: string | null
+          reading: number
+          recorded_at: string
+          recorded_by: string | null
+          service_stop_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          machine_id: string
+          notes?: string | null
+          reading: number
+          recorded_at?: string
+          recorded_by?: string | null
+          service_stop_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          machine_id?: string
+          notes?: string | null
+          reading?: number
+          recorded_at?: string
+          recorded_by?: string | null
+          service_stop_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_meter_readings_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_meter_readings_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_meter_readings_service_stop_id_fkey"
+            columns: ["service_stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       machines: {
         Row: {
           client_id: string
