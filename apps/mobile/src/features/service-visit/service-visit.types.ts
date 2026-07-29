@@ -51,6 +51,11 @@ export const SERVICE_VISIT_STEPS = [
   },
 ] as const;
 
+export const BEFORE_PHOTO_KINDS = [
+  "exterior",
+  "interior_hopper",
+] as const;
+
 export type ServiceVisitStepId = (typeof SERVICE_VISIT_STEPS)[number]["id"];
 
 export type ServiceVisitStatus = "in_progress" | "completed" | "cancelled";
@@ -104,6 +109,50 @@ export type MachineScanVerification = {
   verifiedAt: string;
 };
 
+export type BeforePhotoKind =
+  (typeof BEFORE_PHOTO_KINDS)[number];
+
+export type BeforePhotoUploadStatus =
+  | "pending_upload"
+  | "uploading"
+  | "uploaded"
+  | "failed";
+
+export type BeforePhotoRecord = {
+  kind: BeforePhotoKind;
+
+  /**
+   * Durable URI inside FileSystem.documentDirectory.
+   * Do not save the temporary CameraView URI here.
+   */
+  localUri: string;
+
+  /**
+   * Private Supabase Storage object path.
+   * This is not a public URL.
+   */
+  storagePath: string | null;
+
+  uploadStatus: BeforePhotoUploadStatus;
+  uploadError: string | null;
+
+  capturedAt: string;
+  uploadedAt: string | null;
+};
+
+export type SaveBeforePhotoInput = {
+  kind: BeforePhotoKind;
+  localUri: string;
+  capturedAt: string;
+};
+
+export type UpdateBeforePhotoUploadInput = {
+  uploadStatus: BeforePhotoUploadStatus;
+  storagePath?: string | null;
+  uploadError?: string | null;
+  uploadedAt?: string | null;
+};
+
 export type CompleteMachineScanInput = {
   scannedValue: string;
 };
@@ -126,6 +175,7 @@ export type ServiceVisit = {
 
   arrivalVerification: ArrivalVerification | null;
   machineScanVerification: MachineScanVerification | null;
+  beforePhotos: BeforePhotoRecord[];
 
   startedAt: string;
   updatedAt: string;

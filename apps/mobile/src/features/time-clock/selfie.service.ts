@@ -1,6 +1,6 @@
 import { decode } from "base64-arraybuffer";
 import * as FileSystem from "expo-file-system/legacy";
-
+import { prepareSelfie } from "./prepare-selfie";
 import { supabase } from "../../lib/supabase";
 
 const SELFIE_BUCKET = "time-entry-selfies";
@@ -184,7 +184,8 @@ export async function uploadClockInSelfie({
 
   onPhaseChange?.("preparing");
 
-  const base64Photo = await readPhotoAsBase64(photoUri);
+  const preparedSelfie = await prepareSelfie(photoUri);
+  const base64Photo = await readPhotoAsBase64(preparedSelfie.uri);
   const imageArrayBuffer = decode(base64Photo);
   const storagePath = createStoragePath(userId, timeEntryId);
 

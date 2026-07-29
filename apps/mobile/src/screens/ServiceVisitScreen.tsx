@@ -14,11 +14,13 @@ import { useServiceVisit } from "../features/service-visit/ServiceVisitProvider"
 import {
   getServiceVisitStep,
   SERVICE_VISIT_STEPS,
+  BEFORE_PHOTO_KINDS,
   type ServiceVisitStepId,
 } from "../features/service-visit/service-visit.types";
 import ArrivalStep from "../features/service-visit/ArrivalStep";
 import MachineScanStep from "../features/service-visit/MachineScanStep";
 import MachineDigitalPassportCard from "../features/service-visit/MachineDigitalPassportCard";
+import BeforePhotosStep from "../features/service-visit/BeforePhotosStep";
 
 type Props = {
   onBack: () => void;
@@ -27,13 +29,17 @@ type Props = {
 
 type PlaceholderStepId = Exclude<
   ServiceVisitStepId,
-  "arrival" | "machine_scan"
+  "arrival" | "machine_scan" | "before_photos"
 >;
 
 function isPlaceholderStep(
   stepId: ServiceVisitStepId,
 ): stepId is PlaceholderStepId {
-  return stepId !== "arrival" && stepId !== "machine_scan";
+  return (
+    stepId !== "arrival" &&
+    stepId !== "machine_scan" &&
+    stepId !== "before_photos"
+  );
 }
 
 function getStepStatusLabel(
@@ -85,6 +91,14 @@ export default function ServiceVisitScreen({
 
   const currentStepNumber = currentStepIndex >= 0 ? currentStepIndex + 1 : 1;
 
+  const uploadedBeforePhotoCount = activeVisit.beforePhotos.filter(
+    (photo) => photo.uploadStatus === "uploaded",
+  ).length;
+
+  const failedBeforePhotoCount = activeVisit.beforePhotos.filter(
+    (photo) => photo.uploadStatus === "failed",
+  ).length;
+  
   async function handleCompleteCurrentStep(): Promise<void> {
     if (!activeVisit || submitting) {
       return;
@@ -220,6 +234,30 @@ export default function ServiceVisitScreen({
           </View>
         ) : null}
 
+        {activeVisit.beforePhotos.length === BEFORE_PHOTO_KINDS.length &&
+          activeVisit.currentStep !== "before_photos" ? (
+            <View style={styles.beforePhotosSummaryCard}>
+              <Text style={styles.beforePhotosSummaryTitle}>
+                Before photos captured
+              </Text>
+
+              <Text style={styles.beforePhotosSummaryText}>
+                Exterior and interior/hopper views are stored locally.
+              </Text>
+
+              <Text style={styles.beforePhotosSummaryDetail}>
+                {uploadedBeforePhotoCount} of {BEFORE_PHOTO_KINDS.length} uploaded
+              </Text>
+
+              {failedBeforePhotoCount > 0 ? (
+                <Text style={styles.beforePhotosSummaryWarning}>
+                  {failedBeforePhotoCount} upload{" "}
+                  {failedBeforePhotoCount === 1 ? "needs" : "need"} retry.
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
         {activeVisit.status === "completed" ? (
           <Pressable
             style={({ pressed }) => [
@@ -247,6 +285,10 @@ export default function ServiceVisitScreen({
         ) : activeVisit.currentStep === "machine_scan" ? (
           <View style={styles.activeStepContainer}>
             <MachineScanStep />
+          </View>
+        ) : activeVisit.currentStep === "before_photos" ? (
+          <View style={styles.activeStepContainer}>
+            <BeforePhotosStep />
           </View>
         ) : (
           <>
@@ -577,5 +619,39 @@ const styles = StyleSheet.create({
   },
   passportContainer: {
     marginTop: 16,
+  },
+  beforePhotosSummaryCard: {
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#d6e4d8",
+    borderRadius: 16,
+    backgroundColor: "#f3faf4",
+    padding: 16,
+  },
+
+  beforePhotosSummaryTitle: {
+    marginBottom: 6,
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#244a2c",
+  },
+
+  beforePhotosSummaryText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#405847",
+  },
+
+  beforePhotosSummaryDetail: {
+    marginTop: 8,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#376640",
+  },
+    beforePhotosSummaryWarning: {
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#9a5b16",
   },
 });
