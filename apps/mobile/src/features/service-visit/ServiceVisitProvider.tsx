@@ -14,6 +14,7 @@ import {
   removeServiceVisit,
   saveServiceVisit,
 } from "./service-visit.storage";
+import { saveMachineMeterReading } from "./meter-reading.service";
 import {
   BEFORE_PHOTO_KINDS,
   createInitialStepStates,
@@ -22,6 +23,7 @@ import {
   type BeforePhotoKind,
   type CompleteArrivalInput,
   type CompleteMachineScanInput,
+  type CompleteMeterReadingInput,
   type SaveBeforePhotoInput,
   type ServiceVisit,
   type ServiceVisitStepId,
@@ -31,7 +33,10 @@ import {
 
 type PlaceholderStepId = Exclude<
   ServiceVisitStepId,
-  "arrival" | "machine_scan" | "before_photos"
+  | "arrival"
+  | "machine_scan"
+  | "before_photos"
+  | "meter_reading"
 >;
 
 type ServiceVisitContextValue = {
@@ -64,6 +69,10 @@ type ServiceVisitContextValue = {
 
   completeBeforePhotos: () => Promise<ServiceVisit>;
   
+  completeMeterReading: (
+    input: CompleteMeterReadingInput,
+  ) => Promise<ServiceVisit>;
+
   completeCurrentStep: (stepId: PlaceholderStepId) => Promise<ServiceVisit>;
 
   cancelVisit: () => Promise<void>;
@@ -209,9 +218,44 @@ function validateRestoredVisit(
     return null;
   }
 
+  const restoredMeterReading =
+    visit.meterReading ?? null;
+
+  if (restoredMeterReading) {
+    const hasValidReading =
+      Number.isSafeInteger(restoredMeterReading.reading) &&
+      restoredMeterReading.reading >= 0;
+
+    const hasValidPreviousReading =
+      restoredMeterReading.previousReading === null ||
+      (Number.isSafeInteger(
+        restoredMeterReading.previousReading,
+      ) &&
+        restoredMeterReading.previousReading >= 0);
+
+    const hasValidDelta =
+      restoredMeterReading.delta === null ||
+      (Number.isSafeInteger(restoredMeterReading.delta) &&
+        restoredMeterReading.delta >= 0);
+
+    if (
+      typeof restoredMeterReading.databaseId !== "string" ||
+      restoredMeterReading.databaseId.trim().length === 0 ||
+      typeof restoredMeterReading.sourceVisitId !== "string" ||
+      restoredMeterReading.sourceVisitId.trim().length === 0 ||
+      typeof restoredMeterReading.recordedAt !== "string" ||
+      !hasValidReading ||
+      !hasValidPreviousReading ||
+      !hasValidDelta
+    ) {
+      return null;
+    }
+  }
+
   return {
     ...visit,
     beforePhotos: restoredBeforePhotos,
+    meterReading: restoredMeterReading,
   };
 }
 
@@ -420,6 +464,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         arrivalVerification: null,
         machineScanVerification: null,
         beforePhotos: [],
+        meterReading: null,
 
         startedAt: now,
         updatedAt: now,
@@ -787,6 +832,72 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     [activeVisit],
   );
 
+  const completeMeterReading = useCallback(
+    async (
+      input: CompleteMeterReadingInput,
+    ): Promise<ServiceVisit> => {
+      if (!activeVisit) {
+        throw new Error(
+          "There is no active service visit.",
+        );
+      }
+
+      if (activeVisit.currentStep !== "meter_reading") {
+        throw new Error(
+          "The meter reading can only be completed during Step 4.",
+        );
+      }
+
+      if (
+        !Number.isSafeInteger(input.reading) ||
+        input.reading < 0
+      ) {
+        throw new Error(
+          "Enter a valid non-negative whole-number meter reading.",
+        );
+      }
+
+      const savedReading =
+        await saveMachineMeterReading({
+          machineId: activeVisit.machineId,
+          stopId: activeVisit.stopId,
+          recordedBy: activeVisit.userId,
+          sourceVisitId: activeVisit.id,
+          reading: input.reading,
+        });
+
+      const now = new Date().toISOString();
+
+      const visitWithMeterReading: ServiceVisit = {
+        ...activeVisit,
+        meterReading: {
+          databaseId: savedReading.id,
+          sourceVisitId: savedReading.sourceVisitId,
+          reading: savedReading.reading,
+          previousReading:
+            savedReading.previousReading,
+          delta: savedReading.delta,
+          recordedAt: savedReading.recordedAt,
+        },
+        updatedAt: now,
+      };
+
+      const updatedVisit = transitionToNextStep(
+        visitWithMeterReading,
+        "meter_reading",
+        now,
+      );
+
+      await saveServiceVisit(updatedVisit);
+
+      setActiveVisit(updatedVisit);
+      setErrorMessage(null);
+
+      return updatedVisit;
+    },
+    [activeVisit],
+  );
+
   const completeCurrentStep = useCallback(
     async (stepId: PlaceholderStepId): Promise<ServiceVisit> => {
       if (!activeVisit) {
@@ -860,6 +971,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       updateBeforePhotoUpload,
       removeBeforePhoto,
       completeBeforePhotos,
+      completeMeterReading,
       completeCurrentStep,
       cancelVisit,
       clearCompletedVisit,
@@ -878,6 +990,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       updateBeforePhotoUpload,
       removeBeforePhoto,
       completeBeforePhotos,
+      completeMeterReading,
       completeCurrentStep,
       cancelVisit,
       clearCompletedVisit,

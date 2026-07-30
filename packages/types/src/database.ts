@@ -119,33 +119,42 @@ export type Database = {
       machine_meter_readings: {
         Row: {
           created_at: string
+          delta: number | null
           id: string
           machine_id: string
           notes: string | null
+          previous_reading: number | null
           reading: number
           recorded_at: string
           recorded_by: string | null
           service_stop_id: string | null
+          source_visit_id: string
         }
         Insert: {
           created_at?: string
+          delta?: number | null
           id?: string
           machine_id: string
           notes?: string | null
+          previous_reading?: number | null
           reading: number
           recorded_at?: string
           recorded_by?: string | null
           service_stop_id?: string | null
+          source_visit_id: string
         }
         Update: {
           created_at?: string
+          delta?: number | null
           id?: string
           machine_id?: string
           notes?: string | null
+          previous_reading?: number | null
           reading?: number
           recorded_at?: string
           recorded_by?: string | null
           service_stop_id?: string | null
+          source_visit_id?: string
         }
         Relationships: [
           {
