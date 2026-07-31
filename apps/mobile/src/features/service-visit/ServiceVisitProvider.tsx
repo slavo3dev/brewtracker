@@ -652,6 +652,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         kind: input.kind,
         localUri: input.localUri,
         storagePath: null,
+        databaseId: null,
         uploadStatus: "pending_upload",
         uploadError: null,
         capturedAt: input.capturedAt,
@@ -714,6 +715,10 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
                   input.uploadedAt !== undefined
                     ? input.uploadedAt
                     : photo.uploadedAt,
+                databaseId:
+                  input.databaseId !== undefined
+                    ? input.databaseId
+                    : photo.databaseId,
               }
             : photo,
         );

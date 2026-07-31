@@ -203,19 +203,47 @@ export default function BeforePhotosStep() {
         uploadError: null,
       });
 
-      const result = await uploadBeforePhoto({
-        userId: visit.userId,
-        visitId: visit.id,
-        kind,
-        localUri,
-      });
+      const localPhoto =
+        visit.beforePhotos.find(
+          (photo) => photo.kind === kind,
+        );
+
+      if (!localPhoto) {
+        throw new Error(
+          "The local photo metadata could not be found.",
+        );
+      }
+
+      const result =
+        await uploadBeforePhoto({
+          userId: visit.userId,
+
+          visitId: visit.id,
+
+          stopId: visit.stopId,
+
+          machineId: visit.machineId,
+
+          capturedAt: localPhoto.capturedAt,
+
+          stage: "before",
+
+          kind,
+
+          localUri,
+        });
 
       await updateBeforePhotoUpload(kind, {
         uploadStatus: "uploaded",
+
         storagePath: result.storagePath,
+
+        databaseId: result.databaseId,
+
         uploadError: null,
+
         uploadedAt: new Date().toISOString(),
-      });
+    });
     } catch (error) {
       const message =
         error instanceof Error
@@ -275,6 +303,7 @@ export default function BeforePhotosStep() {
 
         await deleteUploadedBeforePhoto(
           previousPhoto.storagePath,
+          previousPhoto.databaseId,
         );
       }
 
@@ -314,6 +343,7 @@ export default function BeforePhotosStep() {
       await deleteLocalBeforePhoto(photo.localUri);
       await deleteUploadedBeforePhoto(
         photo.storagePath,
+        photo.databaseId,
       );
     } catch (error) {
       setErrorMessage(

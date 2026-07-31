@@ -1,9 +1,13 @@
 import { decode } from "base64-arraybuffer";
 import * as FileSystem from "expo-file-system/legacy";
-
 import { supabase } from "../../lib/supabase";
 import type { BeforePhotoKind } from "./service-visit.types";
 import { prepareServicePhoto } from "./photos/prepare-service-photo";
+import {
+  createServiceVisitPhoto,
+  deleteServiceVisitPhoto,
+  type ServicePhotoStage,
+} from "./service-visit-photo.service";
 
 const SERVICE_VISIT_PHOTOS_BUCKET =
   "service-visit-photos";
@@ -16,13 +20,25 @@ type PersistBeforePhotoInput = {
 
 type UploadBeforePhotoInput = {
   userId: string;
+
   visitId: string;
+
+  stopId: string;
+
+  machineId: string;
+
+  capturedAt: string;
+
+  stage: ServicePhotoStage;
+
   kind: BeforePhotoKind;
+
   localUri: string;
 };
 
 export type UploadBeforePhotoResult = {
   storagePath: string;
+  databaseId: string;
 };
 
 function requireDocumentDirectory(): string {
@@ -157,6 +173,10 @@ function createStoragePath({
 export async function uploadBeforePhoto({
   userId,
   visitId,
+  stopId,
+  machineId,
+  capturedAt,
+  stage,
   kind,
   localUri,
 }: UploadBeforePhotoInput): Promise<UploadBeforePhotoResult> {
@@ -168,6 +188,7 @@ export async function uploadBeforePhoto({
     visitId,
     kind,
   });
+  
 
   const { error } = await supabase.storage
     .from(SERVICE_VISIT_PHOTOS_BUCKET)
@@ -183,9 +204,29 @@ export async function uploadBeforePhoto({
     );
   }
 
-  return {
-    storagePath,
-  };
+  try {
+    const databaseId = await createServiceVisitPhoto({
+      userId,
+      visitId,
+      stopId,
+      machineId,
+      stage,
+      kind,
+      storagePath,
+      capturedAt,
+    });
+
+    return {
+      storagePath,
+      databaseId,
+    };
+  } catch (error) {
+    await supabase.storage
+      .from(SERVICE_VISIT_PHOTOS_BUCKET)
+      .remove([storagePath]);
+
+    throw error;
+  }
 }
 
 export async function deleteLocalBeforePhoto(
@@ -208,19 +249,22 @@ export async function deleteLocalBeforePhoto(
 
 export async function deleteUploadedBeforePhoto(
   storagePath: string | null | undefined,
+  databaseId: string | null | undefined,
 ): Promise<void> {
-  if (!storagePath) {
-    return;
+  if (storagePath) {
+    const { error } = await supabase.storage
+      .from(SERVICE_VISIT_PHOTOS_BUCKET)
+      .remove([storagePath]);
+
+    if (error) {
+      console.warn(
+        "Unable to remove replaced service photo:",
+        error.message,
+      );
+    }
   }
 
-  const { error } = await supabase.storage
-    .from(SERVICE_VISIT_PHOTOS_BUCKET)
-    .remove([storagePath]);
-
-  if (error) {
-    console.warn(
-      "Unable to remove replaced service photo:",
-      error.message,
-    );
+  if (databaseId) {
+    await deleteServiceVisitPhoto(databaseId);
   }
 }

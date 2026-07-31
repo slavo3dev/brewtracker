@@ -288,6 +288,67 @@ export type Database = {
           },
         ]
       }
+      service_visit_photos: {
+        Row: {
+          captured_at: string
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["service_photo_kind"]
+          machine_id: string
+          source_visit_id: string
+          stage: Database["public"]["Enums"]["service_photo_stage"]
+          stop_id: string
+          storage_path: string
+          uploaded_by: string
+        }
+        Insert: {
+          captured_at: string
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["service_photo_kind"]
+          machine_id: string
+          source_visit_id: string
+          stage: Database["public"]["Enums"]["service_photo_stage"]
+          stop_id: string
+          storage_path: string
+          uploaded_by: string
+        }
+        Update: {
+          captured_at?: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["service_photo_kind"]
+          machine_id?: string
+          source_visit_id?: string
+          stage?: Database["public"]["Enums"]["service_photo_stage"]
+          stop_id?: string
+          storage_path?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_visit_photos_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_photos_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_photos_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stops: {
         Row: {
           arrived_at: string | null
@@ -625,6 +686,8 @@ export type Database = {
         | "completed"
         | "cancelled"
       selfie_verification_status: "required" | "uploaded" | "missing" | "waived"
+      service_photo_kind: "exterior" | "interior_hopper"
+      service_photo_stage: "before" | "after" | "signature"
       stop_status: "pending" | "in_progress" | "completed" | "skipped"
       time_entry_review_status: "pending" | "approved" | "flagged" | "rejected"
       time_entry_status: "open" | "closed" | "flagged" | "manager_override"
@@ -765,6 +828,8 @@ export const Constants = {
         "cancelled",
       ],
       selfie_verification_status: ["required", "uploaded", "missing", "waived"],
+      service_photo_kind: ["exterior", "interior_hopper"],
+      service_photo_stage: ["before", "after", "signature"],
       stop_status: ["pending", "in_progress", "completed", "skipped"],
       time_entry_review_status: ["pending", "approved", "flagged", "rejected"],
       time_entry_status: ["open", "closed", "flagged", "manager_override"],
