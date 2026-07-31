@@ -153,6 +153,21 @@ export type UpdateBeforePhotoUploadInput = {
   uploadedAt?: string | null;
 };
 
+export type MeterReadingRecord = {
+  databaseId: string;
+  sourceVisitId: string;
+
+  reading: number;
+  previousReading: number | null;
+  delta: number | null;
+
+  recordedAt: string;
+};
+
+export type CompleteMeterReadingInput = {
+  reading: number;
+};
+
 export type CompleteMachineScanInput = {
   scannedValue: string;
 };
@@ -176,6 +191,7 @@ export type ServiceVisit = {
   arrivalVerification: ArrivalVerification | null;
   machineScanVerification: MachineScanVerification | null;
   beforePhotos: BeforePhotoRecord[];
+  meterReading: MeterReadingRecord | null;
 
   startedAt: string;
   updatedAt: string;

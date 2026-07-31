@@ -596,3 +596,53 @@ set
   route_date = current_date,
   status = 'scheduled',
   updated_at = now();
+
+  -- ==========================================================
+-- TODAY'S TEST ROUTE FOR MOBILE DRIVER
+-- ==========================================================
+
+begin;
+
+-- Remove an existing route for this driver today.
+-- Related stops are deleted automatically by ON DELETE CASCADE.
+delete from public.routes
+where driver_id = '0d6aa3f3-63ec-4262-b811-3e28edf6384e'::uuid
+  and route_date = current_date;
+
+with new_route as (
+  insert into public.routes (
+    driver_id,
+    warehouse_id,
+    route_date,
+    status,
+    created_by
+  )
+  select
+    '0d6aa3f3-63ec-4262-b811-3e28edf6384e'::uuid,
+    warehouse_id,
+    current_date,
+    'scheduled'::public.route_status,
+    created_by
+  from public.routes
+  where id = '73d3d34f-d742-4d44-9a6a-22fe169e90eb'::uuid
+  returning id
+)
+insert into public.stops (
+  route_id,
+  client_id,
+  machine_id,
+  sequence_number,
+  status
+)
+select
+  nr.id,
+  s.client_id,
+  s.machine_id,
+  s.sequence_number,
+  'pending'::public.stop_status
+from public.stops s
+cross join new_route nr
+where s.route_id = '73d3d34f-d742-4d44-9a6a-22fe169e90eb'::uuid
+order by s.sequence_number;
+
+commit;

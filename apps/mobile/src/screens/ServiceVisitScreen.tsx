@@ -21,6 +21,7 @@ import ArrivalStep from "../features/service-visit/ArrivalStep";
 import MachineScanStep from "../features/service-visit/MachineScanStep";
 import MachineDigitalPassportCard from "../features/service-visit/MachineDigitalPassportCard";
 import BeforePhotosStep from "../features/service-visit/BeforePhotosStep";
+import MeterReadingStep from "../features/service-visit/MeterReadingStep";
 
 type Props = {
   onBack: () => void;
@@ -29,7 +30,10 @@ type Props = {
 
 type PlaceholderStepId = Exclude<
   ServiceVisitStepId,
-  "arrival" | "machine_scan" | "before_photos"
+  | "arrival"
+  | "machine_scan"
+  | "before_photos"
+  | "meter_reading"
 >;
 
 function isPlaceholderStep(
@@ -38,7 +42,8 @@ function isPlaceholderStep(
   return (
     stepId !== "arrival" &&
     stepId !== "machine_scan" &&
-    stepId !== "before_photos"
+    stepId !== "before_photos" &&
+    stepId !== "meter_reading"
   );
 }
 
@@ -258,6 +263,50 @@ export default function ServiceVisitScreen({
             </View>
           ) : null}
 
+        {activeVisit.meterReading &&
+          activeVisit.currentStep !== "meter_reading" ? (
+            <View style={styles.meterReadingSummaryCard}>
+              <Text style={styles.meterReadingSummaryTitle}>
+                Meter reading recorded
+              </Text>
+
+              <View style={styles.meterReadingSummaryRow}>
+                <View>
+                  <Text style={styles.meterReadingSummaryLabel}>
+                    Current reading
+                  </Text>
+
+                  <Text style={styles.meterReadingSummaryValue}>
+                    {activeVisit.meterReading.reading.toLocaleString()}
+                  </Text>
+                </View>
+
+                {activeVisit.meterReading.delta !== null ? (
+                  <View style={styles.meterReadingDeltaContainer}>
+                    <Text style={styles.meterReadingSummaryLabel}>
+                      Increase
+                    </Text>
+
+                    <Text style={styles.meterReadingDeltaValue}>
+                      +{activeVisit.meterReading.delta.toLocaleString()}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {activeVisit.meterReading.previousReading !== null ? (
+                <Text style={styles.meterReadingSummaryDetail}>
+                  Previous reading:{" "}
+                  {activeVisit.meterReading.previousReading.toLocaleString()}
+                </Text>
+              ) : (
+                <Text style={styles.meterReadingSummaryDetail}>
+                  First recorded reading for this machine.
+                </Text>
+              )}
+            </View>
+          ) : null}    
+
         {activeVisit.status === "completed" ? (
           <Pressable
             style={({ pressed }) => [
@@ -289,6 +338,10 @@ export default function ServiceVisitScreen({
         ) : activeVisit.currentStep === "before_photos" ? (
           <View style={styles.activeStepContainer}>
             <BeforePhotosStep />
+          </View>
+        ) : activeVisit.currentStep === "meter_reading" ? (
+          <View style={styles.activeStepContainer}>
+            <MeterReadingStep />
           </View>
         ) : (
           <>
@@ -653,5 +706,51 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: "#9a5b16",
+  },
+  meterReadingSummaryCard: {
+    backgroundColor: "#eef5e9",
+    borderColor: "#cadcbe",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 16,
+  },
+  meterReadingSummaryTitle: {
+    color: "#315f35",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  meterReadingSummaryRow: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 12,
+  },
+  meterReadingSummaryLabel: {
+    color: "#658067",
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  meterReadingSummaryValue: {
+    color: "#244a2c",
+    fontSize: 24,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+  meterReadingDeltaContainer: {
+    alignItems: "flex-end",
+  },
+  meterReadingDeltaValue: {
+    color: "#3a6b3e",
+    fontSize: 19,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+  meterReadingSummaryDetail: {
+    color: "#5e7c61",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 10,
   },
 });
