@@ -33,10 +33,7 @@ import {
 
 type PlaceholderStepId = Exclude<
   ServiceVisitStepId,
-  | "arrival"
-  | "machine_scan"
-  | "before_photos"
-  | "meter_reading"
+  "arrival" | "machine_scan" | "before_photos" | "meter_reading"
 >;
 
 type ServiceVisitContextValue = {
@@ -52,23 +49,20 @@ type ServiceVisitContextValue = {
 
   completeMachineScan: (
     input: CompleteMachineScanInput,
-    ) => Promise<ServiceVisit>;
-
-    saveBeforePhoto: (
-    input: SaveBeforePhotoInput,
   ) => Promise<ServiceVisit>;
 
+  saveBeforePhoto: (input: SaveBeforePhotoInput) => Promise<ServiceVisit>;
+
   updateBeforePhotoUpload: (
+    visit: ServiceVisit,
     kind: BeforePhotoKind,
     input: UpdateBeforePhotoUploadInput,
   ) => Promise<ServiceVisit>;
 
-  removeBeforePhoto: (
-    kind: BeforePhotoKind,
-  ) => Promise<ServiceVisit>;
+  removeBeforePhoto: (kind: BeforePhotoKind) => Promise<ServiceVisit>;
 
   completeBeforePhotos: () => Promise<ServiceVisit>;
-  
+
   completeMeterReading: (
     input: CompleteMeterReadingInput,
   ) => Promise<ServiceVisit>;
@@ -185,41 +179,31 @@ function validateRestoredVisit(
     return null;
   }
 
-  const restoredBeforePhotos = Array.isArray(
-    visit.beforePhotos,
-  )
+  const restoredBeforePhotos = Array.isArray(visit.beforePhotos)
     ? visit.beforePhotos
     : [];
 
-  const hasValidBeforePhotos =
-    restoredBeforePhotos.every((photo) => {
-      const hasValidKind =
-        BEFORE_PHOTO_KINDS.includes(photo.kind);
+  const hasValidBeforePhotos = restoredBeforePhotos.every((photo) => {
+    const hasValidKind = BEFORE_PHOTO_KINDS.includes(photo.kind);
 
-      const hasValidLocalUri =
-        typeof photo.localUri === "string" &&
-        photo.localUri.trim().length > 0;
+    const hasValidLocalUri =
+      typeof photo.localUri === "string" && photo.localUri.trim().length > 0;
 
-      const hasValidStatus = [
-        "pending_upload",
-        "uploading",
-        "uploaded",
-        "failed",
-      ].includes(photo.uploadStatus);
+    const hasValidStatus = [
+      "pending_upload",
+      "uploading",
+      "uploaded",
+      "failed",
+    ].includes(photo.uploadStatus);
 
-      return (
-        hasValidKind &&
-        hasValidLocalUri &&
-        hasValidStatus
-      );
-    });
+    return hasValidKind && hasValidLocalUri && hasValidStatus;
+  });
 
   if (!hasValidBeforePhotos) {
     return null;
   }
 
-  const restoredMeterReading =
-    visit.meterReading ?? null;
+  const restoredMeterReading = visit.meterReading ?? null;
 
   if (restoredMeterReading) {
     const hasValidReading =
@@ -228,9 +212,7 @@ function validateRestoredVisit(
 
     const hasValidPreviousReading =
       restoredMeterReading.previousReading === null ||
-      (Number.isSafeInteger(
-        restoredMeterReading.previousReading,
-      ) &&
+      (Number.isSafeInteger(restoredMeterReading.previousReading) &&
         restoredMeterReading.previousReading >= 0);
 
     const hasValidDelta =
@@ -622,31 +604,22 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   );
 
   const saveBeforePhoto = useCallback(
-    async (
-      input: SaveBeforePhotoInput,
-    ): Promise<ServiceVisit> => {
+    async (input: SaveBeforePhotoInput): Promise<ServiceVisit> => {
       if (!activeVisit) {
-        throw new Error(
-          "There is no active service visit.",
-        );
+        throw new Error("There is no active service visit.");
       }
 
       if (activeVisit.currentStep !== "before_photos") {
-        throw new Error(
-          "Before photos can only be captured during Step 3.",
-        );
+        throw new Error("Before photos can only be captured during Step 3.");
       }
 
       if (!input.localUri.trim()) {
-        throw new Error(
-          "The locally stored photo URI is missing.",
-        );
+        throw new Error("The locally stored photo URI is missing.");
       }
 
-      const updatedPhotos =
-        activeVisit.beforePhotos.filter(
-          (photo) => photo.kind !== input.kind,
-        );
+      const updatedPhotos = activeVisit.beforePhotos.filter(
+        (photo) => photo.kind !== input.kind,
+      );
 
       updatedPhotos.push({
         kind: input.kind,
@@ -677,54 +650,45 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
   const updateBeforePhotoUpload = useCallback(
     async (
+      visit: ServiceVisit,
       kind: BeforePhotoKind,
       input: UpdateBeforePhotoUploadInput,
     ): Promise<ServiceVisit> => {
-      if (!activeVisit) {
-        throw new Error(
-          "There is no active service visit.",
-        );
-      }
-
-      const existingPhoto =
-        activeVisit.beforePhotos.find(
-          (photo) => photo.kind === kind,
-        );
+      const existingPhoto = visit.beforePhotos.find(
+        (photo) => photo.kind === kind,
+      );
 
       if (!existingPhoto) {
-        throw new Error(
-          "The selected before photo could not be found.",
-        );
+        throw new Error("The selected before photo could not be found.");
       }
 
-      const updatedPhotos =
-        activeVisit.beforePhotos.map((photo) =>
-          photo.kind === kind
-            ? {
-                ...photo,
-                uploadStatus: input.uploadStatus,
-                storagePath:
-                  input.storagePath !== undefined
-                    ? input.storagePath
-                    : photo.storagePath,
-                uploadError:
-                  input.uploadError !== undefined
-                    ? input.uploadError
-                    : photo.uploadError,
-                uploadedAt:
-                  input.uploadedAt !== undefined
-                    ? input.uploadedAt
-                    : photo.uploadedAt,
-                databaseId:
-                  input.databaseId !== undefined
-                    ? input.databaseId
-                    : photo.databaseId,
-              }
-            : photo,
-        );
+      const updatedPhotos = visit.beforePhotos.map((photo) =>
+        photo.kind === kind
+          ? {
+              ...photo,
+              uploadStatus: input.uploadStatus,
+              storagePath:
+                input.storagePath !== undefined
+                  ? input.storagePath
+                  : photo.storagePath,
+              uploadError:
+                input.uploadError !== undefined
+                  ? input.uploadError
+                  : photo.uploadError,
+              uploadedAt:
+                input.uploadedAt !== undefined
+                  ? input.uploadedAt
+                  : photo.uploadedAt,
+              databaseId:
+                input.databaseId !== undefined
+                  ? input.databaseId
+                  : photo.databaseId,
+            }
+          : photo,
+      );
 
       const updatedVisit: ServiceVisit = {
-        ...activeVisit,
+        ...visit,
         beforePhotos: updatedPhotos,
         updatedAt: new Date().toISOString(),
       };
@@ -735,23 +699,17 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
       return updatedVisit;
     },
-    [activeVisit],
+    [],
   );
 
   const removeBeforePhoto = useCallback(
-    async (
-      kind: BeforePhotoKind,
-    ): Promise<ServiceVisit> => {
+    async (kind: BeforePhotoKind): Promise<ServiceVisit> => {
       if (!activeVisit) {
-        throw new Error(
-          "There is no active service visit.",
-        );
+        throw new Error("There is no active service visit.");
       }
 
       if (activeVisit.currentStep !== "before_photos") {
-        throw new Error(
-          "Before photos can only be changed during Step 3.",
-        );
+        throw new Error("Before photos can only be changed during Step 3.");
       }
 
       const updatedVisit: ServiceVisit = {
@@ -772,79 +730,61 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     [activeVisit],
   );
 
-  const completeBeforePhotos = useCallback(
-    async (): Promise<ServiceVisit> => {
-      if (!activeVisit) {
-        throw new Error(
-          "There is no active service visit.",
-        );
-      }
+  const completeBeforePhotos = useCallback(async (): Promise<ServiceVisit> => {
+    if (!activeVisit) {
+      throw new Error("There is no active service visit.");
+    }
 
-      if (activeVisit.currentStep !== "before_photos") {
-        throw new Error(
-          "Before-photo verification can only be completed during Step 3.",
-        );
-      }
-
-      const exteriorPhoto =
-        activeVisit.beforePhotos.find(
-          (photo) => photo.kind === "exterior",
-        );
-
-      const interiorPhoto =
-        activeVisit.beforePhotos.find(
-          (photo) => photo.kind === "interior_hopper",
-        );
-
-      if (!exteriorPhoto?.localUri) {
-        throw new Error(
-          "Capture the required exterior machine photo.",
-        );
-      }
-
-      if (!interiorPhoto?.localUri) {
-        throw new Error(
-          "Capture the required interior/hopper photo.",
-        );
-      }
-
-      const hasUploadingPhoto =
-        activeVisit.beforePhotos.some(
-          (photo) => photo.uploadStatus === "uploading",
-        );
-
-      if (hasUploadingPhoto) {
-        throw new Error(
-          "Wait for the current photo upload attempt to finish.",
-        );
-      }
-
-      const now = new Date().toISOString();
-
-      const updatedVisit = transitionToNextStep(
-        activeVisit,
-        "before_photos",
-        now,
+    if (activeVisit.currentStep !== "before_photos") {
+      throw new Error(
+        "Before-photo verification can only be completed during Step 3.",
       );
+    }
 
-      await saveServiceVisit(updatedVisit);
+    const exteriorPhoto = activeVisit.beforePhotos.find(
+      (photo) => photo.kind === "exterior",
+    );
 
-      setActiveVisit(updatedVisit);
-      setErrorMessage(null);
+    const interiorPhoto = activeVisit.beforePhotos.find(
+      (photo) => photo.kind === "interior_hopper",
+    );
 
-      return updatedVisit;
-    },
-    [activeVisit],
-  );
+    if (!exteriorPhoto?.localUri) {
+      throw new Error("Capture the required exterior machine photo.");
+    }
+
+    if (!interiorPhoto?.localUri) {
+      throw new Error("Capture the required interior/hopper photo.");
+    }
+
+    const hasUploadingPhoto = activeVisit.beforePhotos.some(
+      (photo) => photo.uploadStatus === "uploading",
+    );
+
+    if (hasUploadingPhoto) {
+      throw new Error("Wait for the current photo upload attempt to finish.");
+    }
+
+    const now = new Date().toISOString();
+
+    const updatedVisit = transitionToNextStep(
+      activeVisit,
+      "before_photos",
+      now,
+    );
+
+    await saveServiceVisit(updatedVisit);
+
+    setActiveVisit(updatedVisit);
+    setErrorMessage(null);
+
+    return updatedVisit;
+  }, [activeVisit]);
 
   const completeMeterReading = useCallback(
-    async (
-      input: CompleteMeterReadingInput,
-    ): Promise<ServiceVisit> => {
+    async (input: CompleteMeterReadingInput): Promise<ServiceVisit> => {
       if (!activeVisit) {
-        throw new Error(
-          "There is no active service visit.",
-        );
+        throw new Error("There is no active service visit.");
       }
 
       if (activeVisit.currentStep !== "meter_reading") {
@@ -853,23 +793,19 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         );
       }
 
-      if (
-        !Number.isSafeInteger(input.reading) ||
-        input.reading < 0
-      ) {
+      if (!Number.isSafeInteger(input.reading) || input.reading < 0) {
         throw new Error(
           "Enter a valid non-negative whole-number meter reading.",
         );
       }
 
-      const savedReading =
-        await saveMachineMeterReading({
-          machineId: activeVisit.machineId,
-          stopId: activeVisit.stopId,
-          recordedBy: activeVisit.userId,
-          sourceVisitId: activeVisit.id,
-          reading: input.reading,
-        });
+      const savedReading = await saveMachineMeterReading({
+        machineId: activeVisit.machineId,
+        stopId: activeVisit.stopId,
+        recordedBy: activeVisit.userId,
+        sourceVisitId: activeVisit.id,
+        reading: input.reading,
+      });
 
       const now = new Date().toISOString();
 
@@ -879,8 +815,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
           databaseId: savedReading.id,
           sourceVisitId: savedReading.sourceVisitId,
           reading: savedReading.reading,
-          previousReading:
-            savedReading.previousReading,
+          previousReading: savedReading.previousReading,
           delta: savedReading.delta,
           recordedAt: savedReading.recordedAt,
         },

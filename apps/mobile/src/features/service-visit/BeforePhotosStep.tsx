@@ -1,8 +1,4 @@
-import {
-  CameraView,
-  type CameraType,
-  useCameraPermissions,
-} from "expo-camera";
+import { CameraView, type CameraType, useCameraPermissions } from "expo-camera";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,17 +20,12 @@ import { useServiceVisit } from "./ServiceVisitProvider";
 import type {
   BeforePhotoKind,
   BeforePhotoRecord,
+  ServiceVisit,
 } from "./service-visit.types";
 
-type CaptureState =
-  | "overview"
-  | "camera"
-  | "preview"
-  | "saving";
+type CaptureState = "overview" | "camera" | "preview" | "saving";
 
-function getPhotoTitle(
-  kind: BeforePhotoKind,
-): string {
+function getPhotoTitle(kind: BeforePhotoKind): string {
   switch (kind) {
     case "exterior":
       return "Machine exterior";
@@ -44,9 +35,7 @@ function getPhotoTitle(
   }
 }
 
-function getPhotoInstruction(
-  kind: BeforePhotoKind,
-): string {
+function getPhotoInstruction(kind: BeforePhotoKind): string {
   switch (kind) {
     case "exterior":
       return "Capture the complete front and exterior condition of the machine.";
@@ -56,9 +45,7 @@ function getPhotoInstruction(
   }
 }
 
-function getUploadLabel(
-  photo: BeforePhotoRecord,
-): string {
+function getUploadLabel(photo: BeforePhotoRecord): string {
   switch (photo.uploadStatus) {
     case "pending_upload":
       return "Queued for upload";
@@ -77,8 +64,7 @@ function getUploadLabel(
 export default function BeforePhotosStep() {
   const cameraRef = useRef<CameraView | null>(null);
 
-  const [permission, requestPermission] =
-    useCameraPermissions();
+  const [permission, requestPermission] = useCameraPermissions();
 
   const {
     activeVisit,
@@ -88,25 +74,23 @@ export default function BeforePhotosStep() {
     completeBeforePhotos,
   } = useServiceVisit();
 
-  const [captureState, setCaptureState] =
-    useState<CaptureState>("overview");
+  const [captureState, setCaptureState] = useState<CaptureState>("overview");
 
-  const [activeKind, setActiveKind] =
-    useState<BeforePhotoKind | null>(null);
+  const [activeKind, setActiveKind] = useState<BeforePhotoKind | null>(null);
 
-  const [temporaryPhotoUri, setTemporaryPhotoUri] =
-    useState<string | null>(null);
+  const [temporaryPhotoUri, setTemporaryPhotoUri] = useState<string | null>(
+    null,
+  );
 
   const [capturing, setCapturing] = useState(false);
 
-  const [uploadingKind, setUploadingKind] =
-    useState<BeforePhotoKind | null>(null);
+  const [uploadingKind, setUploadingKind] = useState<BeforePhotoKind | null>(
+    null,
+  );
 
-  const [completing, setCompleting] =
-    useState(false);
+  const [completing, setCompleting] = useState(false);
 
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!activeVisit) {
     return null;
@@ -115,25 +99,17 @@ export default function BeforePhotosStep() {
   const visit = activeVisit;
 
   const exteriorPhoto =
-    visit.beforePhotos.find(
-      (photo) => photo.kind === "exterior",
-    ) ?? null;
+    visit.beforePhotos.find((photo) => photo.kind === "exterior") ?? null;
 
   const interiorPhoto =
-    visit.beforePhotos.find(
-      (photo) =>
-        photo.kind === "interior_hopper",
-    ) ?? null;
+    visit.beforePhotos.find((photo) => photo.kind === "interior_hopper") ??
+    null;
 
-  const hasBothPhotos =
-    exteriorPhoto !== null &&
-    interiorPhoto !== null;
+  const hasBothPhotos = exteriorPhoto !== null && interiorPhoto !== null;
 
   const uploadInProgress =
     uploadingKind !== null ||
-    visit.beforePhotos.some(
-      (photo) => photo.uploadStatus === "uploading",
-    );
+    visit.beforePhotos.some((photo) => photo.uploadStatus === "uploading");
 
   function openCamera(kind: BeforePhotoKind): void {
     setActiveKind(kind);
@@ -154,11 +130,7 @@ export default function BeforePhotosStep() {
   }
 
   async function handleTakePhoto(): Promise<void> {
-    if (
-      !cameraRef.current ||
-      !activeKind ||
-      capturing
-    ) {
+    if (!cameraRef.current || !activeKind || capturing) {
       return;
     }
 
@@ -166,16 +138,13 @@ export default function BeforePhotosStep() {
     setErrorMessage(null);
 
     try {
-      const photo =
-        await cameraRef.current.takePictureAsync({
-          quality: 0.78,
-          skipProcessing: false,
-        });
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.78,
+        skipProcessing: false,
+      });
 
       if (!photo?.uri) {
-        throw new Error(
-          "The camera did not return a photo.",
-        );
+        throw new Error("The camera did not return a photo.");
       }
 
       setTemporaryPhotoUri(photo.uri);
@@ -192,65 +161,51 @@ export default function BeforePhotosStep() {
   }
 
   async function attemptUpload(
+    visit: ServiceVisit,
     kind: BeforePhotoKind,
     localUri: string,
   ): Promise<void> {
     setUploadingKind(kind);
 
     try {
-      await updateBeforePhotoUpload(kind, {
+      await updateBeforePhotoUpload(visit, kind, {
         uploadStatus: "uploading",
         uploadError: null,
       });
 
-      const localPhoto =
-        visit.beforePhotos.find(
-          (photo) => photo.kind === kind,
-        );
+      const localPhoto = visit.beforePhotos.find(
+        (photo: BeforePhotoRecord) => photo.kind === kind,
+      );
 
       if (!localPhoto) {
-        throw new Error(
-          "The local photo metadata could not be found.",
-        );
+        throw new Error("The local photo metadata could not be found.");
       }
 
-      const result =
-        await uploadBeforePhoto({
-          userId: visit.userId,
+      const result = await uploadBeforePhoto({
+        userId: visit.userId,
+        visitId: visit.id,
+        stopId: visit.stopId,
+        machineId: visit.machineId,
+        capturedAt: localPhoto.capturedAt,
+        stage: "before",
+        kind,
+        localUri,
+      });
 
-          visitId: visit.id,
-
-          stopId: visit.stopId,
-
-          machineId: visit.machineId,
-
-          capturedAt: localPhoto.capturedAt,
-
-          stage: "before",
-
-          kind,
-
-          localUri,
-        });
-
-      await updateBeforePhotoUpload(kind, {
+      await updateBeforePhotoUpload(visit, kind, {
         uploadStatus: "uploaded",
-
         storagePath: result.storagePath,
-
         databaseId: result.databaseId,
-
         uploadError: null,
-
         uploadedAt: new Date().toISOString(),
-    });
+      });
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "Unable to upload the service photo.";
 
-      await updateBeforePhotoUpload(kind, {
+      await updateBeforePhotoUpload(visit, kind, {
         uploadStatus: "failed",
         uploadError: message,
       });
@@ -260,11 +215,7 @@ export default function BeforePhotosStep() {
   }
 
   async function handleUsePhoto(): Promise<void> {
-    if (
-      !activeKind ||
-      !temporaryPhotoUri ||
-      captureState === "saving"
-    ) {
+    if (!activeKind || !temporaryPhotoUri || captureState === "saving") {
       return;
     }
 
@@ -272,34 +223,26 @@ export default function BeforePhotosStep() {
     setErrorMessage(null);
 
     try {
-      const previousPhoto =
-        visit.beforePhotos.find(
-          (photo) => photo.kind === activeKind,
-        );
+      const previousPhoto = visit.beforePhotos.find(
+        (photo) => photo.kind === activeKind,
+      );
 
-      const capturedAt =
-        new Date().toISOString();
+      const capturedAt = new Date().toISOString();
 
-      const localUri =
-        await persistBeforePhotoLocally({
-          visitId: visit.id,
-          kind: activeKind,
-          temporaryUri: temporaryPhotoUri,
-        });
+      const localUri = await persistBeforePhotoLocally({
+        visitId: visit.id,
+        kind: activeKind,
+        temporaryUri: temporaryPhotoUri,
+      });
 
-      await saveBeforePhoto({
+      const updatedVisit = await saveBeforePhoto({
         kind: activeKind,
         localUri,
         capturedAt,
       });
 
-      if (
-        previousPhoto &&
-        previousPhoto.localUri !== localUri
-      ) {
-        await deleteLocalBeforePhoto(
-          previousPhoto.localUri,
-        );
+      if (previousPhoto && previousPhoto.localUri !== localUri) {
+        await deleteLocalBeforePhoto(previousPhoto.localUri);
 
         await deleteUploadedBeforePhoto(
           previousPhoto.storagePath,
@@ -313,7 +256,7 @@ export default function BeforePhotosStep() {
       setTemporaryPhotoUri(null);
       setCaptureState("overview");
 
-      void attemptUpload(savedKind, localUri);
+      void attemptUpload(updatedVisit, savedKind, localUri);
     } catch (error) {
       setCaptureState("preview");
 
@@ -325,13 +268,8 @@ export default function BeforePhotosStep() {
     }
   }
 
-  async function handleRemovePhoto(
-    photo: BeforePhotoRecord,
-  ): Promise<void> {
-    if (
-      uploadingKind === photo.kind ||
-      completing
-    ) {
+  async function handleRemovePhoto(photo: BeforePhotoRecord): Promise<void> {
+    if (uploadingKind === photo.kind || completing) {
       return;
     }
 
@@ -341,10 +279,7 @@ export default function BeforePhotosStep() {
       await removeBeforePhoto(photo.kind);
 
       await deleteLocalBeforePhoto(photo.localUri);
-      await deleteUploadedBeforePhoto(
-        photo.storagePath,
-        photo.databaseId,
-      );
+      await deleteUploadedBeforePhoto(photo.storagePath, photo.databaseId);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -354,27 +289,18 @@ export default function BeforePhotosStep() {
     }
   }
 
-  async function handleRetryUpload(
-    photo: BeforePhotoRecord,
-  ): Promise<void> {
+  async function handleRetryUpload(photo: BeforePhotoRecord): Promise<void> {
     if (uploadingKind) {
       return;
     }
 
     setErrorMessage(null);
 
-    await attemptUpload(
-      photo.kind,
-      photo.localUri,
-    );
+    await attemptUpload(visit, photo.kind, photo.localUri);
   }
 
   async function handleCompleteStep(): Promise<void> {
-    if (
-      !hasBothPhotos ||
-      uploadInProgress ||
-      completing
-    ) {
+    if (!hasBothPhotos || uploadInProgress || completing) {
       return;
     }
 
@@ -399,9 +325,7 @@ export default function BeforePhotosStep() {
       <View style={styles.card}>
         <ActivityIndicator color="#9c5621" />
 
-        <Text style={styles.loadingText}>
-          Checking camera permission…
-        </Text>
+        <Text style={styles.loadingText}>Checking camera permission…</Text>
       </View>
     );
   }
@@ -409,17 +333,13 @@ export default function BeforePhotosStep() {
   if (!permission.granted) {
     return (
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>
-          Step 3 of 8
-        </Text>
+        <Text style={styles.eyebrow}>Step 3 of 8</Text>
 
-        <Text style={styles.title}>
-          Camera permission required
-        </Text>
+        <Text style={styles.title}>Camera permission required</Text>
 
         <Text style={styles.description}>
-          Camera access is required to capture the two mandatory
-          before-service photos.
+          Camera access is required to capture the two mandatory before-service
+          photos.
         </Text>
 
         <Pressable
@@ -438,28 +358,19 @@ export default function BeforePhotosStep() {
           }}
         >
           <Text style={styles.primaryButtonText}>
-            {permission.canAskAgain
-              ? "Allow Camera Access"
-              : "Open Settings"}
+            {permission.canAskAgain ? "Allow Camera Access" : "Open Settings"}
           </Text>
         </Pressable>
       </View>
     );
   }
 
-  if (
-    captureState === "camera" &&
-    activeKind
-  ) {
+  if (captureState === "camera" && activeKind) {
     return (
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>
-          Step 3 of 8
-        </Text>
+        <Text style={styles.eyebrow}>Step 3 of 8</Text>
 
-        <Text style={styles.title}>
-          {getPhotoTitle(activeKind)}
-        </Text>
+        <Text style={styles.title}>{getPhotoTitle(activeKind)}</Text>
 
         <Text style={styles.description}>
           {getPhotoInstruction(activeKind)}
@@ -475,9 +386,7 @@ export default function BeforePhotosStep() {
 
         {errorMessage ? (
           <View style={styles.errorCard}>
-            <Text style={styles.errorText}>
-              {errorMessage}
-            </Text>
+            <Text style={styles.errorText}>{errorMessage}</Text>
           </View>
         ) : null}
 
@@ -492,9 +401,7 @@ export default function BeforePhotosStep() {
             ]}
             onPress={closeCamera}
           >
-            <Text style={styles.secondaryButtonText}>
-              Cancel
-            </Text>
+            <Text style={styles.secondaryButtonText}>Cancel</Text>
           </Pressable>
 
           <Pressable
@@ -512,9 +419,7 @@ export default function BeforePhotosStep() {
             {capturing ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={styles.captureButtonText}>
-                Take Photo
-              </Text>
+              <Text style={styles.captureButtonText}>Take Photo</Text>
             )}
           </Pressable>
         </View>
@@ -525,21 +430,15 @@ export default function BeforePhotosStep() {
   if (
     temporaryPhotoUri &&
     activeKind &&
-    (captureState === "preview" ||
-      captureState === "saving")
+    (captureState === "preview" || captureState === "saving")
   ) {
-    const saving =
-      captureState === "saving";
+    const saving = captureState === "saving";
 
     return (
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>
-          Review photo
-        </Text>
+        <Text style={styles.eyebrow}>Review photo</Text>
 
-        <Text style={styles.title}>
-          {getPhotoTitle(activeKind)}
-        </Text>
+        <Text style={styles.title}>{getPhotoTitle(activeKind)}</Text>
 
         <Image
           resizeMode="cover"
@@ -549,9 +448,7 @@ export default function BeforePhotosStep() {
 
         {errorMessage ? (
           <View style={styles.errorCard}>
-            <Text style={styles.errorText}>
-              {errorMessage}
-            </Text>
+            <Text style={styles.errorText}>{errorMessage}</Text>
           </View>
         ) : null}
 
@@ -570,9 +467,7 @@ export default function BeforePhotosStep() {
               setCaptureState("camera");
             }}
           >
-            <Text style={styles.secondaryButtonText}>
-              Retake
-            </Text>
+            <Text style={styles.secondaryButtonText}>Retake</Text>
           </Pressable>
 
           <Pressable
@@ -590,9 +485,7 @@ export default function BeforePhotosStep() {
             {saving ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
-              <Text style={styles.captureButtonText}>
-                Use Photo
-              </Text>
+              <Text style={styles.captureButtonText}>Use Photo</Text>
             )}
           </Pressable>
         </View>
@@ -603,26 +496,20 @@ export default function BeforePhotosStep() {
   return (
     <View>
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>
-          Step 3 of 8
-        </Text>
+        <Text style={styles.eyebrow}>Step 3 of 8</Text>
 
-        <Text style={styles.title}>
-          Before-service photos
-        </Text>
+        <Text style={styles.title}>Before-service photos</Text>
 
         <Text style={styles.description}>
-          Capture both required views before touching, cleaning, or
-          restocking the machine. Photos are saved on this device
-          first and uploaded when possible.
+          Capture both required views before touching, cleaning, or restocking
+          the machine. Photos are saved on this device first and uploaded when
+          possible.
         </Text>
 
         <PhotoSlot
           kind="exterior"
           photo={exteriorPhoto}
-          uploading={
-            uploadingKind === "exterior"
-          }
+          uploading={uploadingKind === "exterior"}
           onCapture={openCamera}
           onRemove={(photo) => {
             void handleRemovePhoto(photo);
@@ -635,9 +522,7 @@ export default function BeforePhotosStep() {
         <PhotoSlot
           kind="interior_hopper"
           photo={interiorPhoto}
-          uploading={
-            uploadingKind === "interior_hopper"
-          }
+          uploading={uploadingKind === "interior_hopper"}
           onCapture={openCamera}
           onRemove={(photo) => {
             void handleRemovePhoto(photo);
@@ -650,24 +535,16 @@ export default function BeforePhotosStep() {
 
       {errorMessage ? (
         <View style={styles.errorCard}>
-          <Text style={styles.errorText}>
-            {errorMessage}
-          </Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       ) : null}
 
       <Pressable
         accessibilityRole="button"
-        disabled={
-          !hasBothPhotos ||
-          uploadInProgress ||
-          completing
-        }
+        disabled={!hasBothPhotos || uploadInProgress || completing}
         style={({ pressed }) => [
           styles.primaryButton,
-          (!hasBothPhotos ||
-            uploadInProgress ||
-            completing) &&
+          (!hasBothPhotos || uploadInProgress || completing) &&
             styles.buttonDisabled,
           pressed &&
             hasBothPhotos &&
@@ -718,21 +595,14 @@ function PhotoSlot({
     <View style={styles.photoSlot}>
       <View style={styles.photoSlotHeader}>
         <View style={styles.photoSlotTitleArea}>
-          <Text style={styles.photoSlotTitle}>
-            {getPhotoTitle(kind)}
-          </Text>
+          <Text style={styles.photoSlotTitle}>{getPhotoTitle(kind)}</Text>
 
           <Text style={styles.photoSlotInstruction}>
             {getPhotoInstruction(kind)}
           </Text>
         </View>
 
-        <View
-          style={[
-            styles.requiredBadge,
-            photo && styles.completeBadge,
-          ]}
-        >
+        <View style={[styles.requiredBadge, photo && styles.completeBadge]}>
           <Text
             style={[
               styles.requiredBadgeText,
@@ -754,21 +624,14 @@ function PhotoSlot({
 
           <View style={styles.uploadStatusRow}>
             {uploading ? (
-              <ActivityIndicator
-                color="#9c5621"
-                size="small"
-              />
+              <ActivityIndicator color="#9c5621" size="small" />
             ) : null}
 
-            <Text style={styles.uploadStatusText}>
-              {getUploadLabel(photo)}
-            </Text>
+            <Text style={styles.uploadStatusText}>{getUploadLabel(photo)}</Text>
           </View>
 
           {photo.uploadError ? (
-            <Text style={styles.uploadErrorText}>
-              {photo.uploadError}
-            </Text>
+            <Text style={styles.uploadErrorText}>{photo.uploadError}</Text>
           ) : null}
 
           <View style={styles.photoActions}>
@@ -784,9 +647,7 @@ function PhotoSlot({
                 onCapture(kind);
               }}
             >
-              <Text style={styles.smallSecondaryText}>
-                Retake
-              </Text>
+              <Text style={styles.smallSecondaryText}>Retake</Text>
             </Pressable>
 
             {photo.uploadStatus === "failed" ||
@@ -803,9 +664,7 @@ function PhotoSlot({
                   onRetry(photo);
                 }}
               >
-                <Text style={styles.smallPrimaryText}>
-                  Retry Upload
-                </Text>
+                <Text style={styles.smallPrimaryText}>Retry Upload</Text>
               </Pressable>
             ) : null}
 
@@ -821,9 +680,7 @@ function PhotoSlot({
                 onRemove(photo);
               }}
             >
-              <Text style={styles.removeButtonText}>
-                Remove
-              </Text>
+              <Text style={styles.removeButtonText}>Remove</Text>
             </Pressable>
           </View>
         </>
@@ -838,9 +695,7 @@ function PhotoSlot({
             onCapture(kind);
           }}
         >
-          <Text style={styles.addPhotoButtonText}>
-            Capture Photo
-          </Text>
+          <Text style={styles.addPhotoButtonText}>Capture Photo</Text>
         </Pressable>
       )}
     </View>

@@ -9,8 +9,7 @@ import {
   type ServicePhotoStage,
 } from "./service-visit-photo.service";
 
-const SERVICE_VISIT_PHOTOS_BUCKET =
-  "service-visit-photos";
+const SERVICE_VISIT_PHOTOS_BUCKET = "service-visit-photos";
 
 type PersistBeforePhotoInput = {
   visitId: string;
@@ -43,36 +42,24 @@ export type UploadBeforePhotoResult = {
 
 function requireDocumentDirectory(): string {
   if (!FileSystem.documentDirectory) {
-    throw new Error(
-      "Local document storage is unavailable on this device.",
-    );
+    throw new Error("Local document storage is unavailable on this device.");
   }
 
   return FileSystem.documentDirectory;
 }
 
-function getVisitBeforePhotoDirectory(
-  visitId: string,
-): string {
+function getVisitBeforePhotoDirectory(visitId: string): string {
   const documentDirectory = requireDocumentDirectory();
 
-  return (
-    `${documentDirectory}service-visits/` +
-    `${visitId}/before`
-  );
+  return `${documentDirectory}service-visits/` + `${visitId}/before`;
 }
 
-function createLocalFileName(
-  kind: BeforePhotoKind,
-): string {
+function createLocalFileName(kind: BeforePhotoKind): string {
   return `${kind}-${Date.now()}.jpg`;
 }
 
-async function ensureDirectoryExists(
-  directoryUri: string,
-): Promise<void> {
-  const directoryInfo =
-    await FileSystem.getInfoAsync(directoryUri);
+async function ensureDirectoryExists(directoryUri: string): Promise<void> {
+  const directoryInfo = await FileSystem.getInfoAsync(directoryUri);
 
   if (directoryInfo.exists) {
     return;
@@ -83,15 +70,11 @@ async function ensureDirectoryExists(
   });
 }
 
-async function assertFileExists(
-  fileUri: string,
-): Promise<void> {
+async function assertFileExists(fileUri: string): Promise<void> {
   const fileInfo = await FileSystem.getInfoAsync(fileUri);
 
   if (!fileInfo.exists) {
-    throw new Error(
-      "The captured service photo could not be found.",
-    );
+    throw new Error("The captured service photo could not be found.");
   }
 }
 
@@ -107,16 +90,13 @@ export async function persistBeforePhotoLocally({
   kind,
   temporaryUri,
 }: PersistBeforePhotoInput): Promise<string> {
-  const preparedPhoto =
-    await prepareServicePhoto(temporaryUri);
+  const preparedPhoto = await prepareServicePhoto(temporaryUri);
 
-  const directoryUri =
-    getVisitBeforePhotoDirectory(visitId);
+  const directoryUri = getVisitBeforePhotoDirectory(visitId);
 
   await ensureDirectoryExists(directoryUri);
 
-  const localUri =
-    `${directoryUri}/${createLocalFileName(kind)}`;
+  const localUri = `${directoryUri}/${createLocalFileName(kind)}`;
 
   await FileSystem.copyAsync({
     from: preparedPhoto.uri,
@@ -128,22 +108,15 @@ export async function persistBeforePhotoLocally({
   return localUri;
 }
 
-async function readPhotoAsArrayBuffer(
-  localUri: string,
-): Promise<ArrayBuffer> {
+async function readPhotoAsArrayBuffer(localUri: string): Promise<ArrayBuffer> {
   await assertFileExists(localUri);
 
-  const base64 = await FileSystem.readAsStringAsync(
-    localUri,
-    {
-      encoding: FileSystem.EncodingType.Base64,
-    },
-  );
+  const base64 = await FileSystem.readAsStringAsync(localUri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
 
   if (!base64) {
-    throw new Error(
-      "The locally stored service photo is empty.",
-    );
+    throw new Error("The locally stored service photo is empty.");
   }
 
   return decode(base64);
@@ -153,14 +126,8 @@ function createStoragePath({
   userId,
   visitId,
   kind,
-}: Pick<
-  UploadBeforePhotoInput,
-  "userId" | "visitId" | "kind"
->): string {
-  return (
-    `${userId}/${visitId}/before/` +
-    `${kind}-${Date.now()}.jpg`
-  );
+}: Pick<UploadBeforePhotoInput, "userId" | "visitId" | "kind">): string {
+  return `${userId}/${visitId}/before/` + `${kind}-${Date.now()}.jpg`;
 }
 
 /**
@@ -180,15 +147,13 @@ export async function uploadBeforePhoto({
   kind,
   localUri,
 }: UploadBeforePhotoInput): Promise<UploadBeforePhotoResult> {
-  const imageArrayBuffer =
-    await readPhotoAsArrayBuffer(localUri);
+  const imageArrayBuffer = await readPhotoAsArrayBuffer(localUri);
 
   const storagePath = createStoragePath({
     userId,
     visitId,
     kind,
   });
-  
 
   const { error } = await supabase.storage
     .from(SERVICE_VISIT_PHOTOS_BUCKET)
@@ -199,9 +164,7 @@ export async function uploadBeforePhoto({
     });
 
   if (error) {
-    throw new Error(
-      `Unable to upload the service photo: ${error.message}`,
-    );
+    throw error;
   }
 
   try {
@@ -257,10 +220,7 @@ export async function deleteUploadedBeforePhoto(
       .remove([storagePath]);
 
     if (error) {
-      console.warn(
-        "Unable to remove replaced service photo:",
-        error.message,
-      );
+      console.warn("Unable to remove replaced service photo:", error.message);
     }
   }
 
