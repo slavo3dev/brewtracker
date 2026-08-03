@@ -132,7 +132,7 @@ export type BeforePhotoRecord = {
    * This is not a public URL.
    */
   storagePath: string | null;
-
+  databaseId: string | null;
   uploadStatus: BeforePhotoUploadStatus;
   uploadError: string | null;
 
@@ -149,6 +149,7 @@ export type SaveBeforePhotoInput = {
 export type UpdateBeforePhotoUploadInput = {
   uploadStatus: BeforePhotoUploadStatus;
   storagePath?: string | null;
+  databaseId?: string | null;
   uploadError?: string | null;
   uploadedAt?: string | null;
 };
