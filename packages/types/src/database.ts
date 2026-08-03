@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      client_inventory_products: {
+        Row: {
+          client_id: string
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          is_required: boolean
+          product_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          product_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          product_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_inventory_products_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_inventory_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
@@ -58,6 +106,149 @@ export type Database = {
           longitude?: number | null
           name?: string
           region?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inventory_audit_items: {
+        Row: {
+          audit_id: string
+          created_at: string
+          id: string
+          product_id: string
+          quantity: number
+          updated_at: string
+        }
+        Insert: {
+          audit_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+          quantity: number
+          updated_at?: string
+        }
+        Update: {
+          audit_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_audit_items_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audit_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_audits: {
+        Row: {
+          client_id: string
+          counted_at: string
+          counted_by: string
+          created_at: string
+          id: string
+          machine_id: string
+          source_visit_id: string
+          stop_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          counted_at: string
+          counted_by: string
+          created_at?: string
+          id?: string
+          machine_id: string
+          source_visit_id: string
+          stop_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          counted_at?: string
+          counted_by?: string
+          created_at?: string
+          id?: string
+          machine_id?: string
+          source_visit_id?: string
+          stop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_audits_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audits_counted_by_fkey"
+            columns: ["counted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audits_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audits_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_products: {
+        Row: {
+          category: Database["public"]["Enums"]["inventory_product_category"]
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          sku: string | null
+          sort_order: number
+          unit_label: string
+          updated_at: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["inventory_product_category"]
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          sku?: string | null
+          sort_order?: number
+          unit_label: string
+          updated_at?: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["inventory_product_category"]
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          sku?: string | null
+          sort_order?: number
+          unit_label?: string
           updated_at?: string
         }
         Relationships: []
@@ -671,6 +862,17 @@ export type Database = {
       is_driver: { Args: never; Returns: boolean }
       is_field_staff: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
+      save_inventory_audit: {
+        Args: {
+          p_client_id: string
+          p_counted_at: string
+          p_items: Json
+          p_machine_id: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
       warehouse_is_in_current_user_region: {
         Args: { target_warehouse_id: string }
         Returns: boolean
@@ -678,6 +880,13 @@ export type Database = {
     }
     Enums: {
       app_role: "driver" | "tech" | "manager" | "ceo"
+      inventory_product_category:
+        | "coffee"
+        | "powders"
+        | "sweeteners_stirrers"
+        | "cups_lids"
+        | "creamers"
+        | "cleaning"
       machine_status: "active" | "inactive" | "maintenance" | "retired"
       route_status:
         | "draft"
@@ -819,6 +1028,14 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["driver", "tech", "manager", "ceo"],
+      inventory_product_category: [
+        "coffee",
+        "powders",
+        "sweeteners_stirrers",
+        "cups_lids",
+        "creamers",
+        "cleaning",
+      ],
       machine_status: ["active", "inactive", "maintenance", "retired"],
       route_status: [
         "draft",

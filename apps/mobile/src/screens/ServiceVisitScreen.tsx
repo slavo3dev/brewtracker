@@ -22,6 +22,7 @@ import MachineScanStep from "../features/service-visit/MachineScanStep";
 import MachineDigitalPassportCard from "../features/service-visit/MachineDigitalPassportCard";
 import BeforePhotosStep from "../features/service-visit/BeforePhotosStep";
 import MeterReadingStep from "../features/service-visit/MeterReadingStep";
+import InventoryAuditStep from "../features/service-visit/InventoryAuditStep";
 
 type Props = {
   onBack: () => void;
@@ -34,6 +35,7 @@ type PlaceholderStepId = Exclude<
   | "machine_scan"
   | "before_photos"
   | "meter_reading"
+  | "inventory_audit"
 >;
 
 function isPlaceholderStep(
@@ -43,7 +45,8 @@ function isPlaceholderStep(
     stepId !== "arrival" &&
     stepId !== "machine_scan" &&
     stepId !== "before_photos" &&
-    stepId !== "meter_reading"
+    stepId !== "meter_reading" &&
+    stepId !== "inventory_audit"
   );
 }
 
@@ -305,7 +308,31 @@ export default function ServiceVisitScreen({
                 </Text>
               )}
             </View>
-          ) : null}    
+          ) : null} 
+
+          {activeVisit.inventoryAudit &&
+          activeVisit.currentStep !== "inventory_audit" ? (
+            <View style={styles.inventorySummaryCard}>
+              <Text style={styles.inventorySummaryTitle}>
+                Inventory audit recorded
+              </Text>
+
+              <Text style={styles.inventorySummaryText}>
+                {activeVisit.inventoryAudit.items.length}{" "}
+                {activeVisit.inventoryAudit.items.length === 1
+                  ? "product was"
+                  : "products were"}{" "}
+                counted at this location.
+              </Text>
+
+              <Text style={styles.inventorySummaryDetail}>
+                Sync status:{" "}
+                {activeVisit.inventoryAudit.syncStatus === "synced"
+                  ? "Synced"
+                  : "Waiting to sync"}
+              </Text>
+            </View>
+          ) : null}   
 
         {activeVisit.status === "completed" ? (
           <Pressable
@@ -342,6 +369,10 @@ export default function ServiceVisitScreen({
         ) : activeVisit.currentStep === "meter_reading" ? (
           <View style={styles.activeStepContainer}>
             <MeterReadingStep />
+          </View>
+        ) : activeVisit.currentStep === "inventory_audit" ? (
+          <View style={styles.activeStepContainer}>
+            <InventoryAuditStep />
           </View>
         ) : (
           <>
@@ -752,5 +783,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     marginTop: 10,
+  },
+  inventorySummaryCard: {
+  backgroundColor: "#eef5e9",
+  borderColor: "#cadcbe",
+  borderRadius: 16,
+  borderWidth: 1,
+  marginTop: 16,
+  padding: 16,
+},
+  inventorySummaryTitle: {
+    color: "#315f35",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  inventorySummaryText: {
+    color: "#4c7050",
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 6,
+  },
+  inventorySummaryDetail: {
+    color: "#5e7c61",
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 8,
   },
 });
