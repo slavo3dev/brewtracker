@@ -169,6 +169,51 @@ export type CompleteMeterReadingInput = {
   reading: number;
 };
 
+export type InventoryProductCategory =
+  Database["public"]["Enums"]["inventory_product_category"];
+
+export type ClientInventoryProduct = {
+  productId: string;
+  sku: string | null;
+  name: string;
+  category: InventoryProductCategory;
+  unitLabel: string;
+  displayOrder: number;
+  isRequired: boolean;
+};
+
+export type InventoryAuditCountInput = {
+  productId: string;
+  quantity: number;
+};
+
+export type CompleteInventoryAuditInput = {
+  counts: InventoryAuditCountInput[];
+};
+
+export type InventoryAuditItemRecord = {
+  productId: string;
+  sku: string | null;
+  name: string;
+  category: InventoryProductCategory;
+  unitLabel: string;
+  quantity: number;
+};
+
+export type InventoryAuditSyncStatus =
+  | "pending_sync"
+  | "synced"
+  | "failed";
+
+export type InventoryAuditRecord = {
+  databaseId: string | null;
+  sourceVisitId: string;
+  countedAt: string;
+  items: InventoryAuditItemRecord[];
+  syncStatus: InventoryAuditSyncStatus;
+  syncError: string | null;
+};
+
 export type CompleteMachineScanInput = {
   scannedValue: string;
 };
@@ -193,6 +238,7 @@ export type ServiceVisit = {
   machineScanVerification: MachineScanVerification | null;
   beforePhotos: BeforePhotoRecord[];
   meterReading: MeterReadingRecord | null;
+  inventoryAudit: InventoryAuditRecord | null;
 
   startedAt: string;
   updatedAt: string;
