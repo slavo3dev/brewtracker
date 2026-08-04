@@ -19,6 +19,7 @@ import {
   loadClientInventoryProducts,
   saveInventoryAudit,
 } from "./inventory-audit.service";
+import { saveRestockDrop } from "./restock-drop.service";
 import {
   BEFORE_PHOTO_KINDS,
   createInitialStepStates,
@@ -30,6 +31,8 @@ import {
   type CompleteMeterReadingInput,
   type CompleteInventoryAuditInput,
   type InventoryAuditItemRecord,
+  type CompleteRestockDropInput,
+  type RestockDropItemRecord,
   type SaveBeforePhotoInput,
   type ServiceVisit,
   type ServiceVisitStepId,
@@ -44,6 +47,7 @@ type PlaceholderStepId = Exclude<
   | "before_photos"
   | "meter_reading"
   | "inventory_audit"
+  | "restock"
 >;
 
 type ServiceVisitContextValue = {
@@ -81,6 +85,10 @@ type ServiceVisitContextValue = {
     input: CompleteInventoryAuditInput,
   ) => Promise<ServiceVisit>;
 
+  completeRestockDrop: (
+    input: CompleteRestockDropInput,
+  ) => Promise<ServiceVisit>;
+  
   completeCurrentStep: (stepId: PlaceholderStepId) => Promise<ServiceVisit>;
 
   cancelVisit: () => Promise<void>;
@@ -280,11 +288,53 @@ function validateRestoredVisit(
     }
   }
 
+  const restoredRestockDrop = visit.restockDrop ?? null;
+
+  if (restoredRestockDrop) {
+    const hasValidItems =
+      Array.isArray(restoredRestockDrop.items) &&
+      restoredRestockDrop.items.length > 0 &&
+      restoredRestockDrop.items.every(
+        (item) =>
+          typeof item.productId === "string" &&
+          item.productId.trim().length > 0 &&
+          typeof item.name === "string" &&
+          typeof item.unitLabel === "string" &&
+          Number.isFinite(item.countedQuantity) &&
+          item.countedQuantity >= 0 &&
+          Number.isFinite(item.parLevel) &&
+          item.parLevel >= 0 &&
+          Number.isFinite(item.recommendedQuantity) &&
+          item.recommendedQuantity >= 0 &&
+          Number.isFinite(item.actualQuantity) &&
+          item.actualQuantity >= 0,
+      );
+
+    const hasValidSyncStatus = [
+      "pending_sync",
+      "synced",
+      "failed",
+    ].includes(restoredRestockDrop.syncStatus);
+
+    if (
+      typeof restoredRestockDrop.sourceVisitId !== "string" ||
+      restoredRestockDrop.sourceVisitId.trim().length === 0 ||
+      typeof restoredRestockDrop.inventoryAuditId !== "string" ||
+      restoredRestockDrop.inventoryAuditId.trim().length === 0 ||
+      typeof restoredRestockDrop.confirmedAt !== "string" ||
+      !hasValidItems ||
+      !hasValidSyncStatus
+    ) {
+      return null;
+    }
+  }
+
   return {
     ...visit,
     beforePhotos: restoredBeforePhotos,
     meterReading: restoredMeterReading,
     inventoryAudit: restoredInventoryAudit,
+    restockDrop: restoredRestockDrop,
   };
 }
 
@@ -495,6 +545,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         beforePhotos: [],
         meterReading: null,
         inventoryAudit: null,
+        restockDrop: null,
 
         startedAt: now,
         updatedAt: now,
@@ -1063,6 +1114,231 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     [activeVisit],
   );
 
+  const completeRestockDrop = useCallback(
+  async (
+    input: CompleteRestockDropInput,
+  ): Promise<ServiceVisit> => {
+    if (!activeVisit) {
+      throw new Error("There is no active service visit.");
+    }
+
+    if (activeVisit.currentStep !== "restock") {
+      throw new Error(
+        "Restock can only be completed during Step 6.",
+      );
+    }
+
+    const inventoryAudit = activeVisit.inventoryAudit;
+
+    if (
+      !inventoryAudit ||
+      inventoryAudit.syncStatus !== "synced" ||
+      !inventoryAudit.databaseId
+    ) {
+      throw new Error(
+        "The inventory audit must be synced before restocking.",
+      );
+    }
+
+    if (input.quantities.length === 0) {
+      throw new Error(
+        "At least one restock quantity is required.",
+      );
+    }
+
+    const productIds = new Set<string>();
+
+    for (const quantity of input.quantities) {
+      if (!quantity.productId.trim()) {
+        throw new Error(
+          "Every restock quantity must reference a product.",
+        );
+      }
+
+      if (productIds.has(quantity.productId)) {
+        throw new Error(
+          "A product cannot appear more than once.",
+        );
+      }
+
+      if (
+        !Number.isFinite(quantity.actualQuantity) ||
+        quantity.actualQuantity < 0
+      ) {
+        throw new Error(
+          "Every actual restock quantity must be zero or greater.",
+        );
+      }
+
+      productIds.add(quantity.productId);
+    }
+
+    const configuredProducts =
+      await loadClientInventoryProducts(
+        activeVisit.clientId,
+      );
+
+    const configuredById = new Map(
+      configuredProducts.map((product) => [
+        product.productId,
+        product,
+      ]),
+    );
+
+    const auditByProductId = new Map(
+      inventoryAudit.items.map((item) => [
+        item.productId,
+        item,
+      ]),
+    );
+
+    const missingParProduct = configuredProducts.find(
+      (product) =>
+        auditByProductId.has(product.productId) &&
+        product.parLevel === null,
+    );
+
+    if (missingParProduct) {
+      throw new Error(
+        `${missingParProduct.name} does not have a configured par level.`,
+      );
+    }
+
+    const expectedProductIds = inventoryAudit.items.map(
+      (item) => item.productId,
+    );
+
+    if (
+      expectedProductIds.some(
+        (productId) => !productIds.has(productId),
+      )
+    ) {
+      throw new Error(
+        "Confirm the actual quantity for every audited product.",
+      );
+    }
+
+    const items: RestockDropItemRecord[] =
+      input.quantities.map((quantity) => {
+        const auditItem = auditByProductId.get(
+          quantity.productId,
+        );
+
+        const configuredProduct = configuredById.get(
+          quantity.productId,
+        );
+
+        if (
+          !auditItem ||
+          !configuredProduct ||
+          configuredProduct.parLevel === null
+        ) {
+          throw new Error(
+            "The inventory configuration changed. Reload the step and try again.",
+          );
+        }
+
+        const recommendedQuantity = Math.max(
+          configuredProduct.parLevel -
+            auditItem.quantity,
+          0,
+        );
+
+        return {
+          productId: auditItem.productId,
+          sku: auditItem.sku,
+          name: auditItem.name,
+          category: auditItem.category,
+          unitLabel: auditItem.unitLabel,
+          countedQuantity: auditItem.quantity,
+          parLevel: configuredProduct.parLevel,
+          recommendedQuantity,
+          actualQuantity: quantity.actualQuantity,
+        };
+      });
+
+    const confirmedAt = new Date().toISOString();
+
+    const visitWithPendingRestock: ServiceVisit = {
+      ...activeVisit,
+      restockDrop: {
+        databaseId: null,
+        sourceVisitId: activeVisit.id,
+        inventoryAuditId: inventoryAudit.databaseId,
+        confirmedAt,
+        items,
+        syncStatus: "pending_sync",
+        syncError: null,
+      },
+      updatedAt: confirmedAt,
+    };
+
+    await saveServiceVisit(visitWithPendingRestock);
+    setActiveVisit(visitWithPendingRestock);
+
+    try {
+      const databaseId = await saveRestockDrop({
+        sourceVisitId: activeVisit.id,
+        inventoryAuditId: inventoryAudit.databaseId,
+        clientId: activeVisit.clientId,
+        stopId: activeVisit.stopId,
+        machineId: activeVisit.machineId,
+        confirmedAt,
+        quantities: input.quantities,
+      });
+
+      const syncedAt = new Date().toISOString();
+
+      const visitWithSyncedRestock: ServiceVisit = {
+        ...visitWithPendingRestock,
+        restockDrop: {
+          ...visitWithPendingRestock.restockDrop!,
+          databaseId,
+          syncStatus: "synced",
+          syncError: null,
+        },
+        updatedAt: syncedAt,
+      };
+
+      const updatedVisit = transitionToNextStep(
+        visitWithSyncedRestock,
+        "restock",
+        syncedAt,
+      );
+
+      await saveServiceVisit(updatedVisit);
+
+      setActiveVisit(updatedVisit);
+      setErrorMessage(null);
+
+      return updatedVisit;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to sync the restock drop.";
+
+      const failedVisit: ServiceVisit = {
+        ...visitWithPendingRestock,
+        restockDrop: {
+          ...visitWithPendingRestock.restockDrop!,
+          syncStatus: "failed",
+          syncError: message,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+
+      await saveServiceVisit(failedVisit);
+
+      setActiveVisit(failedVisit);
+      setErrorMessage(message);
+
+      throw new Error(message);
+    }
+  },
+  [activeVisit],
+);
+
   const completeCurrentStep = useCallback(
     async (stepId: PlaceholderStepId): Promise<ServiceVisit> => {
       if (!activeVisit) {
@@ -1133,6 +1409,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       completeArrival,
       completeMachineScan,
       completeInventoryAudit,
+      completeRestockDrop,
       saveBeforePhoto,
       updateBeforePhotoUpload,
       removeBeforePhoto,
@@ -1153,6 +1430,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       completeArrival,
       completeMachineScan,
       completeInventoryAudit,
+      completeRestockDrop,
       saveBeforePhoto,
       updateBeforePhotoUpload,
       removeBeforePhoto,

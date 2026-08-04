@@ -13,6 +13,7 @@ type Json =
 type ClientProductQueryRow = {
   display_order: number;
   is_required: boolean;
+  par_level: number | string | null;
   product: {
     id: string;
     sku: string | null;
@@ -32,7 +33,7 @@ export type SaveInventoryAuditInput = {
 };
 
 const CLIENT_PRODUCTS_CACHE_PREFIX =
-  "brewtracker:client-inventory-products:v1";
+  "brewtracker:client-inventory-products:v2";
 
 function getCacheKey(clientId: string): string {
   return `${CLIENT_PRODUCTS_CACHE_PREFIX}:${clientId}`;
@@ -53,7 +54,11 @@ function validateProducts(
       typeof product.name === "string" &&
       typeof product.unitLabel === "string" &&
       typeof product.displayOrder === "number" &&
-      typeof product.isRequired === "boolean",
+      typeof product.isRequired === "boolean"  &&
+      (product.parLevel === null ||
+        (typeof product.parLevel === "number" &&
+          Number.isFinite(product.parLevel) &&
+          product.parLevel >= 0)),
   );
 }
 
@@ -101,6 +106,7 @@ export async function loadClientInventoryProducts(
     .select(`
       display_order,
       is_required,
+      par_level,
       product:inventory_products!client_inventory_products_product_id_fkey (
         id,
         sku,
@@ -144,6 +150,10 @@ export async function loadClientInventoryProducts(
         unitLabel: row.product.unit_label,
         displayOrder: row.display_order,
         isRequired: row.is_required,
+        parLevel:
+          row.par_level === null
+            ? null
+            : Number(row.par_level),
       },
     ];
   });
