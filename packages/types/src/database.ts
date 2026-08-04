@@ -22,6 +22,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_required: boolean
+          par_level: number | null
           product_id: string
           updated_at: string
         }
@@ -32,6 +33,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_required?: boolean
+          par_level?: number | null
           product_id: string
           updated_at?: string
         }
@@ -42,6 +44,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_required?: boolean
+          par_level?: number | null
           product_id?: string
           updated_at?: string
         }
@@ -252,6 +255,138 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      inventory_restock_drop_items: {
+        Row: {
+          actual_quantity: number
+          counted_quantity: number
+          created_at: string
+          id: string
+          movement_from: string
+          movement_to: string
+          par_level: number
+          product_id: string
+          recommended_quantity: number
+          restock_drop_id: string
+          updated_at: string
+        }
+        Insert: {
+          actual_quantity: number
+          counted_quantity: number
+          created_at?: string
+          id?: string
+          movement_from?: string
+          movement_to?: string
+          par_level: number
+          product_id: string
+          recommended_quantity: number
+          restock_drop_id: string
+          updated_at?: string
+        }
+        Update: {
+          actual_quantity?: number
+          counted_quantity?: number
+          created_at?: string
+          id?: string
+          movement_from?: string
+          movement_to?: string
+          par_level?: number
+          product_id?: string
+          recommended_quantity?: number
+          restock_drop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_restock_drop_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_restock_drop_items_restock_drop_id_fkey"
+            columns: ["restock_drop_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_restock_drops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_restock_drops: {
+        Row: {
+          audit_id: string
+          client_id: string
+          confirmed_at: string
+          created_at: string
+          id: string
+          machine_id: string
+          source_driver_id: string
+          source_visit_id: string
+          stop_id: string
+          updated_at: string
+        }
+        Insert: {
+          audit_id: string
+          client_id: string
+          confirmed_at: string
+          created_at?: string
+          id?: string
+          machine_id: string
+          source_driver_id: string
+          source_visit_id: string
+          stop_id: string
+          updated_at?: string
+        }
+        Update: {
+          audit_id?: string
+          client_id?: string
+          confirmed_at?: string
+          created_at?: string
+          id?: string
+          machine_id?: string
+          source_driver_id?: string
+          source_visit_id?: string
+          stop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_restock_drops_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_restock_drops_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_restock_drops_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_restock_drops_source_driver_id_fkey"
+            columns: ["source_driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_restock_drops_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       location_pings: {
         Row: {
@@ -866,6 +1001,18 @@ export type Database = {
         Args: {
           p_client_id: string
           p_counted_at: string
+          p_items: Json
+          p_machine_id: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
+      save_inventory_restock_drop: {
+        Args: {
+          p_audit_id: string
+          p_client_id: string
+          p_confirmed_at: string
           p_items: Json
           p_machine_id: string
           p_source_visit_id: string

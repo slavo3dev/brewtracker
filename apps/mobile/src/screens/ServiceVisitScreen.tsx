@@ -23,6 +23,7 @@ import MachineDigitalPassportCard from "../features/service-visit/MachineDigital
 import BeforePhotosStep from "../features/service-visit/BeforePhotosStep";
 import MeterReadingStep from "../features/service-visit/MeterReadingStep";
 import InventoryAuditStep from "../features/service-visit/InventoryAuditStep";
+import RestockDropStep from "../features/service-visit/RestockDropStep";
 
 type Props = {
   onBack: () => void;
@@ -36,6 +37,7 @@ type PlaceholderStepId = Exclude<
   | "before_photos"
   | "meter_reading"
   | "inventory_audit"
+  | "restock"
 >;
 
 function isPlaceholderStep(
@@ -46,7 +48,8 @@ function isPlaceholderStep(
     stepId !== "machine_scan" &&
     stepId !== "before_photos" &&
     stepId !== "meter_reading" &&
-    stepId !== "inventory_audit"
+    stepId !== "inventory_audit" &&
+    stepId !== "restock"
   );
 }
 
@@ -332,7 +335,46 @@ export default function ServiceVisitScreen({
                   : "Waiting to sync"}
               </Text>
             </View>
-          ) : null}   
+          ) : null} 
+
+          {activeVisit.restockDrop &&
+          activeVisit.currentStep !== "restock" ? (
+            <View style={styles.inventorySummaryCard}>
+              <Text style={styles.inventorySummaryTitle}>
+                Restock drop confirmed
+              </Text>
+
+              <Text style={styles.inventorySummaryText}>
+                {activeVisit.restockDrop.items.filter(
+                  (item) => item.actualQuantity > 0,
+                ).length}{" "}
+                {activeVisit.restockDrop.items.filter(
+                  (item) => item.actualQuantity > 0,
+                ).length === 1
+                  ? "product was"
+                  : "products were"}{" "}
+                moved from the driver to this client.
+              </Text>
+
+              <Text style={styles.inventorySummaryDetail}>
+                Total units left:{" "}
+                {activeVisit.restockDrop.items
+                  .reduce(
+                    (total, item) =>
+                      total + item.actualQuantity,
+                    0,
+                  )
+                  .toLocaleString()}
+              </Text>
+
+              <Text style={styles.inventorySummaryDetail}>
+                Sync status:{" "}
+                {activeVisit.restockDrop.syncStatus === "synced"
+                  ? "Synced"
+                  : "Waiting to sync"}
+              </Text>
+            </View>
+          ) : null}  
 
         {activeVisit.status === "completed" ? (
           <Pressable
@@ -373,6 +415,10 @@ export default function ServiceVisitScreen({
         ) : activeVisit.currentStep === "inventory_audit" ? (
           <View style={styles.activeStepContainer}>
             <InventoryAuditStep />
+          </View>
+        ) : activeVisit.currentStep === "restock" ? (
+          <View style={styles.activeStepContainer}>
+            <RestockDropStep />
           </View>
         ) : (
           <>

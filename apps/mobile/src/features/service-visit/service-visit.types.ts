@@ -180,6 +180,7 @@ export type ClientInventoryProduct = {
   unitLabel: string;
   displayOrder: number;
   isRequired: boolean;
+  parLevel: number | null;
 };
 
 export type InventoryAuditCountInput = {
@@ -214,6 +215,43 @@ export type InventoryAuditRecord = {
   syncError: string | null;
 };
 
+export type RestockDropQuantityInput = {
+  productId: string;
+  actualQuantity: number;
+};
+
+export type CompleteRestockDropInput = {
+  quantities: RestockDropQuantityInput[];
+};
+
+export type RestockDropItemRecord = {
+  productId: string;
+  sku: string | null;
+  name: string;
+  category: InventoryProductCategory;
+  unitLabel: string;
+
+  countedQuantity: number;
+  parLevel: number;
+  recommendedQuantity: number;
+  actualQuantity: number;
+};
+
+export type RestockDropSyncStatus =
+  | "pending_sync"
+  | "synced"
+  | "failed";
+
+export type RestockDropRecord = {
+  databaseId: string | null;
+  sourceVisitId: string;
+  inventoryAuditId: string;
+  confirmedAt: string;
+  items: RestockDropItemRecord[];
+  syncStatus: RestockDropSyncStatus;
+  syncError: string | null;
+};
+
 export type CompleteMachineScanInput = {
   scannedValue: string;
 };
@@ -239,6 +277,7 @@ export type ServiceVisit = {
   beforePhotos: BeforePhotoRecord[];
   meterReading: MeterReadingRecord | null;
   inventoryAudit: InventoryAuditRecord | null;
+  restockDrop: RestockDropRecord | null;
 
   startedAt: string;
   updatedAt: string;
