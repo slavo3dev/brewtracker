@@ -127,7 +127,7 @@ function createStoragePath({
   visitId,
   kind,
 }: Pick<UploadBeforePhotoInput, "userId" | "visitId" | "kind">): string {
-  return `${userId}/${visitId}/before/` + `${kind}-${Date.now()}.jpg`;
+  return `${userId}/${visitId}/before/${kind}.jpg`;
 }
 
 /**
@@ -160,7 +160,7 @@ export async function uploadBeforePhoto({
     .upload(storagePath, imageArrayBuffer, {
       contentType: "image/jpeg",
       cacheControl: "3600",
-      upsert: false,
+      upsert: true,
     });
 
   if (error) {
