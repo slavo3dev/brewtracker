@@ -25,14 +25,14 @@ export default async function FleetPage() {
         </h1>
 
         <p className="mt-2 text-sm text-steam-400">
-          Realtime view of active drivers and vans based on mobile GPS pings.
+          Realtime locations for clocked-in drivers. Managers see their region;
+          CEOs see all regions.
         </p>
       </header>
 
       {locations.length === 0 ? (
         <section className="rounded-2xl border border-latte-200 bg-crema-0 p-6 text-sm text-steam-400">
-          No live driver locations yet. Driver phones need to send location
-          pings first.
+          No clocked-in drivers have sent a location during the last 10 minutes.
         </section>
       ) : (
         <FleetMapLoader initialLocations={locations} />

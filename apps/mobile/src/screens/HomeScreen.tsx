@@ -22,6 +22,7 @@ import {
   requiresClockInSelfie,
   type TimeEntry,
 } from "../features/time-clock/time-clock.types";
+import { stopLocationTracking } from "../features/fleet/location-tracking.service";
 
 type Props = {
   onClockInPress: () => void;
@@ -98,6 +99,7 @@ export default function HomeScreen({
 
     try {
       await clockOut(openEntry.id);
+      await stopLocationTracking();
       await loadOpenEntry();
       await refreshRoute();
     } catch (error) {
@@ -111,6 +113,7 @@ export default function HomeScreen({
 
   async function handleLogout(): Promise<void> {
     try {
+      await stopLocationTracking();
       await signOut();
     } catch (error) {
       setTimeClockError(
