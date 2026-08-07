@@ -17,6 +17,8 @@ import type {
   ClockTarget,
 } from "../features/time-clock/time-clock.types";
 import { useGeofence } from "../hooks/useGeofence";
+import { useAuth } from "../features/auth/AuthProvider";
+import { startLocationTracking } from "../features/fleet/location-tracking.service";
 
 type Props = {
   onBack: () => void;
@@ -24,6 +26,10 @@ type Props = {
 };
 
 export default function ClockInScreen({ onBack, onClockedIn }: Props) {
+  
+  const { session } = useAuth();
+  const user = session?.user ?? null;
+  
   const [clockContext, setClockContext] = useState<ClockContext | null>(null);
   const [loadingTargets, setLoadingTargets] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -150,7 +156,23 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
         target: matchedTarget,
       });
 
+      if (user) {
+        try {
+          await startLocationTracking({
+            driverId: user.id,
+            routeId: result.timeEntry.route_id,
+            timeEntryId: result.timeEntry.id,
+          });
+        } catch (trackingError) {
+          console.warn(
+            "Clock-in succeeded, but live tracking could not start:",
+            trackingError,
+          );
+        }
+      }
+
       onClockedIn(result.timeEntry.id);
+
     } catch (error) {
       setScreenError(
         error instanceof Error ? error.message : "Unable to clock in.",

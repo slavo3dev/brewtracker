@@ -26,6 +26,10 @@ import ServiceVisitScreen from "./src/screens/ServiceVisitScreen";
 import StopDetailsScreen from "./src/screens/StopDetailsScreen";
 import { getOpenTimeEntry } from "./src/features/time-clock/time-clock.service";
 import { requiresClockInSelfie } from "./src/features/time-clock/time-clock.types";
+import {
+  restoreLocationTracking,
+  stopLocationTracking,
+} from "./src/features/fleet/location-tracking.service";
 
 type Screen =
   | "home"
@@ -109,6 +113,18 @@ function AppContent() {
       setCurrentTimeEntryId(null);
       setSelectedStop(null);
       setHomeRefreshKey(0);
+
+      void stopLocationTracking();
+      return;
+    }
+
+    if (status === "authenticated") {
+      void restoreLocationTracking().catch((error: unknown) => {
+        console.warn(
+          "Unable to restore live location tracking:",
+          error,
+        );
+      });
     }
   }, [status]);
 

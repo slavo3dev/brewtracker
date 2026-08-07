@@ -961,7 +961,41 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      active_fleet_locations: {
+        Row: {
+          accuracy_meters: number | null
+          created_at: string | null
+          driver_email: string | null
+          driver_full_name: string | null
+          driver_id: string | null
+          driver_region: string | null
+          heading: number | null
+          id: string | null
+          latitude: number | null
+          longitude: number | null
+          recorded_at: string | null
+          route_date: string | null
+          route_id: string | null
+          route_status: Database["public"]["Enums"]["route_status"] | null
+          speed_meters_per_second: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_pings_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_pings_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       client_is_in_current_user_region: {

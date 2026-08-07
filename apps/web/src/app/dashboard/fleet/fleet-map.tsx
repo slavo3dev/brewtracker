@@ -3,24 +3,77 @@
 import type { FleetLocation } from "@/lib/fleet/fleet-service";
 import { createClient } from "@/lib/supabase/client";
 import L from "leaflet";
-import { useEffect, useMemo, useState } from "react";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  MapContainer,
+  Marker,
+  Popup,
+  TileLayer,
+} from "react-leaflet";
 
 type Props = {
   initialLocations: FleetLocation[];
 };
 
+type MappableFleetLocation = FleetLocation & {
+  driver_id: string;
+  latitude: number;
+  longitude: number;
+  recorded_at: string;
+};
+
+function isMappableLocation(
+  location: FleetLocation,
+): location is MappableFleetLocation {
+  return (
+    location.driver_id !== null &&
+    location.latitude !== null &&
+    location.longitude !== null &&
+    location.recorded_at !== null
+  );
+}
+
+const FLEET_REFRESH_INTERVAL_MS = 60_000;
+
 const driverIcon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconUrl:
+    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl:
+    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
 });
 
-export function FleetMap({ initialLocations }: Props) {
-  const [locations, setLocations] = useState<FleetLocation[]>(initialLocations);
+export function FleetMap({
+  initialLocations,
+}: Props) {
+  const [locations, setLocations] =
+    useState<FleetLocation[]>(initialLocations);
 
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(
+    () => createClient(),
+    [],
+  );
+
+  const refreshLocations =
+    useCallback(async (): Promise<void> => {
+      const { data, error } = await supabase
+        .from("active_fleet_locations")
+        .select("*")
+        .order("recorded_at", {
+          ascending: false,
+        });
+
+      if (error) {
+        console.error(
+          "Unable to refresh fleet locations:",
+          error.message,
+        );
+        return;
+      }
+
+      setLocations(data ?? []);
+    }, [supabase]);
 
   useEffect(() => {
     const channel = supabase
@@ -32,60 +85,43 @@ export function FleetMap({ initialLocations }: Props) {
           schema: "public",
           table: "location_pings",
         },
-        async () => {
-          const { data } = await supabase
-            .from("location_pings")
-            .select(
-              `
-              *,
-              driver:users!location_pings_driver_id_fkey (
-                id,
-                full_name,
-                email,
-                region
-              ),
-              route:routes (
-                id,
-                route_date,
-                status
-              )
-            `,
-            )
-            .order("recorded_at", { ascending: false })
-            .limit(200);
-
-          if (!data) return;
-
-          const latestByDriver = new Map<string, FleetLocation>();
-
-          for (const ping of data as FleetLocation[]) {
-            if (!latestByDriver.has(ping.driver_id)) {
-              latestByDriver.set(ping.driver_id, ping);
-            }
-          }
-
-          setLocations(Array.from(latestByDriver.values()));
+        () => {
+          void refreshLocations();
         },
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [supabase]);
+    const refreshInterval = window.setInterval(() => {
+      void refreshLocations();
+    }, FLEET_REFRESH_INTERVAL_MS);
 
-  const center = locations[0]
-    ? {
-        lat: locations[0].latitude,
-        lng: locations[0].longitude,
-      }
-    : {
-        lat: 44.8125,
-        lng: 20.4612,
-      };
+    return () => {
+      window.clearInterval(refreshInterval);
+      void supabase.removeChannel(channel);
+    };
+  }, [refreshLocations, supabase]);
+
+  const mappableLocations = useMemo(
+    () => locations.filter(isMappableLocation),
+    [locations],
+  );
+
+  const center: [number, number] = mappableLocations[0]
+  ? [
+      mappableLocations[0].latitude,
+      mappableLocations[0].longitude,
+    ]
+  : [44.8125, 20.4612];
 
   return (
     <div className="overflow-hidden rounded-2xl border border-latte-200 bg-crema-0 shadow-sm">
+      {locations.length === 0 ? (
+        <div className="border-b border-latte-200 p-4 text-sm text-steam-400">
+          No clocked-in drivers have sent a location in the last
+          10 minutes.
+        </div>
+      ) : null}
+
       <MapContainer
         center={center}
         zoom={12}
@@ -97,25 +133,44 @@ export function FleetMap({ initialLocations }: Props) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {locations.map((location) => (
+        {mappableLocations.map((location) => (
           <Marker
-            key={`${location.driver_id}-${location.recorded_at}`}
-            position={[location.latitude, location.longitude]}
+            key={location.driver_id}
+            position={[
+              location.latitude,
+              location.longitude,
+            ]}
             icon={driverIcon}
           >
             <Popup>
               <div>
                 <strong>
-                  {location.driver?.full_name ?? "Unknown driver"}
+                  {location.driver_full_name ??
+                    "Unknown driver"}
                 </strong>
+
                 <br />
-                {location.driver?.email ?? "No email"}
+
+                {location.driver_email ?? "No email"}
+
                 <br />
-                Region: {location.driver?.region ?? "—"}
+
+                Region: {location.driver_region ?? "—"}
+
                 <br />
-                Route: {location.route?.route_date ?? "—"}
+
+                Route: {location.route_date ?? "—"}
+
                 <br />
-                Last ping: {new Date(location.recorded_at).toLocaleString()}
+
+                Route status: {location.route_status ?? "—"}
+
+                <br />
+
+                Last ping:{" "}
+                {new Date(
+                  location.recorded_at,
+                ).toLocaleString()}
               </div>
             </Popup>
           </Marker>
