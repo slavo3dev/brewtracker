@@ -79,6 +79,29 @@ export default function InventoryAuditStep() {
 
         if (!cancelled) {
           setProducts(result);
+
+          const savedAudit = activeVisit?.inventoryAudit;
+          const activeVisitId = activeVisit?.id; 
+
+          if (
+            savedAudit &&
+            activeVisitId &&
+            savedAudit.sourceVisitId === activeVisit.id &&
+            savedAudit.syncStatus !== "synced"
+          ) {
+            const restoredCounts = Object.fromEntries(
+              savedAudit.items.map((item) => [
+                item.productId,
+                String(item.quantity),
+              ]),
+            );
+
+            setCounts((current) =>
+              Object.keys(current).length > 0
+                ? current
+                : restoredCounts,
+            );
+          }
         }
       } catch (error) {
         if (!cancelled) {
@@ -100,7 +123,11 @@ export default function InventoryAuditStep() {
     return () => {
       cancelled = true;
     };
-  }, [clientId]);
+  }, [
+    clientId,
+    activeVisit?.id,
+    activeVisit?.inventoryAudit,
+  ]);
 
   const groupedProducts = useMemo(() => {
     const groups = new Map<
@@ -126,7 +153,7 @@ export default function InventoryAuditStep() {
   const missingRequiredCount = products.filter(
     (product) =>
       product.isRequired &&
-      counts[product.productId]?.trim() === "",
+      (counts[product.productId] ?? "").trim() === "",
   ).length;
 
   const hasInvalidQuantity = products.some((product) => {
@@ -166,7 +193,25 @@ export default function InventoryAuditStep() {
     setErrorMessage(null);
   }
 
+  const answeredProducts = products.filter(
+    (product) =>
+      (counts[product.productId] ?? "").trim() !== "",
+  );
+  
   async function handleSubmit(): Promise<void> {
+    if (submitting) {
+      return;
+    }
+
+    if (missingRequiredCount > 0) {
+      setErrorMessage(
+        `Enter a quantity for all ${missingRequiredCount} remaining required ${
+          missingRequiredCount === 1 ? "product" : "products"
+        }.`,
+      );
+      return;
+    }
+
     if (!canSubmit) {
       return;
     }
@@ -176,11 +221,9 @@ export default function InventoryAuditStep() {
 
     try {
       await completeInventoryAudit({
-        counts: products.map((product) => ({
+        counts: answeredProducts.map((product) => ({
           productId: product.productId,
-          quantity: Number(
-            counts[product.productId] ?? "0",
-          ),
+          quantity: Number(counts[product.productId]),
         })),
       });
     } catch (error) {
@@ -192,18 +235,6 @@ export default function InventoryAuditStep() {
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (loading) {
-    return (
-      <View style={styles.card}>
-        <ActivityIndicator />
-
-        <Text style={styles.loadingText}>
-          Loading expected client stock…
-        </Text>
-      </View>
-    );
   }
 
   return (

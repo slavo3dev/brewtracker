@@ -61,6 +61,25 @@ function getUploadLabel(photo: BeforePhotoRecord): string {
   }
 }
 
+function getFriendlyUploadError(error: unknown): string {
+  const technicalMessage =
+    error instanceof Error ? error.message : "";
+
+  const normalizedMessage = technicalMessage.toLowerCase();
+
+  const isNetworkError =
+    normalizedMessage.includes("network request failed") ||
+    normalizedMessage.includes("failed to fetch") ||
+    normalizedMessage.includes("network") ||
+    normalizedMessage.includes("offline");
+
+  if (isNetworkError) {
+    return "Saved locally · upload pending. Reconnect and retry the upload.";
+  }
+
+  return "The photo was saved locally, but could not be uploaded. Please retry.";
+}
+
 export default function BeforePhotosStep() {
   const cameraRef = useRef<CameraView | null>(null);
 
@@ -200,10 +219,9 @@ export default function BeforePhotosStep() {
         uploadedAt: new Date().toISOString(),
       });
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to upload the service photo.";
+      console.warn("Before-photo upload failed:", error);
+
+      const message = getFriendlyUploadError(error);
 
       await updateBeforePhotoUpload(visit, kind, {
         uploadStatus: "failed",
