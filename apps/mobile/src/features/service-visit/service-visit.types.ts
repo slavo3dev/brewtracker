@@ -51,10 +51,7 @@ export const SERVICE_VISIT_STEPS = [
   },
 ] as const;
 
-export const BEFORE_PHOTO_KINDS = [
-  "exterior",
-  "interior_hopper",
-] as const;
+export const BEFORE_PHOTO_KINDS = ["exterior", "interior_hopper"] as const;
 
 export type ServiceVisitStepId = (typeof SERVICE_VISIT_STEPS)[number]["id"];
 
@@ -73,6 +70,7 @@ export type ServiceVisitTarget = {
   latitude: number | null;
   longitude: number | null;
   geofenceRadiusMeters: number;
+  signatureRequired: boolean;
 };
 
 export type ServiceVisitMachineTarget = {
@@ -109,8 +107,7 @@ export type MachineScanVerification = {
   verifiedAt: string;
 };
 
-export type BeforePhotoKind =
-  (typeof BEFORE_PHOTO_KINDS)[number];
+export type BeforePhotoKind = (typeof BEFORE_PHOTO_KINDS)[number];
 
 export type BeforePhotoUploadStatus =
   | "pending_upload"
@@ -148,6 +145,62 @@ export type SaveBeforePhotoInput = {
 
 export type UpdateBeforePhotoUploadInput = {
   uploadStatus: BeforePhotoUploadStatus;
+  storagePath?: string | null;
+  databaseId?: string | null;
+  uploadError?: string | null;
+  uploadedAt?: string | null;
+};
+
+export type MediaUploadStatus =
+  | "pending_upload"
+  | "uploading"
+  | "uploaded"
+  | "failed";
+
+export type AfterPhotoRecord = {
+  localUri: string;
+  storagePath: string | null;
+  databaseId: string | null;
+  uploadStatus: MediaUploadStatus;
+  uploadError: string | null;
+  capturedAt: string;
+  uploadedAt: string | null;
+};
+
+export type SignatureRecord = {
+  localUri: string;
+  storagePath: string | null;
+  databaseId: string | null;
+  uploadStatus: MediaUploadStatus;
+  uploadError: string | null;
+  signedAt: string;
+  uploadedAt: string | null;
+};
+
+export type AfterServiceRecord = {
+  afterPhoto: AfterPhotoRecord | null;
+  signature: SignatureRecord | null;
+  signatureRequired: boolean;
+
+  /**
+   * Populated when this client does not require a
+   * signature and the driver continues without one.
+   */
+  signatureBypassedAt: string | null;
+};
+
+export type SaveAfterPhotoInput = {
+  localUri: string;
+  capturedAt: string;
+};
+
+export type SaveSignatureInput = {
+  localUri: string;
+  signedAt: string;
+};
+
+export type UpdateMediaUploadInput = {
+  uploadStatus: MediaUploadStatus;
   storagePath?: string | null;
   databaseId?: string | null;
   uploadError?: string | null;
@@ -201,10 +254,7 @@ export type InventoryAuditItemRecord = {
   quantity: number;
 };
 
-export type InventoryAuditSyncStatus =
-  | "pending_sync"
-  | "synced"
-  | "failed";
+export type InventoryAuditSyncStatus = "pending_sync" | "synced" | "failed";
 
 export type InventoryAuditRecord = {
   databaseId: string | null;
@@ -237,10 +287,7 @@ export type RestockDropItemRecord = {
   actualQuantity: number;
 };
 
-export type RestockDropSyncStatus =
-  | "pending_sync"
-  | "synced"
-  | "failed";
+export type RestockDropSyncStatus = "pending_sync" | "synced" | "failed";
 
 export type RestockDropRecord = {
   databaseId: string | null;
@@ -278,6 +325,7 @@ export type ServiceVisit = {
   meterReading: MeterReadingRecord | null;
   inventoryAudit: InventoryAuditRecord | null;
   restockDrop: RestockDropRecord | null;
+  afterService: AfterServiceRecord;
 
   startedAt: string;
   updatedAt: string;
