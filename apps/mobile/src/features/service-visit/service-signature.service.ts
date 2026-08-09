@@ -101,14 +101,14 @@ export async function uploadSignature({
     throw new Error("The locally saved signature is empty.");
   }
 
-  const storagePath = `${userId}/${visitId}/` + `client-${Date.now()}.png`;
+  const storagePath = `${userId}/${visitId}/client-signature.png`;
 
   const { error: uploadError } = await supabase.storage
     .from(SIGNATURE_BUCKET)
     .upload(storagePath, decode(base64), {
       contentType: "image/png",
       cacheControl: "3600",
-      upsert: false,
+      upsert: true,
     });
 
   if (uploadError) {

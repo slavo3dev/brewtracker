@@ -8,38 +8,64 @@ import {
   View,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import SignatureCanvas from "react-native-signature-canvas";
+import SignatureCanvas, {
+  type SignatureViewRef,
+} from "react-native-signature-canvas";
 
 import { useServiceVisit } from "./ServiceVisitProvider";
 import {
   persistAfterPhotoLocally,
-  persistSignatureLocally,
   uploadAfterPhoto,
-  uploadSignature,
 } from "./after-service-media.service";
+
+import {
+  persistSignatureLocally,
+  uploadSignature,
+} from "./service-signature.service";
 import type { ServiceVisit } from "./service-visit.types";
 
 const SIGNATURE_WEB_STYLE = `
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+
   .m-signature-pad {
+    width: 100%;
+    height: 100%;
     box-shadow: none;
     border: none;
+    margin: 0;
   }
 
   .m-signature-pad--body {
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
     border: 1px solid #d6c3ab;
     border-radius: 12px;
   }
 
   .m-signature-pad--footer {
     display: none;
-    margin: 0;
   }
 
-  body, html {
-    width: 100%;
-    height: 100%;
+  canvas {
+    touch-action: none;
   }
 `;
+
+type Props = {
+  onSignatureStart?: () => void;
+  onSignatureEnd?: () => void;
+};
 
 function getFriendlyUploadError(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
@@ -57,8 +83,12 @@ function getFriendlyUploadError(error: unknown): string {
     : "Saved locally, but upload failed. " + "Please retry.";
 }
 
-export default function AfterServiceStep() {
+export default function AfterServiceStep({
+  onSignatureStart,
+  onSignatureEnd,
+}: Props) {
   const cameraRef = useRef<CameraView | null>(null);
+  const signatureRef = useRef<SignatureViewRef | null>(null);
 
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -88,8 +118,9 @@ export default function AfterServiceStep() {
     if (activeVisit?.currentStep !== "after_service") {
       setCameraOpen(false);
       setSignatureEditorOpen(false);
+      onSignatureEnd?.();
     }
-  }, [activeVisit?.currentStep]);
+  }, [activeVisit?.currentStep, onSignatureEnd]);
 
   if (!activeVisit || activeVisit.currentStep !== "after_service") {
     return null;
@@ -290,6 +321,7 @@ export default function AfterServiceStep() {
       return;
     }
 
+    onSignatureEnd?.();
     setSavingSignature(true);
     setErrorMessage(null);
 
@@ -313,6 +345,7 @@ export default function AfterServiceStep() {
           : "Unable to save the signature.",
       );
     } finally {
+      onSignatureEnd?.();
       setSavingSignature(false);
     }
   }
@@ -532,19 +565,58 @@ export default function AfterServiceStep() {
           <>
             <View style={styles.signatureCanvas}>
               <SignatureCanvas
+                ref={signatureRef}
+                onBegin={() => {
+                  onSignatureStart?.();
+                  setErrorMessage(null);
+                }}
+                onEnd={() => {
+                  onSignatureEnd?.();
+                }}
                 onOK={(dataUrl) => {
+                  onSignatureEnd?.();
                   void handleSignature(dataUrl);
                 }}
                 onEmpty={() => {
-                  setErrorMessage("Ask the client to sign " + "before saving.");
+                  onSignatureEnd?.();
+                  setErrorMessage("Ask the client to sign before saving.");
                 }}
-                descriptionText={"Sign inside the box"}
-                clearText="Clear"
-                confirmText="Save signature"
+                descriptionText=""
                 webStyle={SIGNATURE_WEB_STYLE}
                 autoClear={false}
                 imageType="image/png"
               />
+            </View>
+
+            <View style={styles.inlineActions}>
+              <Pressable
+                style={styles.secondaryButton}
+                disabled={savingSignature}
+                onPress={() => {
+                  signatureRef.current?.clearSignature();
+                  setErrorMessage(null);
+                }}
+              >
+                <Text style={styles.secondaryButtonText}>Clear</Text>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.primaryButton,
+                  savingSignature && styles.disabledButton,
+                ]}
+                disabled={savingSignature}
+                onPress={() => {
+                  onSignatureEnd?.();
+                  signatureRef.current?.readSignature();
+                }}
+              >
+                {savingSignature ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Save signature</Text>
+                )}
+              </Pressable>
             </View>
 
             {savingSignature ? (
@@ -580,6 +652,16 @@ export default function AfterServiceStep() {
 
       {errorMessage ? (
         <Text style={styles.errorText}>{errorMessage}</Text>
+      ) : null}
+
+      {!afterPhoto?.localUri ? (
+        <Text style={styles.warningText}>
+          Capture the completed-machine photo to continue.
+        </Text>
+      ) : signatureRequired && !signature?.localUri ? (
+        <Text style={styles.warningText}>
+          Draw and save the required signature to continue.
+        </Text>
       ) : null}
 
       <Pressable
@@ -675,7 +757,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
   },
   signatureCanvas: {
-    height: 260,
+    height: 320,
     overflow: "hidden",
     borderRadius: 12,
   },

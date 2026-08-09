@@ -50,6 +50,7 @@ export default function ServiceVisitScreen({
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [signatureActive, setSignatureActive] = useState(false);
 
   if (!activeVisit) {
     return (
@@ -122,6 +123,8 @@ export default function ServiceVisitScreen({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        scrollEnabled={!signatureActive}
       >
         <View style={styles.progressCard}>
           <Text style={styles.progressLabel}>
@@ -356,7 +359,14 @@ export default function ServiceVisitScreen({
           </View>
         ) : activeVisit.currentStep === "after_service" ? (
           <View style={styles.activeStepContainer}>
-            <AfterServiceStep />
+            <AfterServiceStep
+              onSignatureStart={() => {
+                setSignatureActive(true);
+              }}
+              onSignatureEnd={() => {
+                setSignatureActive(false);
+              }}
+            />
           </View>
         ) : (
           <>
