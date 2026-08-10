@@ -153,7 +153,7 @@ FOR UPDATE
 TO authenticated
 USING (
     bucket_id = 'service-visit-signatures'
-    AND owner_id = auth.uid()::text
+    AND (storage.foldername(name))[1] = auth.uid()::text
 )
 WITH CHECK (
     bucket_id = 'service-visit-signatures'
