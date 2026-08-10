@@ -46,6 +46,7 @@ type ClientRow = Pick<
   | "latitude"
   | "longitude"
   | "geofence_radius_meters"
+  | "signature_required"
 >;
 
 type MachineRow = Pick<
@@ -176,7 +177,8 @@ async function fetchClients(clientIds: string[]): Promise<ClientRow[]> {
       city,
       latitude,
       longitude,
-      geofence_radius_meters
+      geofence_radius_meters,
+      signature_required
     `,
     )
     .in("id", clientIds);
@@ -259,6 +261,7 @@ function buildTodayRouteStops(
         latitude: client.latitude,
         longitude: client.longitude,
         geofenceRadiusMeters: client.geofence_radius_meters,
+        signatureRequired: client.signature_required,
       },
 
       machine: machine

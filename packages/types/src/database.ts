@@ -79,6 +79,7 @@ export type Database = {
           longitude: number | null
           name: string
           region: string | null
+          signature_required: boolean
           updated_at: string
         }
         Insert: {
@@ -94,6 +95,7 @@ export type Database = {
           longitude?: number | null
           name: string
           region?: string | null
+          signature_required?: boolean
           updated_at?: string
         }
         Update: {
@@ -109,6 +111,7 @@ export type Database = {
           longitude?: number | null
           name?: string
           region?: string | null
+          signature_required?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -675,6 +678,74 @@ export type Database = {
           },
         ]
       }
+      service_visit_signatures: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          machine_id: string
+          signed_at: string
+          signed_by: string
+          source_visit_id: string
+          stop_id: string
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          machine_id: string
+          signed_at: string
+          signed_by: string
+          source_visit_id: string
+          stop_id: string
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          machine_id?: string
+          signed_at?: string
+          signed_by?: string
+          source_visit_id?: string
+          stop_id?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_visit_signatures_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_signatures_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_signatures_signed_by_fkey"
+            columns: ["signed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_signatures_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stops: {
         Row: {
           arrived_at: string | null
@@ -1076,7 +1147,7 @@ export type Database = {
         | "completed"
         | "cancelled"
       selfie_verification_status: "required" | "uploaded" | "missing" | "waived"
-      service_photo_kind: "exterior" | "interior_hopper"
+      service_photo_kind: "exterior" | "interior_hopper" | "completed_machine"
       service_photo_stage: "before" | "after" | "signature"
       stop_status: "pending" | "in_progress" | "completed" | "skipped"
       time_entry_review_status: "pending" | "approved" | "flagged" | "rejected"
@@ -1226,7 +1297,7 @@ export const Constants = {
         "cancelled",
       ],
       selfie_verification_status: ["required", "uploaded", "missing", "waived"],
-      service_photo_kind: ["exterior", "interior_hopper"],
+      service_photo_kind: ["exterior", "interior_hopper", "completed_machine"],
       service_photo_stage: ["before", "after", "signature"],
       stop_status: ["pending", "in_progress", "completed", "skipped"],
       time_entry_review_status: ["pending", "approved", "flagged", "rejected"],

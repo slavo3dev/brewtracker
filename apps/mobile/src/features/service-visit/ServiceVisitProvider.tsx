@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -20,6 +21,7 @@ import {
   saveInventoryAudit,
 } from "./inventory-audit.service";
 import { saveRestockDrop } from "./restock-drop.service";
+import { deleteLocalMedia } from "./after-service-media.service";
 import {
   BEFORE_PHOTO_KINDS,
   createInitialStepStates,
@@ -38,17 +40,10 @@ import {
   type ServiceVisitStepId,
   type StartServiceVisitInput,
   type UpdateBeforePhotoUploadInput,
+  type SaveAfterPhotoInput,
+  type SaveSignatureInput,
+  type UpdateMediaUploadInput,
 } from "./service-visit.types";
-
-type PlaceholderStepId = Exclude<
-  ServiceVisitStepId,
-  | "arrival"
-  | "machine_scan"
-  | "before_photos"
-  | "meter_reading"
-  | "inventory_audit"
-  | "restock"
->;
 
 type ServiceVisitContextValue = {
   activeVisit: ServiceVisit | null;
@@ -88,8 +83,24 @@ type ServiceVisitContextValue = {
   completeRestockDrop: (
     input: CompleteRestockDropInput,
   ) => Promise<ServiceVisit>;
-  
-  completeCurrentStep: (stepId: PlaceholderStepId) => Promise<ServiceVisit>;
+
+  saveAfterPhoto: (input: SaveAfterPhotoInput) => Promise<ServiceVisit>;
+
+  updateAfterPhotoUpload: (
+    localUri: string,
+    input: UpdateMediaUploadInput,
+  ) => Promise<ServiceVisit>;
+
+  saveSignature: (input: SaveSignatureInput) => Promise<ServiceVisit>;
+
+  updateSignatureUpload: (
+    localUri: string,
+    input: UpdateMediaUploadInput,
+  ) => Promise<ServiceVisit>;
+
+  removeSignature: () => Promise<ServiceVisit>;
+
+  completeAfterService: () => Promise<ServiceVisit>;
 
   cancelVisit: () => Promise<void>;
   clearCompletedVisit: () => Promise<void>;
@@ -272,11 +283,9 @@ function validateRestoredVisit(
           item.quantity >= 0,
       );
 
-    const hasValidSyncStatus = [
-      "pending_sync",
-      "synced",
-      "failed",
-    ].includes(restoredInventoryAudit.syncStatus);
+    const hasValidSyncStatus = ["pending_sync", "synced", "failed"].includes(
+      restoredInventoryAudit.syncStatus,
+    );
 
     if (
       typeof restoredInventoryAudit.sourceVisitId !== "string" ||
@@ -310,11 +319,9 @@ function validateRestoredVisit(
           item.actualQuantity >= 0,
       );
 
-    const hasValidSyncStatus = [
-      "pending_sync",
-      "synced",
-      "failed",
-    ].includes(restoredRestockDrop.syncStatus);
+    const hasValidSyncStatus = ["pending_sync", "synced", "failed"].includes(
+      restoredRestockDrop.syncStatus,
+    );
 
     if (
       typeof restoredRestockDrop.sourceVisitId !== "string" ||
@@ -328,13 +335,59 @@ function validateRestoredVisit(
       return null;
     }
   }
+  const signatureRequired =
+    typeof visit.target.signatureRequired === "boolean"
+      ? visit.target.signatureRequired
+      : true;
+
+  const restoredAfterService = visit.afterService ?? {
+    afterPhoto: null,
+    signature: null,
+    signatureRequired,
+    signatureBypassedAt: null,
+  };
+
+  const validUploadStatuses = [
+    "pending_upload",
+    "uploading",
+    "uploaded",
+    "failed",
+  ];
+
+  if (
+    restoredAfterService.afterPhoto &&
+    (!restoredAfterService.afterPhoto.localUri?.trim() ||
+      !validUploadStatuses.includes(
+        restoredAfterService.afterPhoto.uploadStatus,
+      ))
+  ) {
+    return null;
+  }
+
+  if (
+    restoredAfterService.signature &&
+    (!restoredAfterService.signature.localUri?.trim() ||
+      !validUploadStatuses.includes(
+        restoredAfterService.signature.uploadStatus,
+      ))
+  ) {
+    return null;
+  }
 
   return {
     ...visit,
+    target: {
+      ...visit.target,
+      signatureRequired,
+    },
     beforePhotos: restoredBeforePhotos,
     meterReading: restoredMeterReading,
     inventoryAudit: restoredInventoryAudit,
     restockDrop: restoredRestockDrop,
+    afterService: {
+      ...restoredAfterService,
+      signatureRequired,
+    },
   };
 }
 
@@ -397,11 +450,56 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
   const [activeVisit, setActiveVisit] = useState<ServiceVisit | null>(null);
 
+  const activeVisitRef = useRef<ServiceVisit | null>(null);
+
+  const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
+
   const [restoringVisit, setRestoringVisit] = useState(true);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const userId = session?.user.id ?? null;
+
+  useEffect(() => {
+    activeVisitRef.current = activeVisit;
+  }, [activeVisit]);
+
+  const commitVisitMutation = useCallback(
+    (
+      mutation: (
+        currentVisit: ServiceVisit,
+      ) => ServiceVisit | Promise<ServiceVisit>,
+    ): Promise<ServiceVisit> => {
+      const operation = mutationQueueRef.current.then(async () => {
+        const currentVisit = activeVisitRef.current;
+
+        if (!currentVisit) {
+          throw new Error("There is no active service visit.");
+        }
+
+        const updatedVisit = await mutation(currentVisit);
+
+        await saveServiceVisit(updatedVisit);
+
+        activeVisitRef.current = updatedVisit;
+        setActiveVisit(updatedVisit);
+
+        return updatedVisit;
+      });
+
+      /*
+       * A rejected operation must not leave the
+       * queue permanently rejected.
+       */
+      mutationQueueRef.current = operation.then(
+        () => undefined,
+        () => undefined,
+      );
+
+      return operation;
+    },
+    [],
+  );
 
   const restoreVisit = useCallback(async (): Promise<void> => {
     if (authStatus !== "authenticated" || !userId) {
@@ -529,7 +627,10 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         clientId: input.clientId,
         machineId: input.machineId,
 
-        target: input.target,
+        target: {
+          ...input.target,
+          signatureRequired: input.target.signatureRequired ?? true,
+        },
         machineTarget: {
           ...input.machineTarget,
           qrCode: input.machineTarget.qrCode.trim(),
@@ -546,6 +647,12 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         meterReading: null,
         inventoryAudit: null,
         restockDrop: null,
+        afterService: {
+          afterPhoto: null,
+          signature: null,
+          signatureRequired: input.target.signatureRequired ?? true,
+          signatureBypassedAt: null,
+        },
 
         startedAt: now,
         updatedAt: now,
@@ -938,9 +1045,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   );
 
   const completeInventoryAudit = useCallback(
-    async (
-      input: CompleteInventoryAuditInput,
-    ): Promise<ServiceVisit> => {
+    async (input: CompleteInventoryAuditInput): Promise<ServiceVisit> => {
       if (!activeVisit) {
         throw new Error("There is no active service visit.");
       }
@@ -952,18 +1057,14 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       }
 
       if (input.counts.length === 0) {
-        throw new Error(
-          "At least one inventory count is required.",
-        );
+        throw new Error("At least one inventory count is required.");
       }
 
       const productIds = new Set<string>();
 
       for (const count of input.counts) {
         if (!count.productId.trim()) {
-          throw new Error(
-            "Every inventory count must reference a product.",
-          );
+          throw new Error("Every inventory count must reference a product.");
         }
 
         if (productIds.has(count.productId)) {
@@ -972,71 +1073,55 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
           );
         }
 
-        if (
-          !Number.isFinite(count.quantity) ||
-          count.quantity < 0
-        ) {
-          throw new Error(
-            "Every inventory quantity must be zero or greater.",
-          );
+        if (!Number.isFinite(count.quantity) || count.quantity < 0) {
+          throw new Error("Every inventory quantity must be zero or greater.");
         }
 
         productIds.add(count.productId);
       }
 
-      const configuredProducts =
-        await loadClientInventoryProducts(
-          activeVisit.clientId,
-        );
+      const configuredProducts = await loadClientInventoryProducts(
+        activeVisit.clientId,
+      );
 
       const configuredById = new Map(
-        configuredProducts.map((product) => [
-          product.productId,
-          product,
-        ]),
+        configuredProducts.map((product) => [product.productId, product]),
       );
 
       if (
         configuredProducts.some(
-          (product) =>
-            product.isRequired &&
-            !productIds.has(product.productId),
+          (product) => product.isRequired && !productIds.has(product.productId),
         )
       ) {
-        throw new Error(
-          "Enter a quantity for every required client product.",
-        );
+        throw new Error("Enter a quantity for every required client product.");
       }
 
-      const items: InventoryAuditItemRecord[] =
-        input.counts.map((count) => {
-          const product = configuredById.get(
-            count.productId,
+      const items: InventoryAuditItemRecord[] = input.counts.map((count) => {
+        const product = configuredById.get(count.productId);
+
+        if (!product) {
+          throw new Error(
+            "The inventory list changed. Reload the step and try again.",
           );
+        }
 
-          if (!product) {
-            throw new Error(
-              "The inventory list changed. Reload the step and try again.",
-            );
-          }
-
-          return {
-            productId: product.productId,
-            sku: product.sku,
-            name: product.name,
-            category: product.category,
-            unitLabel: product.unitLabel,
-            quantity: count.quantity,
-          };
-        });
+        return {
+          productId: product.productId,
+          sku: product.sku,
+          name: product.name,
+          category: product.category,
+          unitLabel: product.unitLabel,
+          quantity: count.quantity,
+        };
+      });
 
       const countedAt = new Date().toISOString();
 
       /*
-      * Persist locally before attempting the network mutation.
-      * If the request fails, the audit stays in the visit as
-      * pending/failed and can be retried.
-      */
+       * Persist locally before attempting the network mutation.
+       * If the request fails, the audit stays in the visit as
+       * pending/failed and can be retried.
+       */
       const visitWithPendingAudit: ServiceVisit = {
         ...activeVisit,
         inventoryAudit: {
@@ -1115,249 +1200,440 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   );
 
   const completeRestockDrop = useCallback(
-  async (
-    input: CompleteRestockDropInput,
-  ): Promise<ServiceVisit> => {
-    if (!activeVisit) {
-      throw new Error("There is no active service visit.");
-    }
-
-    if (activeVisit.currentStep !== "restock") {
-      throw new Error(
-        "Restock can only be completed during Step 6.",
-      );
-    }
-
-    const inventoryAudit = activeVisit.inventoryAudit;
-
-    if (
-      !inventoryAudit ||
-      inventoryAudit.syncStatus !== "synced" ||
-      !inventoryAudit.databaseId
-    ) {
-      throw new Error(
-        "The inventory audit must be synced before restocking.",
-      );
-    }
-
-    if (input.quantities.length === 0) {
-      throw new Error(
-        "At least one restock quantity is required.",
-      );
-    }
-
-    const productIds = new Set<string>();
-
-    for (const quantity of input.quantities) {
-      if (!quantity.productId.trim()) {
-        throw new Error(
-          "Every restock quantity must reference a product.",
-        );
-      }
-
-      if (productIds.has(quantity.productId)) {
-        throw new Error(
-          "A product cannot appear more than once.",
-        );
-      }
-
-      if (
-        !Number.isFinite(quantity.actualQuantity) ||
-        quantity.actualQuantity < 0
-      ) {
-        throw new Error(
-          "Every actual restock quantity must be zero or greater.",
-        );
-      }
-
-      productIds.add(quantity.productId);
-    }
-
-    const configuredProducts =
-      await loadClientInventoryProducts(
-        activeVisit.clientId,
-      );
-
-    const configuredById = new Map(
-      configuredProducts.map((product) => [
-        product.productId,
-        product,
-      ]),
-    );
-
-    const auditByProductId = new Map(
-      inventoryAudit.items.map((item) => [
-        item.productId,
-        item,
-      ]),
-    );
-
-    const missingParProduct = configuredProducts.find(
-      (product) =>
-        auditByProductId.has(product.productId) &&
-        product.parLevel === null,
-    );
-
-    if (missingParProduct) {
-      throw new Error(
-        `${missingParProduct.name} does not have a configured par level.`,
-      );
-    }
-
-    const expectedProductIds = inventoryAudit.items.map(
-      (item) => item.productId,
-    );
-
-    if (
-      expectedProductIds.some(
-        (productId) => !productIds.has(productId),
-      )
-    ) {
-      throw new Error(
-        "Confirm the actual quantity for every audited product.",
-      );
-    }
-
-    const items: RestockDropItemRecord[] =
-      input.quantities.map((quantity) => {
-        const auditItem = auditByProductId.get(
-          quantity.productId,
-        );
-
-        const configuredProduct = configuredById.get(
-          quantity.productId,
-        );
-
-        if (
-          !auditItem ||
-          !configuredProduct ||
-          configuredProduct.parLevel === null
-        ) {
-          throw new Error(
-            "The inventory configuration changed. Reload the step and try again.",
-          );
-        }
-
-        const recommendedQuantity = Math.max(
-          configuredProduct.parLevel -
-            auditItem.quantity,
-          0,
-        );
-
-        return {
-          productId: auditItem.productId,
-          sku: auditItem.sku,
-          name: auditItem.name,
-          category: auditItem.category,
-          unitLabel: auditItem.unitLabel,
-          countedQuantity: auditItem.quantity,
-          parLevel: configuredProduct.parLevel,
-          recommendedQuantity,
-          actualQuantity: quantity.actualQuantity,
-        };
-      });
-
-    const confirmedAt = new Date().toISOString();
-
-    const visitWithPendingRestock: ServiceVisit = {
-      ...activeVisit,
-      restockDrop: {
-        databaseId: null,
-        sourceVisitId: activeVisit.id,
-        inventoryAuditId: inventoryAudit.databaseId,
-        confirmedAt,
-        items,
-        syncStatus: "pending_sync",
-        syncError: null,
-      },
-      updatedAt: confirmedAt,
-    };
-
-    await saveServiceVisit(visitWithPendingRestock);
-    setActiveVisit(visitWithPendingRestock);
-
-    try {
-      const databaseId = await saveRestockDrop({
-        sourceVisitId: activeVisit.id,
-        inventoryAuditId: inventoryAudit.databaseId,
-        clientId: activeVisit.clientId,
-        stopId: activeVisit.stopId,
-        machineId: activeVisit.machineId,
-        confirmedAt,
-        quantities: input.quantities,
-      });
-
-      const syncedAt = new Date().toISOString();
-
-      const visitWithSyncedRestock: ServiceVisit = {
-        ...visitWithPendingRestock,
-        restockDrop: {
-          ...visitWithPendingRestock.restockDrop!,
-          databaseId,
-          syncStatus: "synced",
-          syncError: null,
-        },
-        updatedAt: syncedAt,
-      };
-
-      const updatedVisit = transitionToNextStep(
-        visitWithSyncedRestock,
-        "restock",
-        syncedAt,
-      );
-
-      await saveServiceVisit(updatedVisit);
-
-      setActiveVisit(updatedVisit);
-      setErrorMessage(null);
-
-      return updatedVisit;
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to sync the restock drop.";
-
-      const failedVisit: ServiceVisit = {
-        ...visitWithPendingRestock,
-        restockDrop: {
-          ...visitWithPendingRestock.restockDrop!,
-          syncStatus: "failed",
-          syncError: message,
-        },
-        updatedAt: new Date().toISOString(),
-      };
-
-      await saveServiceVisit(failedVisit);
-
-      setActiveVisit(failedVisit);
-      setErrorMessage(message);
-
-      throw new Error(message);
-    }
-  },
-  [activeVisit],
-);
-
-  const completeCurrentStep = useCallback(
-    async (stepId: PlaceholderStepId): Promise<ServiceVisit> => {
+    async (input: CompleteRestockDropInput): Promise<ServiceVisit> => {
       if (!activeVisit) {
         throw new Error("There is no active service visit.");
       }
 
-      const now = new Date().toISOString();
+      if (activeVisit.currentStep !== "restock") {
+        throw new Error("Restock can only be completed during Step 6.");
+      }
 
-      const updatedVisit = transitionToNextStep(activeVisit, stepId, now);
+      const inventoryAudit = activeVisit.inventoryAudit;
 
-      await saveServiceVisit(updatedVisit);
+      if (
+        !inventoryAudit ||
+        inventoryAudit.syncStatus !== "synced" ||
+        !inventoryAudit.databaseId
+      ) {
+        throw new Error(
+          "The inventory audit must be synced before restocking.",
+        );
+      }
 
-      setActiveVisit(updatedVisit);
+      if (input.quantities.length === 0) {
+        throw new Error("At least one restock quantity is required.");
+      }
+
+      const productIds = new Set<string>();
+
+      for (const quantity of input.quantities) {
+        if (!quantity.productId.trim()) {
+          throw new Error("Every restock quantity must reference a product.");
+        }
+
+        if (productIds.has(quantity.productId)) {
+          throw new Error("A product cannot appear more than once.");
+        }
+
+        if (
+          !Number.isFinite(quantity.actualQuantity) ||
+          quantity.actualQuantity < 0
+        ) {
+          throw new Error(
+            "Every actual restock quantity must be zero or greater.",
+          );
+        }
+
+        productIds.add(quantity.productId);
+      }
+
+      const configuredProducts = await loadClientInventoryProducts(
+        activeVisit.clientId,
+      );
+
+      const configuredById = new Map(
+        configuredProducts.map((product) => [product.productId, product]),
+      );
+
+      const auditByProductId = new Map(
+        inventoryAudit.items.map((item) => [item.productId, item]),
+      );
+
+      const missingParProduct = configuredProducts.find(
+        (product) =>
+          auditByProductId.has(product.productId) && product.parLevel === null,
+      );
+
+      if (missingParProduct) {
+        throw new Error(
+          `${missingParProduct.name} does not have a configured par level.`,
+        );
+      }
+
+      const expectedProductIds = inventoryAudit.items.map(
+        (item) => item.productId,
+      );
+
+      if (expectedProductIds.some((productId) => !productIds.has(productId))) {
+        throw new Error(
+          "Confirm the actual quantity for every audited product.",
+        );
+      }
+
+      const items: RestockDropItemRecord[] = input.quantities.map(
+        (quantity) => {
+          const auditItem = auditByProductId.get(quantity.productId);
+
+          const configuredProduct = configuredById.get(quantity.productId);
+
+          if (
+            !auditItem ||
+            !configuredProduct ||
+            configuredProduct.parLevel === null
+          ) {
+            throw new Error(
+              "The inventory configuration changed. Reload the step and try again.",
+            );
+          }
+
+          const recommendedQuantity = Math.max(
+            configuredProduct.parLevel - auditItem.quantity,
+            0,
+          );
+
+          return {
+            productId: auditItem.productId,
+            sku: auditItem.sku,
+            name: auditItem.name,
+            category: auditItem.category,
+            unitLabel: auditItem.unitLabel,
+            countedQuantity: auditItem.quantity,
+            parLevel: configuredProduct.parLevel,
+            recommendedQuantity,
+            actualQuantity: quantity.actualQuantity,
+          };
+        },
+      );
+
+      const confirmedAt = new Date().toISOString();
+
+      const visitWithPendingRestock: ServiceVisit = {
+        ...activeVisit,
+        restockDrop: {
+          databaseId: null,
+          sourceVisitId: activeVisit.id,
+          inventoryAuditId: inventoryAudit.databaseId,
+          confirmedAt,
+          items,
+          syncStatus: "pending_sync",
+          syncError: null,
+        },
+        updatedAt: confirmedAt,
+      };
+
+      await saveServiceVisit(visitWithPendingRestock);
+      setActiveVisit(visitWithPendingRestock);
+
+      try {
+        const databaseId = await saveRestockDrop({
+          sourceVisitId: activeVisit.id,
+          inventoryAuditId: inventoryAudit.databaseId,
+          clientId: activeVisit.clientId,
+          stopId: activeVisit.stopId,
+          machineId: activeVisit.machineId,
+          confirmedAt,
+          quantities: input.quantities,
+        });
+
+        const syncedAt = new Date().toISOString();
+
+        const visitWithSyncedRestock: ServiceVisit = {
+          ...visitWithPendingRestock,
+          restockDrop: {
+            ...visitWithPendingRestock.restockDrop!,
+            databaseId,
+            syncStatus: "synced",
+            syncError: null,
+          },
+          updatedAt: syncedAt,
+        };
+
+        const updatedVisit = transitionToNextStep(
+          visitWithSyncedRestock,
+          "restock",
+          syncedAt,
+        );
+
+        await saveServiceVisit(updatedVisit);
+
+        setActiveVisit(updatedVisit);
+        setErrorMessage(null);
+
+        return updatedVisit;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to sync the restock drop.";
+
+        const failedVisit: ServiceVisit = {
+          ...visitWithPendingRestock,
+          restockDrop: {
+            ...visitWithPendingRestock.restockDrop!,
+            syncStatus: "failed",
+            syncError: message,
+          },
+          updatedAt: new Date().toISOString(),
+        };
+
+        await saveServiceVisit(failedVisit);
+
+        setActiveVisit(failedVisit);
+        setErrorMessage(message);
+
+        throw new Error(message);
+      }
+    },
+    [activeVisit],
+  );
+
+  const saveAfterPhoto = useCallback(
+    async (input: SaveAfterPhotoInput): Promise<ServiceVisit> => {
+      if (!input.localUri.trim()) {
+        throw new Error(
+          "The locally stored after-service " + "photo is missing.",
+        );
+      }
+
+      let previousLocalUri: string | null = null;
+
+      const updatedVisit = await commitVisitMutation((currentVisit) => {
+        if (currentVisit.currentStep !== "after_service") {
+          throw new Error(
+            "After-service photos can only " + "be captured during Step 7.",
+          );
+        }
+
+        previousLocalUri =
+          currentVisit.afterService.afterPhoto?.localUri ?? null;
+
+        return {
+          ...currentVisit,
+          afterService: {
+            ...currentVisit.afterService,
+            afterPhoto: {
+              localUri: input.localUri,
+              storagePath: null,
+              databaseId: null,
+              uploadStatus: "pending_upload",
+              uploadError: null,
+              capturedAt: input.capturedAt,
+              uploadedAt: null,
+            },
+          },
+          updatedAt: new Date().toISOString(),
+        };
+      });
+
+      /*
+       * Only delete the previous image after
+       * the replacement has been persisted.
+       */
+      if (previousLocalUri && previousLocalUri !== input.localUri) {
+        await deleteLocalMedia(previousLocalUri).catch((error: unknown) => {
+          console.warn("Unable to remove replaced " + "after photo:", error);
+        });
+      }
+
       setErrorMessage(null);
 
       return updatedVisit;
     },
-    [activeVisit],
+    [commitVisitMutation],
   );
+
+  const updateAfterPhotoUpload = useCallback(
+    (localUri: string, input: UpdateMediaUploadInput): Promise<ServiceVisit> =>
+      commitVisitMutation((currentVisit) => {
+        const photo = currentVisit.afterService.afterPhoto;
+
+        /*
+         * Ignore a late upload result for a
+         * photo the driver already replaced.
+         */
+        if (!photo || photo.localUri !== localUri) {
+          throw new Error(
+            "This after-service photo was " +
+              "replaced before its upload " +
+              "finished.",
+          );
+        }
+
+        return {
+          ...currentVisit,
+          afterService: {
+            ...currentVisit.afterService,
+            afterPhoto: {
+              ...photo,
+              ...input,
+            },
+          },
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    [commitVisitMutation],
+  );
+
+  const saveSignature = useCallback(
+    async (input: SaveSignatureInput): Promise<ServiceVisit> => {
+      if (!input.localUri.trim()) {
+        throw new Error("The locally stored signature " + "is missing.");
+      }
+
+      let previousLocalUri: string | null = null;
+
+      const updatedVisit = await commitVisitMutation((currentVisit) => {
+        if (currentVisit.currentStep !== "after_service") {
+          throw new Error(
+            "A signature can only be " + "captured during Step 7.",
+          );
+        }
+
+        previousLocalUri =
+          currentVisit.afterService.signature?.localUri ?? null;
+
+        return {
+          ...currentVisit,
+          afterService: {
+            ...currentVisit.afterService,
+            signature: {
+              localUri: input.localUri,
+              storagePath: null,
+              databaseId: null,
+              uploadStatus: "pending_upload",
+              uploadError: null,
+              signedAt: input.signedAt,
+              uploadedAt: null,
+            },
+            signatureBypassedAt: null,
+          },
+          updatedAt: new Date().toISOString(),
+        };
+      });
+
+      if (previousLocalUri && previousLocalUri !== input.localUri) {
+        await deleteLocalMedia(previousLocalUri).catch((error: unknown) => {
+          console.warn("Unable to remove replaced " + "signature:", error);
+        });
+      }
+
+      setErrorMessage(null);
+
+      return updatedVisit;
+    },
+    [commitVisitMutation],
+  );
+
+  const updateSignatureUpload = useCallback(
+    (localUri: string, input: UpdateMediaUploadInput): Promise<ServiceVisit> =>
+      commitVisitMutation((currentVisit) => {
+        const signature = currentVisit.afterService.signature;
+
+        if (!signature || signature.localUri !== localUri) {
+          throw new Error(
+            "This signature was replaced " + "before its upload finished.",
+          );
+        }
+
+        return {
+          ...currentVisit,
+          afterService: {
+            ...currentVisit.afterService,
+            signature: {
+              ...signature,
+              ...input,
+            },
+          },
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    [commitVisitMutation],
+  );
+
+  const removeSignature = useCallback(async (): Promise<ServiceVisit> => {
+    let removedLocalUri: string | null = null;
+
+    const updatedVisit = await commitVisitMutation((currentVisit) => {
+      if (currentVisit.currentStep !== "after_service") {
+        throw new Error("The signature cannot be " + "changed now.");
+      }
+
+      removedLocalUri = currentVisit.afterService.signature?.localUri ?? null;
+
+      return {
+        ...currentVisit,
+        afterService: {
+          ...currentVisit.afterService,
+          signature: null,
+          signatureBypassedAt: null,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    await deleteLocalMedia(removedLocalUri).catch((error: unknown) => {
+      console.warn("Unable to remove local signature:", error);
+    });
+
+    setErrorMessage(null);
+
+    return updatedVisit;
+  }, [commitVisitMutation]);
+
+  const completeAfterService = useCallback(async (): Promise<ServiceVisit> => {
+    const updatedVisit = await commitVisitMutation((currentVisit) => {
+      if (currentVisit.currentStep !== "after_service") {
+        throw new Error("Step 7 is not the current " + "required step.");
+      }
+
+      const { afterPhoto, signature, signatureRequired } =
+        currentVisit.afterService;
+
+      if (!afterPhoto?.localUri) {
+        throw new Error("Capture the required " + "after-service photo.");
+      }
+
+      if (signatureRequired && !signature?.localUri) {
+        throw new Error("This client requires a " + "signature.");
+      }
+
+      const now = new Date().toISOString();
+
+      const visitWithSignatureResult: ServiceVisit = {
+        ...currentVisit,
+        afterService: {
+          ...currentVisit.afterService,
+          signatureBypassedAt: signatureRequired || signature ? null : now,
+        },
+        updatedAt: now,
+      };
+
+      /*
+       * This advances only to Step 8.
+       * It does not complete the visit.
+       */
+      return transitionToNextStep(
+        visitWithSignatureResult,
+        "after_service",
+        now,
+      );
+    });
+
+    setErrorMessage(null);
+
+    return updatedVisit;
+  }, [commitVisitMutation]);
 
   const cancelVisit = useCallback(async (): Promise<void> => {
     if (!activeVisit) {
@@ -1415,7 +1691,12 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       removeBeforePhoto,
       completeBeforePhotos,
       completeMeterReading,
-      completeCurrentStep,
+      saveAfterPhoto,
+      updateAfterPhotoUpload,
+      saveSignature,
+      updateSignatureUpload,
+      removeSignature,
+      completeAfterService,
       cancelVisit,
       clearCompletedVisit,
       retryRestore,
@@ -1436,7 +1717,12 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       removeBeforePhoto,
       completeBeforePhotos,
       completeMeterReading,
-      completeCurrentStep,
+      saveAfterPhoto,
+      updateAfterPhotoUpload,
+      saveSignature,
+      updateSignatureUpload,
+      removeSignature,
+      completeAfterService,
       cancelVisit,
       clearCompletedVisit,
       retryRestore,

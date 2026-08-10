@@ -25,6 +25,7 @@ export type TodayRouteStop = {
     latitude: number | null;
     longitude: number | null;
     geofenceRadiusMeters: number;
+    signatureRequired: boolean;
   };
 
   machine: {

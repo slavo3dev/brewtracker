@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,7 +14,6 @@ import {
   getServiceVisitStep,
   SERVICE_VISIT_STEPS,
   BEFORE_PHOTO_KINDS,
-  type ServiceVisitStepId,
 } from "../features/service-visit/service-visit.types";
 import ArrivalStep from "../features/service-visit/ArrivalStep";
 import MachineScanStep from "../features/service-visit/MachineScanStep";
@@ -24,34 +22,12 @@ import BeforePhotosStep from "../features/service-visit/BeforePhotosStep";
 import MeterReadingStep from "../features/service-visit/MeterReadingStep";
 import InventoryAuditStep from "../features/service-visit/InventoryAuditStep";
 import RestockDropStep from "../features/service-visit/RestockDropStep";
+import AfterServiceStep from "../features/service-visit/AfterServiceStep";
 
 type Props = {
   onBack: () => void;
   onVisitCompleted: () => void;
 };
-
-type PlaceholderStepId = Exclude<
-  ServiceVisitStepId,
-  | "arrival"
-  | "machine_scan"
-  | "before_photos"
-  | "meter_reading"
-  | "inventory_audit"
-  | "restock"
->;
-
-function isPlaceholderStep(
-  stepId: ServiceVisitStepId,
-): stepId is PlaceholderStepId {
-  return (
-    stepId !== "arrival" &&
-    stepId !== "machine_scan" &&
-    stepId !== "before_photos" &&
-    stepId !== "meter_reading" &&
-    stepId !== "inventory_audit" &&
-    stepId !== "restock"
-  );
-}
 
 function getStepStatusLabel(
   status: "locked" | "current" | "completed",
@@ -70,11 +46,11 @@ export default function ServiceVisitScreen({
   onBack,
   onVisitCompleted,
 }: Props) {
-  const { activeVisit, completeCurrentStep, clearCompletedVisit } =
-    useServiceVisit();
+  const { activeVisit, clearCompletedVisit } = useServiceVisit();
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [signatureActive, setSignatureActive] = useState(false);
 
   if (!activeVisit) {
     return (
@@ -109,42 +85,6 @@ export default function ServiceVisitScreen({
   const failedBeforePhotoCount = activeVisit.beforePhotos.filter(
     (photo) => photo.uploadStatus === "failed",
   ).length;
-  
-  async function handleCompleteCurrentStep(): Promise<void> {
-    if (!activeVisit || submitting) {
-      return;
-    }
-
-    if (!isPlaceholderStep(activeVisit.currentStep)) {
-      setErrorMessage(
-        "This step must be completed through its dedicated verification screen.",
-      );
-
-      return;
-    }
-
-    setSubmitting(true);
-    setErrorMessage(null);
-
-    try {
-      const updatedVisit = await completeCurrentStep(activeVisit.currentStep);
-
-      if (updatedVisit.status === "completed") {
-        Alert.alert(
-          "Service completed",
-          "All eight service steps have been completed.",
-        );
-      }
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to complete the service step.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   async function handleFinish(): Promise<void> {
     setSubmitting(true);
@@ -183,6 +123,8 @@ export default function ServiceVisitScreen({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        scrollEnabled={!signatureActive}
       >
         <View style={styles.progressCard}>
           <Text style={styles.progressLabel}>
@@ -246,135 +188,130 @@ export default function ServiceVisitScreen({
         ) : null}
 
         {activeVisit.beforePhotos.length === BEFORE_PHOTO_KINDS.length &&
-          activeVisit.currentStep !== "before_photos" ? (
-            <View style={styles.beforePhotosSummaryCard}>
-              <Text style={styles.beforePhotosSummaryTitle}>
-                Before photos captured
-              </Text>
+        activeVisit.currentStep !== "before_photos" ? (
+          <View style={styles.beforePhotosSummaryCard}>
+            <Text style={styles.beforePhotosSummaryTitle}>
+              Before photos captured
+            </Text>
 
-              <Text style={styles.beforePhotosSummaryText}>
-                Exterior and interior/hopper views are stored locally.
-              </Text>
+            <Text style={styles.beforePhotosSummaryText}>
+              Exterior and interior/hopper views are stored locally.
+            </Text>
 
-              <Text style={styles.beforePhotosSummaryDetail}>
-                {uploadedBeforePhotoCount} of {BEFORE_PHOTO_KINDS.length} uploaded
-              </Text>
+            <Text style={styles.beforePhotosSummaryDetail}>
+              {uploadedBeforePhotoCount} of {BEFORE_PHOTO_KINDS.length} uploaded
+            </Text>
 
-              {failedBeforePhotoCount > 0 ? (
-                <Text style={styles.beforePhotosSummaryWarning}>
-                  {failedBeforePhotoCount} upload{" "}
-                  {failedBeforePhotoCount === 1 ? "needs" : "need"} retry.
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
+            {failedBeforePhotoCount > 0 ? (
+              <Text style={styles.beforePhotosSummaryWarning}>
+                {failedBeforePhotoCount} upload{" "}
+                {failedBeforePhotoCount === 1 ? "needs" : "need"} retry.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
         {activeVisit.meterReading &&
-          activeVisit.currentStep !== "meter_reading" ? (
-            <View style={styles.meterReadingSummaryCard}>
-              <Text style={styles.meterReadingSummaryTitle}>
-                Meter reading recorded
-              </Text>
+        activeVisit.currentStep !== "meter_reading" ? (
+          <View style={styles.meterReadingSummaryCard}>
+            <Text style={styles.meterReadingSummaryTitle}>
+              Meter reading recorded
+            </Text>
 
-              <View style={styles.meterReadingSummaryRow}>
-                <View>
-                  <Text style={styles.meterReadingSummaryLabel}>
-                    Current reading
-                  </Text>
+            <View style={styles.meterReadingSummaryRow}>
+              <View>
+                <Text style={styles.meterReadingSummaryLabel}>
+                  Current reading
+                </Text>
 
-                  <Text style={styles.meterReadingSummaryValue}>
-                    {activeVisit.meterReading.reading.toLocaleString()}
-                  </Text>
-                </View>
-
-                {activeVisit.meterReading.delta !== null ? (
-                  <View style={styles.meterReadingDeltaContainer}>
-                    <Text style={styles.meterReadingSummaryLabel}>
-                      Increase
-                    </Text>
-
-                    <Text style={styles.meterReadingDeltaValue}>
-                      +{activeVisit.meterReading.delta.toLocaleString()}
-                    </Text>
-                  </View>
-                ) : null}
+                <Text style={styles.meterReadingSummaryValue}>
+                  {activeVisit.meterReading.reading.toLocaleString()}
+                </Text>
               </View>
 
-              {activeVisit.meterReading.previousReading !== null ? (
-                <Text style={styles.meterReadingSummaryDetail}>
-                  Previous reading:{" "}
-                  {activeVisit.meterReading.previousReading.toLocaleString()}
-                </Text>
-              ) : (
-                <Text style={styles.meterReadingSummaryDetail}>
-                  First recorded reading for this machine.
-                </Text>
-              )}
+              {activeVisit.meterReading.delta !== null ? (
+                <View style={styles.meterReadingDeltaContainer}>
+                  <Text style={styles.meterReadingSummaryLabel}>Increase</Text>
+
+                  <Text style={styles.meterReadingDeltaValue}>
+                    +{activeVisit.meterReading.delta.toLocaleString()}
+                  </Text>
+                </View>
+              ) : null}
             </View>
-          ) : null} 
 
-          {activeVisit.inventoryAudit &&
-          activeVisit.currentStep !== "inventory_audit" ? (
-            <View style={styles.inventorySummaryCard}>
-              <Text style={styles.inventorySummaryTitle}>
-                Inventory audit recorded
+            {activeVisit.meterReading.previousReading !== null ? (
+              <Text style={styles.meterReadingSummaryDetail}>
+                Previous reading:{" "}
+                {activeVisit.meterReading.previousReading.toLocaleString()}
               </Text>
-
-              <Text style={styles.inventorySummaryText}>
-                {activeVisit.inventoryAudit.items.length}{" "}
-                {activeVisit.inventoryAudit.items.length === 1
-                  ? "product was"
-                  : "products were"}{" "}
-                counted at this location.
+            ) : (
+              <Text style={styles.meterReadingSummaryDetail}>
+                First recorded reading for this machine.
               </Text>
+            )}
+          </View>
+        ) : null}
 
-              <Text style={styles.inventorySummaryDetail}>
-                Sync status:{" "}
-                {activeVisit.inventoryAudit.syncStatus === "synced"
-                  ? "Synced"
-                  : "Waiting to sync"}
-              </Text>
-            </View>
-          ) : null} 
+        {activeVisit.inventoryAudit &&
+        activeVisit.currentStep !== "inventory_audit" ? (
+          <View style={styles.inventorySummaryCard}>
+            <Text style={styles.inventorySummaryTitle}>
+              Inventory audit recorded
+            </Text>
 
-          {activeVisit.restockDrop &&
-          activeVisit.currentStep !== "restock" ? (
-            <View style={styles.inventorySummaryCard}>
-              <Text style={styles.inventorySummaryTitle}>
-                Restock drop confirmed
-              </Text>
+            <Text style={styles.inventorySummaryText}>
+              {activeVisit.inventoryAudit.items.length}{" "}
+              {activeVisit.inventoryAudit.items.length === 1
+                ? "product was"
+                : "products were"}{" "}
+              counted at this location.
+            </Text>
 
-              <Text style={styles.inventorySummaryText}>
-                {activeVisit.restockDrop.items.filter(
+            <Text style={styles.inventorySummaryDetail}>
+              Sync status:{" "}
+              {activeVisit.inventoryAudit.syncStatus === "synced"
+                ? "Synced"
+                : "Waiting to sync"}
+            </Text>
+          </View>
+        ) : null}
+
+        {activeVisit.restockDrop && activeVisit.currentStep !== "restock" ? (
+          <View style={styles.inventorySummaryCard}>
+            <Text style={styles.inventorySummaryTitle}>
+              Restock drop confirmed
+            </Text>
+
+            <Text style={styles.inventorySummaryText}>
+              {
+                activeVisit.restockDrop.items.filter(
                   (item) => item.actualQuantity > 0,
-                ).length}{" "}
-                {activeVisit.restockDrop.items.filter(
-                  (item) => item.actualQuantity > 0,
-                ).length === 1
-                  ? "product was"
-                  : "products were"}{" "}
-                moved from the driver to this client.
-              </Text>
+                ).length
+              }{" "}
+              {activeVisit.restockDrop.items.filter(
+                (item) => item.actualQuantity > 0,
+              ).length === 1
+                ? "product was"
+                : "products were"}{" "}
+              moved from the driver to this client.
+            </Text>
 
-              <Text style={styles.inventorySummaryDetail}>
-                Total units left:{" "}
-                {activeVisit.restockDrop.items
-                  .reduce(
-                    (total, item) =>
-                      total + item.actualQuantity,
-                    0,
-                  )
-                  .toLocaleString()}
-              </Text>
+            <Text style={styles.inventorySummaryDetail}>
+              Total units left:{" "}
+              {activeVisit.restockDrop.items
+                .reduce((total, item) => total + item.actualQuantity, 0)
+                .toLocaleString()}
+            </Text>
 
-              <Text style={styles.inventorySummaryDetail}>
-                Sync status:{" "}
-                {activeVisit.restockDrop.syncStatus === "synced"
-                  ? "Synced"
-                  : "Waiting to sync"}
-              </Text>
-            </View>
-          ) : null}  
+            <Text style={styles.inventorySummaryDetail}>
+              Sync status:{" "}
+              {activeVisit.restockDrop.syncStatus === "synced"
+                ? "Synced"
+                : "Waiting to sync"}
+            </Text>
+          </View>
+        ) : null}
 
         {activeVisit.status === "completed" ? (
           <Pressable
@@ -420,39 +357,33 @@ export default function ServiceVisitScreen({
           <View style={styles.activeStepContainer}>
             <RestockDropStep />
           </View>
+        ) : activeVisit.currentStep === "after_service" ? (
+          <View style={styles.activeStepContainer}>
+            <AfterServiceStep
+              onSignatureStart={() => {
+                setSignatureActive(true);
+              }}
+              onSignatureEnd={() => {
+                setSignatureActive(false);
+              }}
+            />
+          </View>
         ) : (
           <>
             <View style={styles.developmentNotice}>
               <Text style={styles.developmentNoticeTitle}>
-                Upcoming FLOW story
+                Closing verification
               </Text>
 
               <Text style={styles.developmentNoticeText}>
-                Step {currentStepNumber} is not implemented yet. This temporary
-                control remains available for testing the FLOW-1 state machine
-                until its dedicated story is added.
+                Step 8 requires a second QR scan of the assigned machine.
               </Text>
             </View>
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.buttonPressed,
-                submitting && styles.buttonDisabled,
-              ]}
-              disabled={submitting}
-              onPress={() => {
-                void handleCompleteCurrentStep();
-              }}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.primaryButtonText}>
-                  Complete Current Step
-                </Text>
-              )}
-            </Pressable>
+            <Text style={styles.developmentNoticeText}>
+              Completion is blocked until Step 8 verifies the assigned machine
+              with the required closing QR scan.
+            </Text>
           </>
         )}
 
@@ -778,7 +709,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#376640",
   },
-    beforePhotosSummaryWarning: {
+  beforePhotosSummaryWarning: {
     marginTop: 6,
     fontSize: 13,
     fontWeight: "600",
@@ -831,13 +762,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   inventorySummaryCard: {
-  backgroundColor: "#eef5e9",
-  borderColor: "#cadcbe",
-  borderRadius: 16,
-  borderWidth: 1,
-  marginTop: 16,
-  padding: 16,
-},
+    backgroundColor: "#eef5e9",
+    borderColor: "#cadcbe",
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 16,
+  },
   inventorySummaryTitle: {
     color: "#315f35",
     fontSize: 16,
