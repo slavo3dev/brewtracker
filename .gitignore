@@ -8,6 +8,7 @@ apps/web/.next/
 apps/web/out/
 
 # expo
+
 apps/mobile/.expo/
 apps/mobile/dist/
 apps/mobile/web-build/
