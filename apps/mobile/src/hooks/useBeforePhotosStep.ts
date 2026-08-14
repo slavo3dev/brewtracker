@@ -174,12 +174,16 @@ export function useBeforePhotosStep({
       throw new Error("Capture the required interior/hopper photo.");
     }
 
-    const hasUploadingPhoto = activeVisit.beforePhotos.some(
-      (photo) => photo.uploadStatus === "uploading",
-    );
+    if (exteriorPhoto.uploadStatus !== "uploaded") {
+      throw new Error(
+        "The required exterior photo must finish uploading before continuing.",
+      );
+    }
 
-    if (hasUploadingPhoto) {
-      throw new Error("Wait for the current photo upload attempt to finish.");
+    if (interiorPhoto.uploadStatus !== "uploaded") {
+      throw new Error(
+        "The required interior/hopper photo must finish uploading before continuing.",
+      );
     }
 
     const now = new Date().toISOString();
