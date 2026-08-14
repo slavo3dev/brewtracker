@@ -221,6 +221,17 @@ export function validateRestoredVisit(
     signatureBypassedAt: null,
   };
 
+  const restoredSummary = visit.summary ?? {
+    closingVerification: null,
+
+    syncStatus: "not_started" as const,
+    syncError: null,
+
+    databaseId: null,
+    surveyToken: null,
+    emailSentAt: null,
+  };
+
   const validUploadStatuses = [
     "pending_upload",
     "uploading",
@@ -262,5 +273,6 @@ export function validateRestoredVisit(
       ...restoredAfterService,
       signatureRequired,
     },
+    summary: restoredSummary,
   };
 }

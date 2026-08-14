@@ -16,6 +16,7 @@ import { useInventoryAuditStep } from "../../hooks/useInventoryAuditStep";
 import { useMeterReadingStep } from "../../hooks/useMeterReadingStep";
 import { useRestockStep } from "../../hooks/useRestockStep";
 import { useVisitMutation } from "../../hooks/useVisitMutation";
+import { useSummaryStep } from "../../hooks/useSummaryStep";
 
 import {
   loadServiceVisit,
@@ -110,6 +111,14 @@ type ServiceVisitContextValue = {
   clearLocalVisit: () => Promise<void>;
 
   isVisitForStop: (stopId: string) => boolean;
+
+  verifyClosingMachineScan: (
+    scannedValue: string,
+  ) => Promise<ServiceVisit>;
+
+  completeSummary: () => Promise<ServiceVisit>;
+
+  retrySummarySync: () => Promise<ServiceVisit>;
 };
 
 const ServiceVisitContext = createContext<ServiceVisitContextValue | null>(
@@ -149,6 +158,15 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   const { commitVisitMutation } = useVisitMutation({
     activeVisit,
     setActiveVisit,
+  });
+
+  const {
+    verifyClosingMachineScan,
+    completeSummary,
+    retrySummarySync,
+  } = useSummaryStep({
+    commitVisitMutation,
+    setErrorMessage,
   });
 
   /*
@@ -380,6 +398,17 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
           signatureRequired: input.target.signatureRequired ?? true,
 
           signatureBypassedAt: null,
+        },
+
+        summary: {
+          closingVerification: null,
+
+          syncStatus: "not_started",
+          syncError: null,
+
+          databaseId: null,
+          surveyToken: null,
+          emailSentAt: null,
         },
 
         startedAt: now,
@@ -644,6 +673,10 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
       completeAfterService,
 
+      verifyClosingMachineScan,
+      completeSummary,
+      retrySummarySync,
+
       cancelVisit,
       clearCompletedVisit,
 
@@ -681,6 +714,10 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       removeSignature,
 
       completeAfterService,
+
+      verifyClosingMachineScan,
+      completeSummary,
+      retrySummarySync,
 
       cancelVisit,
       clearCompletedVisit,

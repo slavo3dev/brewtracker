@@ -23,6 +23,7 @@ import MeterReadingStep from "../features/service-visit/MeterReadingStep";
 import InventoryAuditStep from "../features/service-visit/InventoryAuditStep";
 import RestockDropStep from "../features/service-visit/RestockDropStep";
 import AfterServiceStep from "../features/service-visit/AfterServiceStep";
+import SummaryStep from "../features/service-visit/SummaryStep";
 
 type Props = {
   onBack: () => void;
@@ -368,24 +369,11 @@ export default function ServiceVisitScreen({
               }}
             />
           </View>
-        ) : (
-          <>
-            <View style={styles.developmentNotice}>
-              <Text style={styles.developmentNoticeTitle}>
-                Closing verification
-              </Text>
-
-              <Text style={styles.developmentNoticeText}>
-                Step 8 requires a second QR scan of the assigned machine.
-              </Text>
-            </View>
-
-            <Text style={styles.developmentNoticeText}>
-              Completion is blocked until Step 8 verifies the assigned machine
-              with the required closing QR scan.
-            </Text>
-          </>
-        )}
+        ) : activeVisit.currentStep === "summary" ? (
+          <View style={styles.activeStepContainer}>
+            <SummaryStep />
+          </View>
+        ) : null}
 
         <View style={styles.stepsCard}>
           {activeVisit.steps.map((stepState, index) => {

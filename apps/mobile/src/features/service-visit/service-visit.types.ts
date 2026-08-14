@@ -303,6 +303,41 @@ export type CompleteMachineScanInput = {
   scannedValue: string;
 };
 
+export type ClosingMachineVerificationRecord = {
+  scannedValue: string;
+  expectedQrCode: string;
+  machineId: string;
+  verifiedAt: string;
+};
+
+export type SummarySyncStatus =
+  | "not_started"
+  | "pending_sync"
+  | "synced"
+  | "failed";
+
+export type ServiceVisitSummaryRecord = {
+  closingVerification: ClosingMachineVerificationRecord | null;
+
+  syncStatus: SummarySyncStatus;
+  syncError: string | null;
+
+  databaseId: string | null;
+  surveyToken: string | null;
+  emailSentAt: string | null;
+};
+
+export type CompleteServiceVisitResult = {
+  summaryId: string;
+  surveyToken: string;
+  notificationStatus:
+    | "pending"
+    | "sent"
+    | "failed"
+    | "skipped";
+  emailSentAt: string | null;
+};
+
 export type ServiceVisit = {
   id: string;
   userId: string;
@@ -326,6 +361,7 @@ export type ServiceVisit = {
   inventoryAudit: InventoryAuditRecord | null;
   restockDrop: RestockDropRecord | null;
   afterService: AfterServiceRecord;
+  summary: ServiceVisitSummaryRecord;
 
   startedAt: string;
   updatedAt: string;

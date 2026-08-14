@@ -79,6 +79,7 @@ export type Database = {
           longitude: number | null
           name: string
           region: string | null
+          service_email: string | null
           signature_required: boolean
           updated_at: string
         }
@@ -95,6 +96,7 @@ export type Database = {
           longitude?: number | null
           name: string
           region?: string | null
+          service_email?: string | null
           signature_required?: boolean
           updated_at?: string
         }
@@ -111,6 +113,7 @@ export type Database = {
           longitude?: number | null
           name?: string
           region?: string | null
+          service_email?: string | null
           signature_required?: boolean
           updated_at?: string
         }
@@ -742,6 +745,121 @@ export type Database = {
             columns: ["stop_id"]
             isOneToOne: false
             referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_visit_summaries: {
+        Row: {
+          client_id: string
+          closing_scanned_value: string
+          closing_verified_at: string
+          completed_at: string
+          completed_by: string
+          created_at: string
+          email_sent_at: string | null
+          id: string
+          machine_id: string
+          notification_error: string | null
+          notification_status: string
+          source_visit_id: string
+          stop_id: string
+          summary: Json
+          survey_token: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          closing_scanned_value: string
+          closing_verified_at: string
+          completed_at: string
+          completed_by: string
+          created_at?: string
+          email_sent_at?: string | null
+          id?: string
+          machine_id: string
+          notification_error?: string | null
+          notification_status?: string
+          source_visit_id: string
+          stop_id: string
+          summary?: Json
+          survey_token?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          closing_scanned_value?: string
+          closing_verified_at?: string
+          completed_at?: string
+          completed_by?: string
+          created_at?: string
+          email_sent_at?: string | null
+          id?: string
+          machine_id?: string
+          notification_error?: string | null
+          notification_status?: string
+          source_visit_id?: string
+          stop_id?: string
+          summary?: Json
+          survey_token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_visit_summaries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_summaries_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_summaries_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_summaries_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_visit_surveys: {
+        Row: {
+          id: string
+          rating: number
+          submitted_at: string
+          summary_id: string
+        }
+        Insert: {
+          id?: string
+          rating: number
+          submitted_at?: string
+          summary_id: string
+        }
+        Update: {
+          id?: string
+          rating?: number
+          submitted_at?: string
+          summary_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_visit_surveys_summary_id_fkey"
+            columns: ["summary_id"]
+            isOneToOne: true
+            referencedRelation: "service_visit_summaries"
             referencedColumns: ["id"]
           },
         ]
