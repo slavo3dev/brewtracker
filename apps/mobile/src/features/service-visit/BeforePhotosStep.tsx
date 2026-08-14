@@ -124,7 +124,9 @@ export default function BeforePhotosStep() {
     visit.beforePhotos.find((photo) => photo.kind === "interior_hopper") ??
     null;
 
-  const hasBothPhotos = exteriorPhoto !== null && interiorPhoto !== null;
+  const requiredPhotosUploaded =
+    exteriorPhoto?.uploadStatus === "uploaded" &&
+    interiorPhoto?.uploadStatus === "uploaded";
 
   const uploadInProgress =
     uploadingKind !== null ||
@@ -261,11 +263,6 @@ export default function BeforePhotosStep() {
 
       if (previousPhoto && previousPhoto.localUri !== localUri) {
         await deleteLocalBeforePhoto(previousPhoto.localUri);
-
-        await deleteUploadedBeforePhoto(
-          previousPhoto.storagePath,
-          previousPhoto.databaseId,
-        );
       }
 
       const savedKind = activeKind;
@@ -318,7 +315,7 @@ export default function BeforePhotosStep() {
   }
 
   async function handleCompleteStep(): Promise<void> {
-    if (!hasBothPhotos || uploadInProgress || completing) {
+    if (!requiredPhotosUploaded || uploadInProgress || completing) {
       return;
     }
 
@@ -559,13 +556,13 @@ export default function BeforePhotosStep() {
 
       <Pressable
         accessibilityRole="button"
-        disabled={!hasBothPhotos || uploadInProgress || completing}
+        disabled={!requiredPhotosUploaded || uploadInProgress || completing}
         style={({ pressed }) => [
           styles.primaryButton,
-          (!hasBothPhotos || uploadInProgress || completing) &&
+          (!requiredPhotosUploaded || uploadInProgress || completing) &&
             styles.buttonDisabled,
           pressed &&
-            hasBothPhotos &&
+            requiredPhotosUploaded &&
             !uploadInProgress &&
             !completing &&
             styles.buttonPressed,
@@ -583,9 +580,9 @@ export default function BeforePhotosStep() {
         )}
       </Pressable>
 
-      {!hasBothPhotos ? (
+      {!requiredPhotosUploaded ? (
         <Text style={styles.requirementHint}>
-          Both required photos must be saved before continuing.
+          Both required photos must be uploaded before continuing.
         </Text>
       ) : null}
     </View>
