@@ -47,7 +47,8 @@ export default function ServiceVisitScreen({
   onBack,
   onVisitCompleted,
 }: Props) {
-  const { activeVisit, clearCompletedVisit } = useServiceVisit();
+  const { activeVisit, clearCompletedVisit, retrySummarySync } =
+    useServiceVisit();
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -70,6 +71,8 @@ export default function ServiceVisitScreen({
       </SafeAreaView>
     );
   }
+
+  const visitSynced = activeVisit.summary.syncStatus === "synced";
 
   const currentStep = getServiceVisitStep(activeVisit.currentStep);
 
@@ -99,6 +102,23 @@ export default function ServiceVisitScreen({
         error instanceof Error
           ? error.message
           : "Unable to close the completed visit.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRetrySync(): Promise<void> {
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      await retrySummarySync();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to sync the completed visit.",
       );
     } finally {
       setSubmitting(false);
@@ -315,25 +335,62 @@ export default function ServiceVisitScreen({
         ) : null}
 
         {activeVisit.status === "completed" ? (
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && styles.buttonPressed,
-              submitting && styles.buttonDisabled,
-            ]}
-            disabled={submitting}
-            onPress={() => {
-              void handleFinish();
-            }}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text style={styles.primaryButtonText}>
-                Finish and Return Home
+          activeVisit.summary.syncStatus === "synced" ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.primaryButton,
+                pressed && styles.buttonPressed,
+                submitting && styles.buttonDisabled,
+              ]}
+              disabled={submitting}
+              onPress={() => {
+                void handleFinish();
+              }}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>
+                  Finish and Return Home
+                </Text>
+              )}
+            </Pressable>
+          ) : (
+            <View style={styles.syncWarningCard}>
+              <Text style={styles.syncWarningTitle}>
+                Service saved — sync required
               </Text>
-            )}
-          </Pressable>
+
+              <Text style={styles.syncWarningText}>
+                The service is saved on this device, but the server has not
+                confirmed it yet. Retry before leaving this visit.
+              </Text>
+
+              {activeVisit.summary.syncError ? (
+                <Text style={styles.syncErrorText}>
+                  {activeVisit.summary.syncError}
+                </Text>
+              ) : null}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  pressed && styles.buttonPressed,
+                  submitting && styles.buttonDisabled,
+                ]}
+                disabled={submitting}
+                onPress={() => {
+                  void handleRetrySync();
+                }}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Retry Sync</Text>
+                )}
+              </Pressable>
+            </View>
+          )
         ) : activeVisit.currentStep === "arrival" ? (
           <View style={styles.activeStepContainer}>
             <ArrivalStep />
@@ -772,6 +829,34 @@ const styles = StyleSheet.create({
     color: "#5e7c61",
     fontSize: 12,
     fontWeight: "600",
+    marginTop: 8,
+  },
+  syncWarningCard: {
+    backgroundColor: "#fff4df",
+    borderColor: "#e5c890",
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 18,
+    padding: 16,
+  },
+
+  syncWarningTitle: {
+    color: "#8a5a16",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  syncWarningText: {
+    color: "#80663e",
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 6,
+  },
+
+  syncErrorText: {
+    color: "#9f302d",
+    fontSize: 12,
+    lineHeight: 18,
     marginTop: 8,
   },
 });

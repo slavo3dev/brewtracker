@@ -112,9 +112,7 @@ type ServiceVisitContextValue = {
 
   isVisitForStop: (stopId: string) => boolean;
 
-  verifyClosingMachineScan: (
-    scannedValue: string,
-  ) => Promise<ServiceVisit>;
+  verifyClosingMachineScan: (scannedValue: string) => Promise<ServiceVisit>;
 
   completeSummary: () => Promise<ServiceVisit>;
 
@@ -160,14 +158,11 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     setActiveVisit,
   });
 
-  const {
-    verifyClosingMachineScan,
-    completeSummary,
-    retrySummarySync,
-  } = useSummaryStep({
-    commitVisitMutation,
-    setErrorMessage,
-  });
+  const { verifyClosingMachineScan, completeSummary, retrySummarySync } =
+    useSummaryStep({
+      commitVisitMutation,
+      setErrorMessage,
+    });
 
   /*
    * Step 3 - Before photos
@@ -622,12 +617,20 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   const clearCompletedVisit = useCallback(async (): Promise<void> => {
     if (!userId) {
       setActiveVisit(null);
-
       return;
     }
 
     if (activeVisit && activeVisit.status === "in_progress") {
       throw new Error("An in-progress visit cannot be removed.");
+    }
+
+    if (
+      activeVisit?.status === "completed" &&
+      activeVisit.summary.syncStatus !== "synced"
+    ) {
+      throw new Error(
+        "The completed service visit must sync successfully before it can be removed.",
+      );
     }
 
     await removeServiceVisit(userId);

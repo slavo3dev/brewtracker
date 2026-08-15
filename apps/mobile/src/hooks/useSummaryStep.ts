@@ -16,132 +16,93 @@ type CommitVisitMutation = (
 
 type UseSummaryStepParams = {
   commitVisitMutation: CommitVisitMutation;
-  setErrorMessage: (
-    message: string | null,
-  ) => void;
+  setErrorMessage: (message: string | null) => void;
 };
 
 export function useSummaryStep({
   commitVisitMutation,
   setErrorMessage,
 }: UseSummaryStepParams) {
-  const verifyClosingMachineScan =
-    useCallback(
-      async (
-        scannedValueInput: string,
-      ): Promise<ServiceVisit> => {
-        const scannedValue =
-          scannedValueInput.trim();
+  const verifyClosingMachineScan = useCallback(
+    async (scannedValueInput: string): Promise<ServiceVisit> => {
+      const scannedValue = scannedValueInput.trim();
 
-        if (!scannedValue) {
+      if (!scannedValue) {
+        throw new Error("The scanned QR code is empty.");
+      }
+
+      const updatedVisit = await commitVisitMutation((currentVisit) => {
+        if (currentVisit.currentStep !== "summary") {
           throw new Error(
-            "The scanned QR code is empty.",
+            "Closing verification can only be performed during Step 8.",
           );
         }
 
-        const updatedVisit =
-          await commitVisitMutation(
-            (currentVisit) => {
-              if (
-                currentVisit.currentStep !==
-                "summary"
-              ) {
-                throw new Error(
-                  "Closing verification can only be performed during Step 8.",
-                );
-              }
+        const expectedQrCode = currentVisit.machineTarget.qrCode.trim();
 
-              const expectedQrCode =
-                currentVisit.machineTarget
-                  .qrCode.trim();
+        if (!expectedQrCode) {
+          throw new Error("The assigned machine has no valid QR code.");
+        }
 
-              if (!expectedQrCode) {
-                throw new Error(
-                  "The assigned machine has no valid QR code.",
-                );
-              }
-
-              if (
-                scannedValue !==
-                expectedQrCode
-              ) {
-                throw new Error(
-                  "This QR code belongs to a different machine. Scan the machine assigned to this stop.",
-                );
-              }
-
-              const now =
-                new Date().toISOString();
-
-              return {
-                ...currentVisit,
-
-                summary: {
-                  ...currentVisit.summary,
-
-                  closingVerification: {
-                    scannedValue,
-                    expectedQrCode,
-
-                    machineId:
-                      currentVisit
-                        .machineTarget.id,
-
-                    verifiedAt: now,
-                  },
-                },
-
-                updatedAt: now,
-              };
-            },
+        if (scannedValue !== expectedQrCode) {
+          throw new Error(
+            "This QR code belongs to a different machine. Scan the machine assigned to this stop.",
           );
+        }
 
-        setErrorMessage(null);
+        const now = new Date().toISOString();
 
-        return updatedVisit;
-      },
-      [
-        commitVisitMutation,
-        setErrorMessage,
-      ],
-    );
+        return {
+          ...currentVisit,
+
+          summary: {
+            ...currentVisit.summary,
+
+            closingVerification: {
+              scannedValue,
+              expectedQrCode,
+
+              machineId: currentVisit.machineTarget.id,
+
+              verifiedAt: now,
+            },
+          },
+
+          updatedAt: now,
+        };
+      });
+
+      setErrorMessage(null);
+
+      return updatedVisit;
+    },
+    [commitVisitMutation, setErrorMessage],
+  );
 
   const syncVisit = useCallback(
-    async (
-      visit: ServiceVisit,
-    ): Promise<ServiceVisit> => {
+    async (visit: ServiceVisit): Promise<ServiceVisit> => {
       try {
-        const result =
-          await syncCompletedServiceVisit(
-            visit,
-          );
+        const result = await syncCompletedServiceVisit(visit);
 
-        const syncedVisit =
-          await commitVisitMutation(
-            (currentVisit) => ({
-              ...currentVisit,
+        const syncedVisit = await commitVisitMutation((currentVisit) => ({
+          ...currentVisit,
 
-              summary: {
-                ...currentVisit.summary,
+          summary: {
+            ...currentVisit.summary,
 
-                syncStatus: "synced",
+            syncStatus: "synced",
 
-                syncError: null,
+            syncError: null,
 
-                databaseId:
-                  result.summaryId,
+            databaseId: result.summaryId,
 
-                surveyToken:
-                  result.surveyToken,
+            surveyToken: result.surveyToken,
 
-                emailSentAt:
-                  result.emailSentAt,
-              },
+            emailSentAt: result.emailSentAt,
+          },
 
-              updatedAt:
-                new Date().toISOString(),
-            }),
-          );
+          updatedAt: new Date().toISOString(),
+        }));
 
         setErrorMessage(null);
 
@@ -152,132 +113,87 @@ export function useSummaryStep({
             ? error.message
             : "Unable to sync the completed service visit.";
 
-        const failedVisit =
-          await commitVisitMutation(
-            (currentVisit) => ({
-              ...currentVisit,
+        await commitVisitMutation((currentVisit) => ({
+          ...currentVisit,
 
-              summary: {
-                ...currentVisit.summary,
+          summary: {
+            ...currentVisit.summary,
 
-                syncStatus: "failed",
+            syncStatus: "failed",
+            syncError: message,
+          },
 
-                syncError: message,
-              },
+          updatedAt: new Date().toISOString(),
+        }));
 
-              updatedAt:
-                new Date().toISOString(),
-            }),
-          );
-
-        /*
-         * Important:
-         *
-         * The visit is already safely completed
-         * locally. Do not turn a notification
-         * failure into a failed service visit.
-         */
         setErrorMessage(
-          "Service completed. Client notification is waiting to sync.",
+          "Service was saved on this device, but could not be synced. Retry before leaving this visit.",
         );
 
-        return failedVisit;
+        throw new Error(message);
       }
     },
-    [
-      commitVisitMutation,
-      setErrorMessage,
-    ],
+    [commitVisitMutation, setErrorMessage],
   );
 
-  const completeSummary =
-    useCallback(async (): Promise<ServiceVisit> => {
-      const completedVisit =
-        await commitVisitMutation(
-          (currentVisit) => {
-            assertVisitReadyForCompletion(
-              currentVisit,
-            );
+  const completeSummary = useCallback(async (): Promise<ServiceVisit> => {
+    const completedVisit = await commitVisitMutation((currentVisit) => {
+      assertVisitReadyForCompletion(currentVisit);
 
-            const now =
-              new Date().toISOString();
+      const now = new Date().toISOString();
 
-            const pendingVisit: ServiceVisit =
-              {
-                ...currentVisit,
+      const pendingVisit: ServiceVisit = {
+        ...currentVisit,
 
-                summary: {
-                  ...currentVisit.summary,
+        summary: {
+          ...currentVisit.summary,
 
-                  syncStatus:
-                    "pending_sync",
+          syncStatus: "pending_sync",
 
-                  syncError: null,
-                },
+          syncError: null,
+        },
 
-                updatedAt: now,
-              };
-
-            /*
-             * "summary" is the final state-machine
-             * step, so this changes status to
-             * "completed" and sets completedAt.
-             */
-            return transitionToNextStep(
-              pendingVisit,
-              "summary",
-              now,
-            );
-          },
-        );
+        updatedAt: now,
+      };
 
       /*
-       * The visit is persisted locally before this
-       * network operation starts.
+       * "summary" is the final state-machine
+       * step, so this changes status to
+       * "completed" and sets completedAt.
        */
-      return syncVisit(completedVisit);
-    }, [
-      commitVisitMutation,
-      syncVisit,
-    ]);
+      return transitionToNextStep(pendingVisit, "summary", now);
+    });
 
-  const retrySummarySync =
-    useCallback(async (): Promise<ServiceVisit> => {
-      const visit =
-        await commitVisitMutation(
-          (currentVisit) => {
-            if (
-              currentVisit.status !==
-              "completed"
-            ) {
-              throw new Error(
-                "Only a completed visit can retry synchronization.",
-              );
-            }
+    /*
+     * The visit is persisted locally before this
+     * network operation starts.
+     */
+    return syncVisit(completedVisit);
+  }, [commitVisitMutation, syncVisit]);
 
-            return {
-              ...currentVisit,
+  const retrySummarySync = useCallback(async (): Promise<ServiceVisit> => {
+    const visit = await commitVisitMutation((currentVisit) => {
+      if (currentVisit.status !== "completed") {
+        throw new Error("Only a completed visit can retry synchronization.");
+      }
 
-              summary: {
-                ...currentVisit.summary,
+      return {
+        ...currentVisit,
 
-                syncStatus:
-                  "pending_sync",
+        summary: {
+          ...currentVisit.summary,
 
-                syncError: null,
-              },
+          syncStatus: "pending_sync",
 
-              updatedAt:
-                new Date().toISOString(),
-            };
-          },
-        );
+          syncError: null,
+        },
 
-      return syncVisit(visit);
-    }, [
-      commitVisitMutation,
-      syncVisit,
-    ]);
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    return syncVisit(visit);
+  }, [commitVisitMutation, syncVisit]);
 
   return {
     verifyClosingMachineScan,
