@@ -1,4 +1,5 @@
 import type { RouteBuilderStop } from "@/lib/routes/route-service";
+import { MapIcon } from "./icons";
 
 type Props = {
   stops: RouteBuilderStop[];
@@ -28,8 +29,9 @@ export function RouteMapPreview({ stops }: Props) {
           href={googleMapsUrl}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 inline-flex rounded-full bg-espresso-950 px-4 py-2 text-sm font-medium text-crema-50 transition-colors hover:bg-copper-600"
+          className="mt-3 inline-flex items-center gap-2 rounded-full bg-espresso-950 px-4 py-2 text-sm font-medium text-crema-50 transition-colors hover:bg-copper-600"
         >
+          <MapIcon className="size-4" />
           Open in Google Maps
         </a>
       )}
