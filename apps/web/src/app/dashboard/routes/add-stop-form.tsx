@@ -4,8 +4,8 @@ import { useActionState, useMemo, useState } from "react";
 import type { Database } from "@brewtracker/types";
 import { addStopAction } from "./actions";
 import { initialRouteActionState } from "./action-state";
-import { PlusIcon } from "./icons";
-import { SubmitButton } from "./submit-button";
+import { PlusIcon } from "@/components/ui/icons";
+import { SubmitButton } from "@/components/ui/submit-button";
 
 type Client = Database["public"]["Tables"]["clients"]["Row"];
 type Machine = Database["public"]["Tables"]["machines"]["Row"];

@@ -6,9 +6,9 @@ import type { RouteBuilderRoute, RouteBuilderStop } from "@/lib/routes/route-ser
 import { deleteStopAction, updateStopSequenceAction } from "./actions";
 import { AddStopForm } from "./add-stop-form";
 import { initialRouteActionState } from "./action-state";
-import { CalendarIcon, ChevronDownIcon, PlusIcon, TrashIcon, UsersIcon } from "./icons";
+import { CalendarIcon, ChevronDownIcon, PlusIcon, TrashIcon, UsersIcon } from "@/components/ui/icons";
 import { RouteMapPreview } from "./route-map-preview";
-import { SubmitButton } from "./submit-button";
+import { SubmitButton } from "@/components/ui/submit-button";
 
 type Client = Database["public"]["Tables"]["clients"]["Row"];
 type Machine = Database["public"]["Tables"]["machines"]["Row"];
