@@ -4,6 +4,8 @@ import { useActionState } from "react";
 import type { Database } from "@brewtracker/types";
 import { createRouteAction } from "./actions";
 import { initialRouteActionState } from "./action-state";
+import { PlusIcon } from "./icons";
+import { SubmitButton } from "./submit-button";
 
 type Driver = Pick<
   Database["public"]["Tables"]["users"]["Row"],
@@ -62,9 +64,12 @@ export function CreateRouteForm({ drivers, warehouses }: Props) {
         </p>
       )}
 
-      <button className="rounded-full bg-espresso-950 px-4 py-2 text-sm font-medium text-crema-50 transition-colors hover:bg-copper-600 md:col-span-2">
-        Create route
-      </button>
+      <div className="md:col-span-2 md:flex md:justify-end">
+        <SubmitButton pendingLabel="Creating route…" className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-espresso-950 px-5 py-2.5 text-sm font-medium text-crema-50 transition-colors hover:bg-copper-600 disabled:opacity-50 md:w-auto">
+          <PlusIcon className="size-4" />
+          Create route
+        </SubmitButton>
+      </div>
     </form>
   );
 }
