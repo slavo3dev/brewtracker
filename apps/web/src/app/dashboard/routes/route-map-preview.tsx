@@ -1,5 +1,5 @@
 import type { RouteBuilderStop } from "@/lib/routes/route-service";
-import { MapIcon } from "./icons";
+import { MapIcon } from "@/components/ui/icons";
 
 type Props = {
   stops: RouteBuilderStop[];

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Database } from "@brewtracker/types";
 import type { RouteBuilderRoute } from "@/lib/routes/route-service";
 import { CreateRouteForm } from "./create-route-form";
-import { PlusIcon, SearchIcon, XIcon } from "./icons";
+import { PlusIcon, SearchIcon, XIcon } from "@/components/ui/icons";
 import { RouteCard } from "./route-card";
 
 type Driver = Pick<Database["public"]["Tables"]["users"]["Row"], "id" | "full_name" | "email" | "region">;
