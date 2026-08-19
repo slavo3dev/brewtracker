@@ -13,7 +13,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { useAfterServiceStep } from "../../hooks/useAfterServiceStep";
 import { useBeforePhotosStep } from "../../hooks/useBeforePhotosStep";
 import { useInventoryAuditStep } from "../../hooks/useInventoryAuditStep";
-import { useMeterReadingStep } from "../../hooks/useDrinkCountStep";
+import { useDrinkCountStep } from "../../hooks/useDrinkCountStep";
 import { useRestockStep } from "../../hooks/useRestockStep";
 import { useVisitMutation } from "../../hooks/useVisitMutation";
 import { useSummaryStep } from "../../hooks/useSummaryStep";
@@ -26,16 +26,14 @@ import {
 
 import {
   createInitialStepStates,
-  SERVICE_VISIT_STEPS,
   type BeforePhotoKind,
   type CompleteArrivalInput,
+  type CompleteDrinkCountInput,
   type CompleteInventoryAuditInput,
   type CompleteMachineScanInput,
-  type CompleteMeterReadingInput,
   type CompleteRestockDropInput,
   type SaveAfterPhotoInput,
   type SaveBeforePhotoInput,
-  type SaveSignatureInput,
   type ServiceVisit,
   type StartServiceVisitInput,
   type UpdateBeforePhotoUploadInput,
@@ -72,9 +70,7 @@ type ServiceVisitContextValue = {
 
   completeBeforePhotos: () => Promise<ServiceVisit>;
 
-  completeMeterReading: (
-    input: CompleteMeterReadingInput,
-  ) => Promise<ServiceVisit>;
+  completeDrinkCount: (input: CompleteDrinkCountInput) => Promise<ServiceVisit>;
 
   completeInventoryAudit: (
     input: CompleteInventoryAuditInput,
@@ -91,15 +87,6 @@ type ServiceVisitContextValue = {
     input: UpdateMediaUploadInput,
   ) => Promise<ServiceVisit>;
 
-  saveSignature: (input: SaveSignatureInput) => Promise<ServiceVisit>;
-
-  updateSignatureUpload: (
-    localUri: string,
-    input: UpdateMediaUploadInput,
-  ) => Promise<ServiceVisit>;
-
-  removeSignature: () => Promise<ServiceVisit>;
-
   completeAfterService: () => Promise<ServiceVisit>;
 
   cancelVisit: () => Promise<void>;
@@ -111,8 +98,6 @@ type ServiceVisitContextValue = {
   clearLocalVisit: () => Promise<void>;
 
   isVisitForStop: (stopId: string) => boolean;
-
-  verifyClosingMachineScan: (scannedValue: string) => Promise<ServiceVisit>;
 
   completeSummary: () => Promise<ServiceVisit>;
 
@@ -158,11 +143,10 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     setActiveVisit,
   });
 
-  const { verifyClosingMachineScan, completeSummary, retrySummarySync } =
-    useSummaryStep({
-      commitVisitMutation,
-      setErrorMessage,
-    });
+  const { completeSummary, retrySummarySync } = useSummaryStep({
+    commitVisitMutation,
+    setErrorMessage,
+  });
 
   /*
    * Step 3 - Before photos
@@ -179,9 +163,12 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   });
 
   /*
-   * Step 4 - Meter reading
+   * Drink Count
+   *
+   * This step exists only when the admin assigned
+   * the task to the route stop.
    */
-  const { completeMeterReading } = useMeterReadingStep({
+  const { completeDrinkCount } = useDrinkCountStep({
     activeVisit,
     setActiveVisit,
     clearError,
@@ -208,17 +195,11 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   /*
    * Step 7 - After photo + signature
    */
-  const {
-    saveAfterPhoto,
-    updateAfterPhotoUpload,
-    saveSignature,
-    updateSignatureUpload,
-    removeSignature,
-    completeAfterService,
-  } = useAfterServiceStep({
-    commitVisitMutation,
-    clearError,
-  });
+  const { saveAfterPhoto, updateAfterPhotoUpload, completeAfterService } =
+    useAfterServiceStep({
+      commitVisitMutation,
+      clearError,
+    });
 
   /*
    * Restore an unfinished service visit for
@@ -427,7 +408,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
       if (activeVisit.currentStep !== "arrival") {
         throw new Error(
-          "Arrival verification can only be completed during Step 1.",
+          "Arrival verification can only be completed during the Arrival step.",
         );
       }
 
@@ -521,7 +502,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
       if (activeVisit.currentStep !== "machine_scan") {
         throw new Error(
-          "Machine scanning can only be completed during Step 2.",
+          "Machine scanning can only be completed during the Machine Scan step.",
         );
       }
 
@@ -651,7 +632,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       removeBeforePhoto,
       completeBeforePhotos,
 
-      completeMeterReading,
+      completeDrinkCount,
 
       completeInventoryAudit,
 
@@ -660,13 +641,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       saveAfterPhoto,
       updateAfterPhotoUpload,
 
-      saveSignature,
-      updateSignatureUpload,
-      removeSignature,
-
       completeAfterService,
 
-      verifyClosingMachineScan,
       completeSummary,
       retrySummarySync,
 
@@ -693,7 +669,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       removeBeforePhoto,
       completeBeforePhotos,
 
-      completeMeterReading,
+      completeDrinkCount,
 
       completeInventoryAudit,
 
@@ -702,13 +678,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       saveAfterPhoto,
       updateAfterPhotoUpload,
 
-      saveSignature,
-      updateSignatureUpload,
-      removeSignature,
-
       completeAfterService,
 
-      verifyClosingMachineScan,
       completeSummary,
       retrySummarySync,
 

@@ -23,62 +23,6 @@ export function useSummaryStep({
   commitVisitMutation,
   setErrorMessage,
 }: UseSummaryStepParams) {
-  const verifyClosingMachineScan = useCallback(
-    async (scannedValueInput: string): Promise<ServiceVisit> => {
-      const scannedValue = scannedValueInput.trim();
-
-      if (!scannedValue) {
-        throw new Error("The scanned QR code is empty.");
-      }
-
-      const updatedVisit = await commitVisitMutation((currentVisit) => {
-        if (currentVisit.currentStep !== "summary") {
-          throw new Error(
-            "Closing verification can only be performed during Step 8.",
-          );
-        }
-
-        const expectedQrCode = currentVisit.machineTarget.qrCode.trim();
-
-        if (!expectedQrCode) {
-          throw new Error("The assigned machine has no valid QR code.");
-        }
-
-        if (scannedValue !== expectedQrCode) {
-          throw new Error(
-            "This QR code belongs to a different machine. Scan the machine assigned to this stop.",
-          );
-        }
-
-        const now = new Date().toISOString();
-
-        return {
-          ...currentVisit,
-
-          summary: {
-            ...currentVisit.summary,
-
-            closingVerification: {
-              scannedValue,
-              expectedQrCode,
-
-              machineId: currentVisit.machineTarget.id,
-
-              verifiedAt: now,
-            },
-          },
-
-          updatedAt: now,
-        };
-      });
-
-      setErrorMessage(null);
-
-      return updatedVisit;
-    },
-    [commitVisitMutation, setErrorMessage],
-  );
-
   const syncVisit = useCallback(
     async (visit: ServiceVisit): Promise<ServiceVisit> => {
       try {
@@ -196,7 +140,6 @@ export function useSummaryStep({
   }, [commitVisitMutation, syncVisit]);
 
   return {
-    verifyClosingMachineScan,
     completeSummary,
     retrySummarySync,
   };

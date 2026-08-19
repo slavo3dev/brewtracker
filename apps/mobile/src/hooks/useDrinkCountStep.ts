@@ -3,66 +3,84 @@ import { useCallback, type Dispatch, type SetStateAction } from "react";
 import { saveMachineMeterReading } from "../features/service-visit/meter-reading.service";
 import { saveServiceVisit } from "../features/service-visit/service-visit.storage";
 import {
-  type CompleteMeterReadingInput,
+  type CompleteDrinkCountInput,
   type ServiceVisit,
 } from "../features/service-visit/service-visit.types";
 import { transitionToNextStep } from "../features/service-visit/state/service-visit.transitions";
 
-type UseMeterReadingStepParams = {
+type UseDrinkCountStepParams = {
   activeVisit: ServiceVisit | null;
   setActiveVisit: Dispatch<SetStateAction<ServiceVisit | null>>;
   clearError: () => void;
 };
 
-export function useMeterReadingStep({
+export function useDrinkCountStep({
   activeVisit,
   setActiveVisit,
   clearError,
-}: UseMeterReadingStepParams) {
-  const completeMeterReading = useCallback(
-    async (input: CompleteMeterReadingInput): Promise<ServiceVisit> => {
+}: UseDrinkCountStepParams) {
+  const completeDrinkCount = useCallback(
+    async (input: CompleteDrinkCountInput): Promise<ServiceVisit> => {
       if (!activeVisit) {
         throw new Error("There is no active service visit.");
       }
 
-      if (activeVisit.currentStep !== "meter_reading") {
+      /*
+       * FLOW-14:
+       * Drink Count is an optional task configured
+       * by the admin for this route stop.
+       */
+      if (!activeVisit.tasks.drinkCountRequired) {
+        throw new Error("Drink Count is not required for this service visit.");
+      }
+
+      if (activeVisit.currentStep !== "drink_count") {
         throw new Error(
-          "The meter reading can only be completed during Step 4.",
+          "Drink Count can only be recorded during the Drink Count step.",
         );
       }
 
-      if (!Number.isSafeInteger(input.reading) || input.reading < 0) {
+      if (!Number.isSafeInteger(input.runningTotal) || input.runningTotal < 0) {
         throw new Error(
-          "Enter a valid non-negative whole-number meter reading.",
+          "Enter a valid non-negative whole-number Running Total.",
         );
       }
 
+      /*
+       * The driver enters only Running Total.
+       * Archive Total is calculated automatically
+       * inside the service layer.
+       */
       const savedReading = await saveMachineMeterReading({
         machineId: activeVisit.machineId,
         stopId: activeVisit.stopId,
         recordedBy: activeVisit.userId,
         sourceVisitId: activeVisit.id,
-        reading: input.reading,
+        runningTotal: input.runningTotal,
       });
 
       const now = new Date().toISOString();
 
-      const visitWithMeterReading: ServiceVisit = {
+      const visitWithDrinkCount: ServiceVisit = {
         ...activeVisit,
-        meterReading: {
+
+        drinkCount: {
           databaseId: savedReading.id,
           sourceVisitId: savedReading.sourceVisitId,
-          reading: savedReading.reading,
-          previousReading: savedReading.previousReading,
-          delta: savedReading.delta,
+
+          runningTotal: savedReading.runningTotal,
+
+          archiveTotal: savedReading.archiveTotal,
+
           recordedAt: savedReading.recordedAt,
         },
+
         updatedAt: now,
       };
 
       const updatedVisit = transitionToNextStep(
-        visitWithMeterReading,
-        "meter_reading",
+        visitWithDrinkCount,
+        "drink_count",
         now,
       );
 
@@ -77,6 +95,6 @@ export function useMeterReadingStep({
   );
 
   return {
-    completeMeterReading,
+    completeDrinkCount,
   };
 }

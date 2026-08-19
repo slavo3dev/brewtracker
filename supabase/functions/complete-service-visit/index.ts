@@ -1,7 +1,6 @@
-import { createClient } from "supabase";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
@@ -24,20 +23,12 @@ type CompletionPayload = {
 
   completedAt: string;
 
-  closingVerification: {
-    scannedValue: string;
-    expectedQrCode: string;
-    machineId: string;
-    verifiedAt: string;
-  };
-
   visitSummary: Record<string, unknown>;
 };
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-
     headers: {
       "Content-Type": "application/json",
     },
@@ -60,7 +51,7 @@ async function createPhotoSignedUrl(
   return data.signedUrl;
 }
 
-Deno.serve(async (request) => {
+Deno.serve(async (request: Request) => {
   if (request.method !== "POST") {
     return jsonResponse(
       {
@@ -120,9 +111,11 @@ Deno.serve(async (request) => {
 
   if (
     !payload.sourceVisitId ||
+    !payload.routeId ||
     !payload.stopId ||
     !payload.clientId ||
-    !payload.machineId
+    !payload.machineId ||
+    !payload.completedAt
   ) {
     return jsonResponse(
       {
@@ -133,23 +126,23 @@ Deno.serve(async (request) => {
   }
 
   //--------------------------------------------------
-  // Verify stop belongs to driver + machine/client
+  // Verify stop belongs to driver + route + machine/client
   //--------------------------------------------------
 
   const { data: stop, error: stopError } = await supabaseAdmin
     .from("stops")
     .select(
       `
-      id,
-      client_id,
-      machine_id,
-      route_id,
-      status,
-      route:routes!inner (
         id,
-        driver_id
-      )
-    `,
+        client_id,
+        machine_id,
+        route_id,
+        status,
+        route:routes!inner (
+          id,
+          driver_id
+        )
+      `,
     )
     .eq("id", payload.stopId)
     .single();
@@ -166,6 +159,7 @@ Deno.serve(async (request) => {
   if (
     stop.client_id !== payload.clientId ||
     stop.machine_id !== payload.machineId ||
+    stop.route_id !== payload.routeId ||
     stop.route.driver_id !== user.id
   ) {
     return jsonResponse(
@@ -177,17 +171,21 @@ Deno.serve(async (request) => {
   }
 
   //--------------------------------------------------
-  // Verify machine QR server-side too
+  // Load assigned machine
+  //
+  // FLOW-14:
+  // No closing QR verification.
+  // We still load the machine because its serial number
+  // is used in the client completion email.
   //--------------------------------------------------
 
   const { data: machine, error: machineError } = await supabaseAdmin
     .from("machines")
     .select(
       `
-      id,
-      qr_code,
-      serial_number
-    `,
+        id,
+        serial_number
+      `,
     )
     .eq("id", payload.machineId)
     .single();
@@ -201,15 +199,6 @@ Deno.serve(async (request) => {
     );
   }
 
-  if (payload.closingVerification.scannedValue !== machine.qr_code) {
-    return jsonResponse(
-      {
-        error: "Closing QR verification failed.",
-      },
-      400,
-    );
-  }
-
   //--------------------------------------------------
   // Load client
   //--------------------------------------------------
@@ -218,10 +207,10 @@ Deno.serve(async (request) => {
     .from("clients")
     .select(
       `
-      id,
-      name,
-      service_email
-    `,
+        id,
+        name,
+        service_email
+      `,
     )
     .eq("id", payload.clientId)
     .single();
@@ -253,10 +242,6 @@ Deno.serve(async (request) => {
 
         completed_by: payload.completedBy,
 
-        closing_scanned_value: payload.closingVerification.scannedValue,
-
-        closing_verified_at: payload.closingVerification.verifiedAt,
-
         completed_at: payload.completedAt,
 
         summary: payload.visitSummary,
@@ -269,20 +254,22 @@ Deno.serve(async (request) => {
     )
     .select(
       `
-      id,
-      survey_token,
-      notification_status,
-      email_sent_at
-    `,
+        id,
+        survey_token,
+        notification_status,
+        email_sent_at
+      `,
     )
     .single();
 
   if (summaryError || !summary) {
-    console.error(summaryError);
+    console.error("Unable to save service summary:", summaryError);
 
     return jsonResponse(
       {
         error: "Unable to save service summary.",
+        details: summaryError?.message ?? null,
+        code: summaryError?.code ?? null,
       },
       500,
     );
@@ -296,15 +283,18 @@ Deno.serve(async (request) => {
     .from("stops")
     .update({
       status: "completed",
-
       completed_at: payload.completedAt,
     })
     .eq("id", payload.stopId);
 
   if (stopUpdateError) {
+    console.error("Unable to mark stop completed:", stopUpdateError);
+
     return jsonResponse(
       {
         error: "Unable to mark stop completed.",
+        details: stopUpdateError.message,
+        code: stopUpdateError.code,
       },
       500,
     );
@@ -326,7 +316,7 @@ Deno.serve(async (request) => {
   }
 
   //--------------------------------------------------
-  // Client may not yet have notification email
+  // Client may not have notification email
   //--------------------------------------------------
 
   if (!client.service_email) {
@@ -353,37 +343,42 @@ Deno.serve(async (request) => {
   }
 
   //--------------------------------------------------
-  // Get photos
+  // Get service photos
   //--------------------------------------------------
 
   const { data: photos, error: photosError } = await supabaseAdmin
     .from("service_visit_photos")
     .select(
       `
-      stage,
-      kind,
-      storage_path
-    `,
+        stage,
+        kind,
+        storage_path
+      `,
     )
     .eq("source_visit_id", payload.sourceVisitId);
 
   if (photosError) {
-    console.error(photosError.message);
+    console.error("Unable to load service photos:", photosError.message);
   }
 
   const photoLinks = await Promise.all(
-    (photos ?? []).map(async (photo) => ({
-      stage: photo.stage,
+    (photos ?? []).map(
+      async (photo: { stage: string; kind: string; storage_path: string }) => ({
+        stage: photo.stage,
+        kind: photo.kind,
 
-      kind: photo.kind,
-
-      url: await createPhotoSignedUrl(photo.storage_path),
-    })),
+        url: await createPhotoSignedUrl(photo.storage_path),
+      }),
+    ),
   );
 
-  const beforePhotos = photoLinks.filter((photo) => photo.stage === "before");
+  const beforePhotos = photoLinks.filter(
+    (photo: { stage: string }) => photo.stage === "before",
+  );
 
-  const afterPhotos = photoLinks.filter((photo) => photo.stage === "after");
+  const afterPhotos = photoLinks.filter(
+    (photo: { stage: string }) => photo.stage === "after",
+  );
 
   //--------------------------------------------------
   // Survey URL
@@ -421,13 +416,13 @@ Deno.serve(async (request) => {
   }
 
   const photoHtml = [
-    ...beforePhotos.map((photo) =>
+    ...beforePhotos.map((photo: { kind?: string; url?: string | null }) =>
       photo.url
         ? `<p><a href="${photo.url}">Before photo — ${photo.kind}</a></p>`
         : "",
     ),
 
-    ...afterPhotos.map((photo) =>
+    ...afterPhotos.map((photo: { url?: string | null }) =>
       photo.url ? `<p><a href="${photo.url}">After-service photo</a></p>` : "",
     ),
   ].join("");
@@ -449,37 +444,37 @@ Deno.serve(async (request) => {
       subject: `Service completed — ${client.name}`,
 
       html: `
-            <h1>Service completed</h1>
+          <h1>Service completed</h1>
 
-            <p>
-              Service for ${client.name}
-              was completed successfully.
-            </p>
+          <p>
+            Service for ${client.name}
+            was completed successfully.
+          </p>
 
-            <p>
-              Machine serial:
-              ${machine.serial_number ?? "N/A"}
-            </p>
+          <p>
+            Machine serial:
+            ${machine.serial_number ?? "N/A"}
+          </p>
 
-            <p>
-              Completed:
-              ${payload.completedAt}
-            </p>
+          <p>
+            Completed:
+            ${payload.completedAt}
+          </p>
 
-            ${photoHtml}
+          ${photoHtml}
 
-            ${
-              surveyUrl
-                ? `
-                  <p>
-                    <a href="${surveyUrl}">
-                      Rate this service from 1–5 stars
-                    </a>
-                  </p>
-                `
-                : ""
-            }
-          `,
+          ${
+            surveyUrl
+              ? `
+                <p>
+                  <a href="${surveyUrl}">
+                    Rate this service from 1–5 stars
+                  </a>
+                </p>
+              `
+              : ""
+          }
+        `,
     }),
   });
 

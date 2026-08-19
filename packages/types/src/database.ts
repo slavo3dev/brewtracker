@@ -449,11 +449,9 @@ export type Database = {
         Row: {
           archive_total: number
           created_at: string
-          delta: number | null
           id: string
           machine_id: string
           notes: string | null
-          previous_reading: number | null
           reading: number
           recorded_at: string
           recorded_by: string | null
@@ -463,11 +461,9 @@ export type Database = {
         Insert: {
           archive_total: number
           created_at?: string
-          delta?: number | null
           id?: string
           machine_id: string
           notes?: string | null
-          previous_reading?: number | null
           reading: number
           recorded_at?: string
           recorded_by?: string | null
@@ -477,11 +473,9 @@ export type Database = {
         Update: {
           archive_total?: number
           created_at?: string
-          delta?: number | null
           id?: string
           machine_id?: string
           notes?: string | null
-          previous_reading?: number | null
           reading?: number
           recorded_at?: string
           recorded_by?: string | null

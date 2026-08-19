@@ -9,18 +9,14 @@ import {
 import { useState } from "react";
 
 import { useServiceVisit } from "./ServiceVisitProvider";
+import type { ServiceVisitStepId } from "./service-visit.types";
 
 export default function SummaryStep() {
-  const {
-    activeVisit,
-    completeSummary,
-  } = useServiceVisit();
+  const { activeVisit, completeSummary } = useServiceVisit();
 
-  const [submitting, setSubmitting] =
-    useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!activeVisit) {
     return null;
@@ -42,18 +38,14 @@ export default function SummaryStep() {
       await completeSummary();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to complete service.",
+        error instanceof Error ? error.message : "Unable to complete service.",
       );
     } finally {
       setSubmitting(false);
     }
   }
 
-  function getTaskLabel(
-    id: (typeof activeVisit.steps)[number]["id"],
-  ): string {
+  function getTaskLabel(id: ServiceVisitStepId): string {
     switch (id) {
       case "arrival":
         return "Arrival confirmed";
@@ -85,26 +77,17 @@ export default function SummaryStep() {
     <View style={styles.container}>
       <View style={styles.taskList}>
         {completedTasks.map((step) => (
-          <View
-            key={step.id}
-            style={styles.taskRow}
-          >
-            <Text style={styles.check}>
-              ✓
-            </Text>
+          <View key={step.id} style={styles.taskRow}>
+            <Text style={styles.check}>✓</Text>
 
-            <Text style={styles.taskText}>
-              {getTaskLabel(step.id)}
-            </Text>
+            <Text style={styles.taskText}>{getTaskLabel(step.id)}</Text>
           </View>
         ))}
       </View>
 
       {errorMessage ? (
         <View style={styles.errorCard}>
-          <Text style={styles.errorText}>
-            {errorMessage}
-          </Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       ) : null}
 
@@ -123,9 +106,7 @@ export default function SummaryStep() {
         {submitting ? (
           <ActivityIndicator color="#ffffff" />
         ) : (
-          <Text style={styles.completeButtonText}>
-            Complete Service
-          </Text>
+          <Text style={styles.completeButtonText}>Complete Service</Text>
         )}
       </Pressable>
     </View>

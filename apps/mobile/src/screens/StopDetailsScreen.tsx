@@ -181,6 +181,10 @@ export default function StopDetailsScreen({
           installedAt: stop.machine.installedAt,
           lastServiceAt: stop.machine.lastServiceAt,
         },
+
+        tasks: {
+          drinkCountRequired: stop.drinkCountRequired,
+        },
       });
 
       onServiceStarted();
@@ -340,11 +344,6 @@ export default function StopDetailsScreen({
 
         <View style={styles.serviceCard}>
           <Text style={styles.serviceTitle}>Service workflow</Text>
-
-          <Text style={styles.serviceText}>
-            Complete all eight required service steps in sequence. Your progress
-            is saved automatically on this device.
-          </Text>
 
           {hasDifferentActiveVisit ? (
             <View style={styles.activeVisitWarning}>
