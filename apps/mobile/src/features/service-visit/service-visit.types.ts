@@ -3,51 +3,35 @@ import type { Database, GeoPoint } from "@brewtracker/types";
 export const SERVICE_VISIT_STEPS = [
   {
     id: "arrival",
-    number: 1,
-    title: "Arrive and verify location",
-    description: "Confirm arrival inside the client geofence.",
+    title: "Arrival",
   },
   {
     id: "machine_scan",
-    number: 2,
-    title: "Scan machine QR code",
-    description: "Scan and verify the machine assigned to this stop.",
+    title: "Scan Machine",
   },
   {
     id: "before_photos",
-    number: 3,
-    title: "Take before photos",
-    description: "Capture the required machine photos before service.",
+    title: "Before Photos",
   },
   {
-    id: "meter_reading",
-    number: 4,
-    title: "Enter meter reading",
-    description: "Record and validate the machine cup count.",
+    id: "drink_count",
+    title: "Drink Count",
   },
   {
     id: "inventory_audit",
-    number: 5,
-    title: "Audit current inventory",
-    description: "Count the stock currently available at the client.",
+    title: "Inventory Audit",
   },
   {
     id: "restock",
-    number: 6,
-    title: "Confirm restock and drop",
-    description: "Confirm the products left at the client.",
+    title: "Recommended Refill",
   },
   {
     id: "after_service",
-    number: 7,
-    title: "After photos and signature",
-    description: "Capture final photos and the client signature.",
+    title: "After Service Photo",
   },
   {
     id: "summary",
-    number: 8,
-    title: "Review and complete",
-    description: "Review the visit summary and complete the service.",
+    title: "Review & Complete",
   },
 ] as const;
 
@@ -70,7 +54,10 @@ export type ServiceVisitTarget = {
   latitude: number | null;
   longitude: number | null;
   geofenceRadiusMeters: number;
-  signatureRequired: boolean;
+};
+
+export type ServiceVisitTasks = {
+  drinkCountRequired: boolean;
 };
 
 export type ServiceVisitMachineTarget = {
@@ -167,36 +154,13 @@ export type AfterPhotoRecord = {
   uploadedAt: string | null;
 };
 
-export type SignatureRecord = {
-  localUri: string;
-  storagePath: string | null;
-  databaseId: string | null;
-  uploadStatus: MediaUploadStatus;
-  uploadError: string | null;
-  signedAt: string;
-  uploadedAt: string | null;
-};
-
 export type AfterServiceRecord = {
   afterPhoto: AfterPhotoRecord | null;
-  signature: SignatureRecord | null;
-  signatureRequired: boolean;
-
-  /**
-   * Populated when this client does not require a
-   * signature and the driver continues without one.
-   */
-  signatureBypassedAt: string | null;
 };
 
 export type SaveAfterPhotoInput = {
   localUri: string;
   capturedAt: string;
-};
-
-export type SaveSignatureInput = {
-  localUri: string;
-  signedAt: string;
 };
 
 export type UpdateMediaUploadInput = {
@@ -207,19 +171,18 @@ export type UpdateMediaUploadInput = {
   uploadedAt?: string | null;
 };
 
-export type MeterReadingRecord = {
+export type DrinkCountRecord = {
   databaseId: string;
   sourceVisitId: string;
 
-  reading: number;
-  previousReading: number | null;
-  delta: number | null;
+  runningTotal: number;
+  archiveTotal: number;
 
   recordedAt: string;
 };
 
-export type CompleteMeterReadingInput = {
-  reading: number;
+export type CompleteDrinkCountInput = {
+  runningTotal: number;
 };
 
 export type InventoryProductCategory =
@@ -303,13 +266,6 @@ export type CompleteMachineScanInput = {
   scannedValue: string;
 };
 
-export type ClosingMachineVerificationRecord = {
-  scannedValue: string;
-  expectedQrCode: string;
-  machineId: string;
-  verifiedAt: string;
-};
-
 export type SummarySyncStatus =
   | "not_started"
   | "pending_sync"
@@ -317,8 +273,6 @@ export type SummarySyncStatus =
   | "failed";
 
 export type ServiceVisitSummaryRecord = {
-  closingVerification: ClosingMachineVerificationRecord | null;
-
   syncStatus: SummarySyncStatus;
   syncError: string | null;
 
@@ -357,7 +311,9 @@ export type ServiceVisit = {
   arrivalVerification: ArrivalVerification | null;
   machineScanVerification: MachineScanVerification | null;
   beforePhotos: BeforePhotoRecord[];
-  meterReading: MeterReadingRecord | null;
+  tasks: ServiceVisitTasks;
+
+  drinkCount: DrinkCountRecord | null;
   inventoryAudit: InventoryAuditRecord | null;
   restockDrop: RestockDropRecord | null;
   afterService: AfterServiceRecord;
@@ -375,8 +331,11 @@ export type StartServiceVisitInput = {
   stopId: string;
   clientId: string;
   machineId: string;
+
   target: ServiceVisitTarget;
   machineTarget: ServiceVisitMachineTarget;
+
+  tasks: ServiceVisitTasks;
 };
 
 export type CompleteArrivalInput = {
@@ -391,18 +350,28 @@ export type CompleteArrivalInput = {
   overrideReason?: string | null;
 };
 
-export function getServiceVisitStepIndex(stepId: ServiceVisitStepId): number {
-  return SERVICE_VISIT_STEPS.findIndex((step) => step.id === stepId);
-}
-
 export function getServiceVisitStep(stepId: ServiceVisitStepId) {
   return SERVICE_VISIT_STEPS.find((step) => step.id === stepId);
 }
 
-export function createInitialStepStates(): ServiceVisitStepState[] {
-  return SERVICE_VISIT_STEPS.map((step, index) => ({
-    id: step.id,
-    status: index === 0 ? "current" : "locked",
-    completedAt: null,
-  }));
+export function createInitialStepStates(
+  tasks: ServiceVisitTasks,
+): ServiceVisitStepState[] {
+  return getRequiredServiceVisitSteps(tasks).map(
+    (step, index) => ({
+      id: step.id,
+      status: index === 0 ? "current" : "locked",
+      completedAt: null,
+    }),
+  );
+}
+
+export function getRequiredServiceVisitSteps(
+  tasks: ServiceVisitTasks,
+) {
+  return SERVICE_VISIT_STEPS.filter(
+    (step) =>
+      step.id !== "drink_count" ||
+      tasks.drinkCountRequired,
+  );
 }

@@ -14,7 +14,7 @@ export function assertVisitReadyForCompletion(
 
   if (visit.currentStep !== "summary") {
     throw new Error(
-      "The service visit can only be completed during Step 8.",
+      "The service visit can only be completed during Review & Complete.",
     );
   }
 
@@ -45,9 +45,17 @@ export function assertVisitReadyForCompletion(
     );
   }
 
-  if (!visit.meterReading) {
+  /*
+   * FLOW-14:
+   * Drink Count is required only when the admin assigned
+   * the task to this specific route stop.
+   */
+  if (
+    visit.tasks.drinkCountRequired &&
+    !visit.drinkCount
+  ) {
     throw new Error(
-      "The machine meter reading is missing.",
+      "Drink Count is required for this service visit.",
     );
   }
 
@@ -63,55 +71,13 @@ export function assertVisitReadyForCompletion(
     );
   }
 
+  /*
+   * FLOW-14:
+   * After Service requires exactly one completed-machine photo.
+   */
   if (!visit.afterService.afterPhoto?.localUri) {
     throw new Error(
       "The required after-service photo is missing.",
-    );
-  }
-
-  if (
-    visit.afterService.signatureRequired &&
-    !visit.afterService.signature?.localUri
-  ) {
-    throw new Error(
-      "This client requires a signature.",
-    );
-  }
-
-  if (
-    !visit.afterService.signatureRequired &&
-    !visit.afterService.signature &&
-    !visit.afterService.signatureBypassedAt
-  ) {
-    throw new Error(
-      "The optional signature decision was not recorded.",
-    );
-  }
-
-  const closingVerification =
-    visit.summary.closingVerification;
-
-  if (!closingVerification) {
-    throw new Error(
-      "Scan the machine again before completing service.",
-    );
-  }
-
-  if (
-    closingVerification.machineId !==
-    visit.machineId
-  ) {
-    throw new Error(
-      "The closing scan does not belong to the assigned machine.",
-    );
-  }
-
-  if (
-    closingVerification.scannedValue !==
-    visit.machineTarget.qrCode.trim()
-  ) {
-    throw new Error(
-      "The closing QR code does not match the assigned machine.",
     );
   }
 }

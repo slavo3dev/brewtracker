@@ -19,7 +19,7 @@ import ArrivalStep from "../features/service-visit/ArrivalStep";
 import MachineScanStep from "../features/service-visit/MachineScanStep";
 import MachineDigitalPassportCard from "../features/service-visit/MachineDigitalPassportCard";
 import BeforePhotosStep from "../features/service-visit/BeforePhotosStep";
-import MeterReadingStep from "../features/service-visit/MeterReadingStep";
+import MeterReadingStep from "../features/service-visit/DrinkCountStep";
 import InventoryAuditStep from "../features/service-visit/InventoryAuditStep";
 import RestockDropStep from "../features/service-visit/RestockDropStep";
 import AfterServiceStep from "../features/service-visit/AfterServiceStep";

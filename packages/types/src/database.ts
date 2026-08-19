@@ -80,7 +80,6 @@ export type Database = {
           name: string
           region: string | null
           service_email: string | null
-          signature_required: boolean
           updated_at: string
         }
         Insert: {
@@ -97,7 +96,6 @@ export type Database = {
           name: string
           region?: string | null
           service_email?: string | null
-          signature_required?: boolean
           updated_at?: string
         }
         Update: {
@@ -114,7 +112,6 @@ export type Database = {
           name?: string
           region?: string | null
           service_email?: string | null
-          signature_required?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -450,6 +447,7 @@ export type Database = {
       }
       machine_meter_readings: {
         Row: {
+          archive_total: number
           created_at: string
           delta: number | null
           id: string
@@ -463,6 +461,7 @@ export type Database = {
           source_visit_id: string
         }
         Insert: {
+          archive_total: number
           created_at?: string
           delta?: number | null
           id?: string
@@ -476,6 +475,7 @@ export type Database = {
           source_visit_id: string
         }
         Update: {
+          archive_total?: number
           created_at?: string
           delta?: number | null
           id?: string
@@ -681,79 +681,11 @@ export type Database = {
           },
         ]
       }
-      service_visit_signatures: {
-        Row: {
-          client_id: string
-          created_at: string
-          id: string
-          machine_id: string
-          signed_at: string
-          signed_by: string
-          source_visit_id: string
-          stop_id: string
-          storage_path: string
-          updated_at: string
-        }
-        Insert: {
-          client_id: string
-          created_at?: string
-          id?: string
-          machine_id: string
-          signed_at: string
-          signed_by: string
-          source_visit_id: string
-          stop_id: string
-          storage_path: string
-          updated_at?: string
-        }
-        Update: {
-          client_id?: string
-          created_at?: string
-          id?: string
-          machine_id?: string
-          signed_at?: string
-          signed_by?: string
-          source_visit_id?: string
-          stop_id?: string
-          storage_path?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "service_visit_signatures_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_visit_signatures_machine_id_fkey"
-            columns: ["machine_id"]
-            isOneToOne: false
-            referencedRelation: "machines"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_visit_signatures_signed_by_fkey"
-            columns: ["signed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_visit_signatures_stop_id_fkey"
-            columns: ["stop_id"]
-            isOneToOne: false
-            referencedRelation: "stops"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       service_visit_summaries: {
         Row: {
           client_id: string
-          closing_scanned_value: string
-          closing_verified_at: string
+          closing_scanned_value: string | null
+          closing_verified_at: string | null
           completed_at: string
           completed_by: string
           created_at: string
@@ -770,8 +702,8 @@ export type Database = {
         }
         Insert: {
           client_id: string
-          closing_scanned_value: string
-          closing_verified_at: string
+          closing_scanned_value?: string | null
+          closing_verified_at?: string | null
           completed_at: string
           completed_by: string
           created_at?: string
@@ -788,8 +720,8 @@ export type Database = {
         }
         Update: {
           client_id?: string
-          closing_scanned_value?: string
-          closing_verified_at?: string
+          closing_scanned_value?: string | null
+          closing_verified_at?: string | null
           completed_at?: string
           completed_by?: string
           created_at?: string
@@ -870,6 +802,7 @@ export type Database = {
           client_id: string
           completed_at: string | null
           created_at: string
+          drink_count_required: boolean
           id: string
           machine_id: string | null
           notes: string | null
@@ -886,6 +819,7 @@ export type Database = {
           client_id: string
           completed_at?: string | null
           created_at?: string
+          drink_count_required?: boolean
           id?: string
           machine_id?: string | null
           notes?: string | null
@@ -902,6 +836,7 @@ export type Database = {
           client_id?: string
           completed_at?: string | null
           created_at?: string
+          drink_count_required?: boolean
           id?: string
           machine_id?: string | null
           notes?: string | null

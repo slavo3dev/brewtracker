@@ -1,12 +1,12 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 
-import { saveMachineMeterReading } from "../../src/features/service-visit/meter-reading.service";
-import { saveServiceVisit } from "../../src/features/service-visit/service-visit.storage";
+import { saveMachineMeterReading } from "../features/service-visit/meter-reading.service";
+import { saveServiceVisit } from "../features/service-visit/service-visit.storage";
 import {
   type CompleteMeterReadingInput,
   type ServiceVisit,
-} from "../../src/features/service-visit/service-visit.types";
-import { transitionToNextStep } from "../../src/features/service-visit/state/service-visit.transitions";
+} from "../features/service-visit/service-visit.types";
+import { transitionToNextStep } from "../features/service-visit/state/service-visit.transitions";
 
 type UseMeterReadingStepParams = {
   activeVisit: ServiceVisit | null;

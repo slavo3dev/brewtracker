@@ -13,7 +13,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { useAfterServiceStep } from "../../hooks/useAfterServiceStep";
 import { useBeforePhotosStep } from "../../hooks/useBeforePhotosStep";
 import { useInventoryAuditStep } from "../../hooks/useInventoryAuditStep";
-import { useMeterReadingStep } from "../../hooks/useMeterReadingStep";
+import { useMeterReadingStep } from "../../hooks/useDrinkCountStep";
 import { useRestockStep } from "../../hooks/useRestockStep";
 import { useVisitMutation } from "../../hooks/useVisitMutation";
 import { useSummaryStep } from "../../hooks/useSummaryStep";
@@ -358,46 +358,36 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         clientId: input.clientId,
         machineId: input.machineId,
 
-        target: {
-          ...input.target,
-          signatureRequired: input.target.signatureRequired ?? true,
-        },
+        target: input.target,
 
         machineTarget: {
           ...input.machineTarget,
           qrCode: input.machineTarget.qrCode.trim(),
         },
 
+        tasks: input.tasks,
+
         status: "in_progress",
 
-        currentStep: SERVICE_VISIT_STEPS[0].id,
+        currentStep: "arrival",
 
-        steps: createInitialStepStates(),
+        steps: createInitialStepStates(input.tasks),
 
         arrivalVerification: null,
-
         machineScanVerification: null,
 
         beforePhotos: [],
 
-        meterReading: null,
+        drinkCount: null,
 
         inventoryAudit: null,
-
         restockDrop: null,
 
         afterService: {
           afterPhoto: null,
-          signature: null,
-
-          signatureRequired: input.target.signatureRequired ?? true,
-
-          signatureBypassedAt: null,
         },
 
         summary: {
-          closingVerification: null,
-
           syncStatus: "not_started",
           syncError: null,
 

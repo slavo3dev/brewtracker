@@ -68,7 +68,8 @@ export async function addStopAction(
   const scheduledStartAt = optionalText(formData.get("scheduledStartAt"));
   const scheduledEndAt = optionalText(formData.get("scheduledEndAt"));
   const notes = optionalText(formData.get("notes"));
-
+  const drinkCountRequired = formData.get("drinkCountRequired") === "on";
+  
   if (!routeId || !clientId) {
     return {
       error: "Route and client are required.",
@@ -84,6 +85,7 @@ export async function addStopAction(
       scheduledStartAt,
       scheduledEndAt,
       notes,
+      drinkCountRequired,
     });
 
     revalidatePath("/dashboard/routes");

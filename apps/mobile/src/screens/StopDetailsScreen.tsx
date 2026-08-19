@@ -169,7 +169,6 @@ export default function StopDetailsScreen({
           latitude: stop.client.latitude,
           longitude: stop.client.longitude,
           geofenceRadiusMeters: stop.client.geofenceRadiusMeters,
-          signatureRequired: stop.client.signatureRequired ?? true,
         },
 
         machineTarget: {

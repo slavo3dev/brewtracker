@@ -1,8 +1,6 @@
-import {
-  getServiceVisitStepIndex,
-  SERVICE_VISIT_STEPS,
-  type ServiceVisit,
-  type ServiceVisitStepId,
+import type {
+  ServiceVisit,
+  ServiceVisitStepId,
 } from "../service-visit.types";
 
 export function transitionToNextStep(
@@ -11,7 +9,9 @@ export function transitionToNextStep(
   timestamp: string,
 ): ServiceVisit {
   if (visit.status !== "in_progress") {
-    throw new Error("Only an in-progress service visit can be updated.");
+    throw new Error(
+      "Only an in-progress service visit can be updated.",
+    );
   }
 
   if (visit.currentStep !== stepId) {
@@ -20,13 +20,17 @@ export function transitionToNextStep(
     );
   }
 
-  const currentIndex = getServiceVisitStepIndex(stepId);
+  const currentIndex = visit.steps.findIndex(
+    (step) => step.id === stepId,
+  );
 
   if (currentIndex < 0) {
-    throw new Error("The requested service step is invalid.");
+    throw new Error(
+      "The requested service step is not part of this visit.",
+    );
   }
 
-  const isFinalStep = currentIndex === SERVICE_VISIT_STEPS.length - 1;
+  const nextStep = visit.steps[currentIndex + 1] ?? null;
 
   const updatedSteps = visit.steps.map((step, index) => {
     if (index === currentIndex) {
@@ -37,7 +41,7 @@ export function transitionToNextStep(
       };
     }
 
-    if (!isFinalStep && index === currentIndex + 1) {
+    if (nextStep && index === currentIndex + 1) {
       return {
         ...step,
         status: "current" as const,
@@ -47,14 +51,25 @@ export function transitionToNextStep(
     return step;
   });
 
+  const isFinalStep = nextStep === null;
+
   return {
     ...visit,
-    status: isFinalStep ? "completed" : "in_progress",
+
+    status: isFinalStep
+      ? "completed"
+      : "in_progress",
+
     currentStep: isFinalStep
       ? visit.currentStep
-      : SERVICE_VISIT_STEPS[currentIndex + 1].id,
+      : nextStep.id,
+
     steps: updatedSteps,
+
     updatedAt: timestamp,
-    completedAt: isFinalStep ? timestamp : null,
+
+    completedAt: isFinalStep
+      ? timestamp
+      : null,
   };
 }
