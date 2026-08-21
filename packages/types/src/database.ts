@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          created_at: string
+          google_review_url: string | null
+          id: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          google_review_url?: string | null
+          id?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          google_review_url?: string | null
+          id?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       client_inventory_products: {
         Row: {
           client_id: string
