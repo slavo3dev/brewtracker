@@ -11,9 +11,10 @@ export type MachineMeterReadingResult = {
   serviceStopId: string | null;
   recordedBy: string | null;
   sourceVisitId: string;
-  reading: number;
-  previousReading: number | null;
-  delta: number | null;
+
+  runningTotal: number;
+  archiveTotal: number;
+
   recordedAt: string;
 };
 
@@ -22,7 +23,8 @@ export type SaveMachineMeterReadingInput = {
   stopId: string;
   recordedBy: string;
   sourceVisitId: string;
-  reading: number;
+
+  runningTotal: number;
 };
 
 const METER_READING_SELECT = `
@@ -32,8 +34,7 @@ const METER_READING_SELECT = `
   recorded_by,
   source_visit_id,
   reading,
-  previous_reading,
-  delta,
+  archive_total,
   recorded_at
 `;
 
@@ -65,8 +66,7 @@ function mapMeterReading(
     | "recorded_by"
     | "source_visit_id"
     | "reading"
-    | "previous_reading"
-    | "delta"
+    | "archive_total"
     | "recorded_at"
   >,
 ): MachineMeterReadingResult {
@@ -76,12 +76,17 @@ function mapMeterReading(
     serviceStopId: row.service_stop_id,
     recordedBy: row.recorded_by,
     sourceVisitId: row.source_visit_id,
-    reading: toSafeNumber(row.reading, "Meter reading") ?? 0,
-    previousReading: toSafeNumber(
-      row.previous_reading,
-      "Previous meter reading",
-    ),
-    delta: toSafeNumber(row.delta, "Meter reading delta"),
+
+    /*
+     * Keep the existing database column name `reading`.
+     * In the application this now represents Running Total.
+     */
+    runningTotal:
+      toSafeNumber(row.reading, "Running Total") ?? 0,
+
+    archiveTotal:
+      toSafeNumber(row.archive_total, "Archive Total") ?? 0,
+
     recordedAt: row.recorded_at,
   };
 }
@@ -110,7 +115,7 @@ export async function loadLatestMachineMeterReading(
 
   if (error) {
     throw new Error(
-      `Unable to load the latest meter reading: ${error.message}`,
+      `Unable to load the latest Drink Count: ${error.message}`,
     );
   }
 
@@ -132,7 +137,7 @@ async function loadReadingByVisitId(
 
   if (error) {
     throw new Error(
-      `Unable to check the saved meter reading: ${error.message}`,
+      `Unable to check the saved Drink Count: ${error.message}`,
     );
   }
 
@@ -163,17 +168,19 @@ export async function saveMachineMeterReading(
   }
 
   if (
-    !Number.isSafeInteger(input.reading) ||
-    input.reading < 0
+    !Number.isSafeInteger(input.runningTotal) ||
+    input.runningTotal < 0
   ) {
     throw new Error(
-      "Enter a valid non-negative whole-number meter reading.",
+      "Enter a valid non-negative whole-number Running Total.",
     );
   }
 
   /*
-   * Check first so a retry after an app interruption does not
-   * create a duplicate reading for the same local visit.
+   * Preserve the existing retry/idempotency protection.
+   *
+   * If this visit already saved a Drink Count, don't create
+   * another database record.
    */
   const existingReading = await loadReadingByVisitId(
     input.sourceVisitId,
@@ -183,15 +190,58 @@ export async function saveMachineMeterReading(
     if (
       existingReading.machineId !== input.machineId ||
       existingReading.serviceStopId !== input.stopId ||
-      existingReading.reading !== input.reading
+      existingReading.runningTotal !== input.runningTotal
     ) {
       throw new Error(
-        "This service visit already has a different meter reading.",
+        "This service visit already has a different Drink Count.",
       );
     }
 
     return existingReading;
   }
+
+  /*
+   * Find the previous reading for this machine so Archive Total
+   * can be calculated automatically.
+   */
+  const previousReading = await loadLatestMachineMeterReading(
+    input.machineId,
+  );
+
+  let archiveTotal: number;
+
+  if (!previousReading) {
+    /*
+     * First known reading for this machine.
+     *
+     * Until we have a previous reading, Running Total becomes
+     * the initial Archive Total.
+     */
+    archiveTotal = input.runningTotal;
+  } else {
+    /*
+     * FLOW-14 does NOT support Running Total resets yet.
+     */
+    if (input.runningTotal < previousReading.runningTotal) {
+      throw new Error(
+        `Running Total cannot be lower than the previous value (${previousReading.runningTotal}).`,
+      );
+    }
+
+    const difference =
+      input.runningTotal - previousReading.runningTotal;
+
+    archiveTotal =
+      previousReading.archiveTotal + difference;
+  }
+
+  if (!Number.isSafeInteger(archiveTotal)) {
+    throw new Error(
+      "Archive Total is outside the supported numeric range.",
+    );
+  }
+
+  const recordedAt = new Date().toISOString();
 
   const { data, error } = await supabase
     .from("machine_meter_readings")
@@ -200,8 +250,18 @@ export async function saveMachineMeterReading(
       service_stop_id: input.stopId,
       recorded_by: input.recordedBy,
       source_visit_id: input.sourceVisitId,
-      reading: input.reading,
-      recorded_at: new Date().toISOString(),
+
+      /*
+       * Existing DB column retained for compatibility.
+       */
+      reading: input.runningTotal,
+
+      /*
+       * Automatically calculated lifetime total.
+       */
+      archive_total: archiveTotal,
+
+      recorded_at: recordedAt,
     })
     .select(METER_READING_SELECT)
     .single();
@@ -226,12 +286,12 @@ export async function saveMachineMeterReading(
       error.message.toLowerCase().includes("cannot be lower")
     ) {
       throw new Error(
-        "The new meter reading cannot be lower than the previous reading.",
+        "Running Total cannot be lower than the previous value.",
       );
     }
 
     throw new Error(
-      `Unable to save the meter reading: ${error.message}`,
+      `Unable to save the Drink Count: ${error.message}`,
     );
   }
 

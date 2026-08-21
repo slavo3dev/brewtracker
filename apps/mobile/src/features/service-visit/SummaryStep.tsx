@@ -1,8 +1,4 @@
 import {
-  useState,
-} from "react";
-
-import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
@@ -10,92 +6,25 @@ import {
   View,
 } from "react-native";
 
-import {
-  CameraView,
-  useCameraPermissions,
-  type BarcodeScanningResult,
-} from "expo-camera";
+import { useState } from "react";
 
 import { useServiceVisit } from "./ServiceVisitProvider";
+import type { ServiceVisitStepId } from "./service-visit.types";
 
 export default function SummaryStep() {
-  const {
-    activeVisit,
-    verifyClosingMachineScan,
-    completeSummary,
-  } = useServiceVisit();
+  const { activeVisit, completeSummary } = useServiceVisit();
 
-  const [
-    cameraPermission,
-    requestCameraPermission,
-  ] = useCameraPermissions();
+  const [submitting, setSubmitting] = useState(false);
 
-  const [
-    scanning,
-    setScanning,
-  ] = useState(false);
-
-  const [
-    submitting,
-    setSubmitting,
-  ] = useState(false);
-
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!activeVisit) {
     return null;
   }
 
-  const closingVerified =
-    Boolean(
-      activeVisit.summary
-        .closingVerification,
-    );
-
-  async function handleBarcodeScanned(
-    result: BarcodeScanningResult,
-  ): Promise<void> {
-    if (!scanning) {
-      return;
-    }
-
-    setScanning(false);
-    setErrorMessage(null);
-
-    try {
-      await verifyClosingMachineScan(
-        result.data,
-      );
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to verify the machine.",
-      );
-    }
-  }
-
-  async function handleStartScan(): Promise<void> {
-    setErrorMessage(null);
-
-    if (!cameraPermission?.granted) {
-      const permission =
-        await requestCameraPermission();
-
-      if (!permission.granted) {
-        setErrorMessage(
-          "Camera permission is required to scan the machine.",
-        );
-
-        return;
-      }
-    }
-
-    setScanning(true);
-  }
+  const completedTasks = activeVisit.steps.filter(
+    (step) => step.id !== "summary",
+  );
 
   async function handleComplete(): Promise<void> {
     if (submitting) {
@@ -109,247 +38,75 @@ export default function SummaryStep() {
       await completeSummary();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to complete the service visit.",
+        error instanceof Error ? error.message : "Unable to complete service.",
       );
     } finally {
       setSubmitting(false);
     }
   }
 
-  const deliveredItems =
-    activeVisit.restockDrop?.items ??
-    [];
+  function getTaskLabel(id: ServiceVisitStepId): string {
+    switch (id) {
+      case "arrival":
+        return "Arrival confirmed";
 
-  const totalDelivered =
-    deliveredItems.reduce(
-      (total, item) =>
-        total + item.actualQuantity,
-      0,
-    );
+      case "machine_scan":
+        return "Machine scanned";
+
+      case "before_photos":
+        return "Before photos added";
+
+      case "drink_count":
+        return "Drink Count recorded";
+
+      case "inventory_audit":
+        return "Inventory audited";
+
+      case "restock":
+        return "Refill completed";
+
+      case "after_service":
+        return "After-service photo added";
+
+      case "summary":
+        return "Review complete";
+    }
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>
-        Service Summary
-      </Text>
+      <View style={styles.taskList}>
+        {completedTasks.map((step) => (
+          <View key={step.id} style={styles.taskRow}>
+            <Text style={styles.check}>✓</Text>
 
-      <Text style={styles.description}>
-        Review the completed service and
-        scan the machine once more before
-        closing this location.
-      </Text>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>
-          Client
-        </Text>
-
-        <Text style={styles.value}>
-          {activeVisit.target.clientName}
-        </Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>
-          Machine
-        </Text>
-
-        <Text style={styles.value}>
-          {activeVisit.machineTarget.name ??
-            activeVisit.machineTarget.model ??
-            "Assigned machine"}
-        </Text>
-
-        {activeVisit.machineTarget
-          .serialNumber ? (
-          <Text style={styles.detail}>
-            Serial:{" "}
-            {
-              activeVisit.machineTarget
-                .serialNumber
-            }
-          </Text>
-        ) : null}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>
-          Meter reading
-        </Text>
-
-        <Text style={styles.value}>
-          {activeVisit.meterReading
-            ? activeVisit.meterReading.reading.toLocaleString()
-            : "Missing"}
-        </Text>
-
-        {activeVisit.meterReading
-          ?.delta != null ? (
-          <Text style={styles.detail}>
-            Increase: +
-            {activeVisit.meterReading.delta.toLocaleString()}
-          </Text>
-        ) : null}
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>
-          Inventory
-        </Text>
-
-        <Text style={styles.detail}>
-          Products counted:{" "}
-          {activeVisit.inventoryAudit
-            ?.items.length ?? 0}
-        </Text>
-
-        <Text style={styles.detail}>
-          Total units delivered:{" "}
-          {totalDelivered.toLocaleString()}
-        </Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>
-          Service evidence
-        </Text>
-
-        <Text style={styles.detail}>
-          Before photos:{" "}
-          {activeVisit.beforePhotos.length}
-        </Text>
-
-        <Text style={styles.detail}>
-          After photo:{" "}
-          {activeVisit.afterService
-            .afterPhoto
-            ? "Captured"
-            : "Missing"}
-        </Text>
-
-        <Text style={styles.detail}>
-          Signature:{" "}
-          {activeVisit.afterService
-            .signature
-            ? "Captured"
-            : activeVisit.afterService
-                  .signatureRequired
-              ? "Required"
-              : "Not required"}
-        </Text>
-      </View>
-
-      <View style={styles.verificationCard}>
-        <Text style={styles.cardTitle}>
-          Closing machine verification
-        </Text>
-
-        {closingVerified ? (
-          <>
-            <Text style={styles.successText}>
-              ✓ Machine verified
-            </Text>
-
-            <Text style={styles.detail}>
-              The closing scan matches the
-              machine assigned to this stop.
-            </Text>
-          </>
-        ) : scanning ? (
-          <View style={styles.cameraContainer}>
-            <CameraView
-              style={styles.camera}
-              facing="back"
-              barcodeScannerSettings={{
-                barcodeTypes: [
-                  "qr",
-                  "code128",
-                  "code39",
-                  "ean13",
-                  "ean8",
-                ],
-              }}
-              onBarcodeScanned={(result) => {
-                void handleBarcodeScanned(
-                  result,
-                );
-              }}
-            />
-
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() =>
-                setScanning(false)
-              }
-            >
-              <Text
-                style={
-                  styles.secondaryButtonText
-                }
-              >
-                Cancel Scan
-              </Text>
-            </Pressable>
+            <Text style={styles.taskText}>{getTaskLabel(step.id)}</Text>
           </View>
-        ) : (
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() => {
-              void handleStartScan();
-            }}
-          >
-            <Text
-              style={
-                styles.secondaryButtonText
-              }
-            >
-              Scan Machine to Close
-            </Text>
-          </Pressable>
-        )}
+        ))}
       </View>
 
       {errorMessage ? (
         <View style={styles.errorCard}>
-          <Text style={styles.errorText}>
-            {errorMessage}
-          </Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       ) : null}
 
       <Pressable
-        disabled={
-          !closingVerified ||
-          submitting
-        }
-        style={({ pressed }) => [
-          styles.completeButton,
-
-          pressed &&
-            styles.buttonPressed,
-
-          (!closingVerified ||
-            submitting) &&
-            styles.buttonDisabled,
-        ]}
+        accessibilityRole="button"
+        disabled={submitting}
         onPress={() => {
           void handleComplete();
         }}
+        style={({ pressed }) => [
+          styles.completeButton,
+          pressed && styles.buttonPressed,
+          submitting && styles.buttonDisabled,
+        ]}
       >
         {submitting ? (
-          <ActivityIndicator
-            color="#ffffff"
-          />
+          <ActivityIndicator color="#ffffff" />
         ) : (
-          <Text
-            style={
-              styles.completeButtonText
-            }
-          >
-            Complete Service
-          </Text>
+          <Text style={styles.completeButtonText}>Complete Service</Text>
         )}
       </Pressable>
     </View>
@@ -358,90 +115,33 @@ export default function SummaryStep() {
 
 const styles = StyleSheet.create({
   container: {
-    gap: 16,
+    gap: 20,
   },
 
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1c1410",
-  },
-
-  description: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#6f6258",
-  },
-
-  card: {
-    borderWidth: 1,
-    borderColor: "#e2d4c0",
-    borderRadius: 16,
-    padding: 16,
-    backgroundColor: "#fffdfa",
-    gap: 6,
-  },
-
-  verificationCard: {
-    borderWidth: 1,
-    borderColor: "#e2d4c0",
-    borderRadius: 16,
-    padding: 16,
-    backgroundColor: "#fffdfa",
+  taskList: {
     gap: 12,
   },
 
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#3d2b1f",
-  },
-
-  value: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#1c1410",
-  },
-
-  detail: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#6f6258",
-  },
-
-  successText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#38734d",
-  },
-
-  cameraContainer: {
-    gap: 12,
-  },
-
-  camera: {
-    height: 260,
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-
-  secondaryButton: {
-    minHeight: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#b6692b",
+  taskRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
+    gap: 10,
   },
 
-  secondaryButtonText: {
-    color: "#9c5621",
-    fontWeight: "600",
+  check: {
+    color: "#38734d",
+    fontSize: 17,
+    fontWeight: "700",
+  },
+
+  taskText: {
+    color: "#3d2b1f",
+    fontSize: 16,
+    fontWeight: "500",
   },
 
   completeButton: {
-    minHeight: 52,
+    minHeight: 54,
     borderRadius: 14,
     backgroundColor: "#b6692b",
     alignItems: "center",

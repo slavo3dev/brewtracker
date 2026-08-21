@@ -126,6 +126,7 @@ export async function addRouteStop(input: {
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   notes: string | null;
+  drinkCountRequired: boolean;
 }) {
   const supabase = createAdminClient();
 
@@ -151,6 +152,7 @@ export async function addRouteStop(input: {
     notes: input.notes,
     sequence_number: nextSequence,
     status: "pending",
+    drink_count_required: input.drinkCountRequired,
   });
 
   if (error) throw new Error(error.message);

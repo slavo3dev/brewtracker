@@ -24,6 +24,17 @@ export function AddStopForm({ routeId, clients, machines }: Props) {
       <label className="grid gap-1.5 text-sm font-medium text-espresso-800">Machine<select name="machineId" disabled={!clientId} className={inputClass}><option value="">{clientId ? "No machine selected" : "Select a client first"}</option>{availableMachines.map((machine) => <option key={machine.id} value={machine.id}>{machine.name ?? machine.serial_number ?? machine.id}</option>)}</select></label>
       <label className="grid gap-1.5 text-sm font-medium text-espresso-800">Scheduled start<input name="scheduledStartAt" type="datetime-local" className={inputClass} /></label>
       <label className="grid gap-1.5 text-sm font-medium text-espresso-800">Scheduled end<input name="scheduledEndAt" type="datetime-local" className={inputClass} /></label>
+      <label className="flex items-center gap-3 rounded-xl border border-latte-200 bg-latte-100/50 px-4 py-3 text-sm font-medium text-espresso-800 md:col-span-2">
+      <input
+        type="checkbox"
+        name="drinkCountRequired"
+        className="size-4 accent-copper-500"
+      />
+
+      <span>
+        Add Drink Count task for this stop
+      </span>
+    </label>
       <label className="grid gap-1.5 text-sm font-medium text-espresso-800 md:col-span-2">Notes<input name="notes" placeholder="Optional instructions for the driver" className={inputClass} /></label>
       {state.error && <p role="alert" className="rounded-lg bg-copper-100 px-3 py-2 text-sm text-copper-600 md:col-span-2">{state.error}</p>}
       {state.success && <p role="status" className="rounded-lg bg-latte-100 px-3 py-2 text-sm text-espresso-800 md:col-span-2">{state.success}</p>}

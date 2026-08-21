@@ -16,10 +16,7 @@ import type {
   InventoryProductCategory,
 } from "./service-visit.types";
 
-const CATEGORY_LABELS: Record<
-  InventoryProductCategory,
-  string
-> = {
+const CATEGORY_LABELS: Record<InventoryProductCategory, string> = {
   coffee: "Coffee",
   powders: "Powders",
   sweeteners_stirrers: "Sweeteners & Stirrers",
@@ -53,23 +50,16 @@ function formatQuantity(value: number): string {
 }
 
 export default function RestockDropStep() {
-  const {
-    activeVisit,
-    completeRestockDrop,
-  } = useServiceVisit();
+  const { activeVisit, completeRestockDrop } = useServiceVisit();
 
-  const [products, setProducts] =
-    useState<ClientInventoryProduct[]>([]);
+  const [products, setProducts] = useState<ClientInventoryProduct[]>([]);
 
-  const [actualQuantities, setActualQuantities] =
-    useState<QuantityValues>({});
+  const [actualQuantities, setActualQuantities] = useState<QuantityValues>({});
 
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] =
-    useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const clientId = activeVisit?.clientId ?? null;
   const inventoryAudit = activeVisit?.inventoryAudit ?? null;
@@ -86,8 +76,7 @@ export default function RestockDropStep() {
       setErrorMessage(null);
 
       try {
-        const result =
-          await loadClientInventoryProducts(clientId);
+        const result = await loadClientInventoryProducts(clientId);
 
         if (!cancelled) {
           setProducts(result);
@@ -120,34 +109,27 @@ export default function RestockDropStep() {
     }
 
     const productsById = new Map(
-      products.map((product) => [
-        product.productId,
-        product,
-      ]),
+      products.map((product) => [product.productId, product]),
     );
 
-    return inventoryAudit.items.flatMap(
-      (auditItem) => {
-        const product = productsById.get(
-          auditItem.productId,
-        );
+    return inventoryAudit.items.flatMap((auditItem) => {
+      const product = productsById.get(auditItem.productId);
 
-        if (!product || product.parLevel === null) {
-          return [];
-        }
+      if (!product || product.parLevel === null) {
+        return [];
+      }
 
-        return [
-          {
-            product,
-            auditItem,
-            recommendedQuantity: Math.max(
-              product.parLevel - auditItem.quantity,
-              0,
-            ),
-          },
-        ];
-      },
-    );
+      return [
+        {
+          product,
+          auditItem,
+          recommendedQuantity: Math.max(
+            product.parLevel - auditItem.quantity,
+            0,
+          ),
+        },
+      ];
+    });
   }, [inventoryAudit, products]);
 
   useEffect(() => {
@@ -179,43 +161,29 @@ export default function RestockDropStep() {
     !inventoryAudit.databaseId
   ) {
     return (
-      <View style={styles.card}>
-        <Text style={styles.eyebrow}>Step 6</Text>
-
-        <Text style={styles.title}>
-          Inventory audit required
-        </Text>
-
-        <Text style={styles.description}>
-          Step 5 must be synced before restock recommendations can be
-          calculated.
+      <View style={styles.errorCard}>
+        <Text style={styles.errorText}>
+          Complete and sync the Inventory Audit before continuing.
         </Text>
       </View>
     );
   }
 
-  const productsWithoutPar = inventoryAudit.items.filter(
-    (auditItem) => {
-      const product = products.find(
-        (configuredProduct) =>
-          configuredProduct.productId ===
-          auditItem.productId,
-      );
+  const productsWithoutPar = inventoryAudit.items.filter((auditItem) => {
+    const product = products.find(
+      (configuredProduct) =>
+        configuredProduct.productId === auditItem.productId,
+    );
 
-      return !product || product.parLevel === null;
-    },
-  );
+    return !product || product.parLevel === null;
+  });
 
   const missingQuantityCount = rows.filter(
-    (row) =>
-      actualQuantities[
-        row.product.productId
-      ]?.trim() === "",
+    (row) => actualQuantities[row.product.productId]?.trim() === "",
   ).length;
 
   const hasInvalidQuantity = rows.some((row) => {
-    const value =
-      actualQuantities[row.product.productId];
+    const value = actualQuantities[row.product.productId];
 
     if (value === undefined || value.trim() === "") {
       return false;
@@ -234,28 +202,17 @@ export default function RestockDropStep() {
     missingQuantityCount === 0 &&
     !hasInvalidQuantity;
 
-  const groupedRows = new Map<
-    InventoryProductCategory,
-    RestockRow[]
-  >();
+  const groupedRows = new Map<InventoryProductCategory, RestockRow[]>();
 
   for (const row of rows) {
-    const categoryRows =
-      groupedRows.get(row.product.category) ?? [];
+    const categoryRows = groupedRows.get(row.product.category) ?? [];
 
     categoryRows.push(row);
-    groupedRows.set(
-      row.product.category,
-      categoryRows,
-    );
+    groupedRows.set(row.product.category, categoryRows);
   }
 
-  function updateActualQuantity(
-    productId: string,
-    value: string,
-  ): void {
-    const normalized =
-      normalizeQuantityInput(value);
+  function updateActualQuantity(productId: string, value: string): void {
+    const normalized = normalizeQuantityInput(value);
 
     if (value.length > 0 && normalized === "") {
       return;
@@ -282,9 +239,7 @@ export default function RestockDropStep() {
         quantities: rows.map((row) => ({
           productId: row.product.productId,
           actualQuantity: Number(
-            actualQuantities[
-              row.product.productId
-            ] ?? "0",
+            actualQuantities[row.product.productId] ?? "0",
           ),
         })),
       });
@@ -304,178 +259,78 @@ export default function RestockDropStep() {
       <View style={styles.card}>
         <ActivityIndicator />
 
-        <Text style={styles.loadingText}>
-          Calculating recommended restock…
-        </Text>
+        <Text style={styles.loadingText}>Calculating recommended restock…</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.card}>
-      <Text style={styles.eyebrow}>Step 6</Text>
-
-      <Text style={styles.title}>
-        Confirm restock and drop
-      </Text>
-
-      <Text style={styles.description}>
-        Recommended quantities are calculated from the client par level
-        minus the stock counted during Step 5. Confirm what you actually
-        leave at the location.
-      </Text>
-
-      <View style={styles.clientCard}>
-        <Text style={styles.clientLabel}>
-          Destination
-        </Text>
-
-        <Text style={styles.clientName}>
-          {activeVisit.target.clientName}
-        </Text>
-
-        <Text style={styles.movementText}>
-          Inventory movement: Driver → Client
-        </Text>
-      </View>
-
       {productsWithoutPar.length > 0 ? (
         <View style={styles.errorCard}>
           <Text style={styles.errorText}>
-            {productsWithoutPar.length} audited{" "}
-            {productsWithoutPar.length === 1
-              ? "product does"
-              : "products do"}{" "}
-            not have a configured par level. A manager must configure the
-            missing par level before Step 6 can be completed.
+            {productsWithoutPar.length}{" "}
+            {productsWithoutPar.length === 1 ? "product is" : "products are"}{" "}
+            missing a configured par level.
           </Text>
         </View>
       ) : null}
 
-      {Array.from(groupedRows.entries()).map(
-        ([category, categoryRows]) => (
-          <View
-            key={category}
-            style={styles.category}
-          >
-            <Text style={styles.categoryTitle}>
-              {CATEGORY_LABELS[category]}
-            </Text>
+      {Array.from(groupedRows.entries()).map(([category, categoryRows]) => (
+        <View key={category} style={styles.category}>
+          <Text style={styles.categoryTitle}>{CATEGORY_LABELS[category]}</Text>
 
-            {categoryRows.map((row) => (
-              <View
-                key={row.product.productId}
-                style={styles.productCard}
-              >
-                <View style={styles.productHeader}>
-                  <View style={styles.productContent}>
-                    <Text style={styles.productName}>
-                      {row.product.name}
-                    </Text>
+          {categoryRows.map((row) => (
+            <View key={row.product.productId} style={styles.productCard}>
+              <View style={styles.productContent}>
+                <Text style={styles.productName}>{row.product.name}</Text>
 
-                    <Text style={styles.productDetail}>
-                      {row.product.sku
-                        ? `SKU ${row.product.sku} · `
-                        : ""}
-                      {row.product.unitLabel}
-                    </Text>
-                  </View>
+                <Text style={styles.productDetail}>
+                  {row.product.unitLabel}
+                </Text>
+              </View>
+
+              <View style={styles.refillRow}>
+                <View style={styles.recommendation}>
+                  <Text style={styles.recommendationLabel}>
+                    Recommended refill
+                  </Text>
+
+                  <Text style={styles.recommendedValue}>
+                    {formatQuantity(row.recommendedQuantity)}
+                  </Text>
                 </View>
 
-                <View style={styles.calculationRow}>
-                  <View style={styles.metric}>
-                    <Text style={styles.metricLabel}>
-                      Counted
-                    </Text>
-
-                    <Text style={styles.metricValue}>
-                      {formatQuantity(
-                        row.auditItem.quantity,
-                      )}
-                    </Text>
-                  </View>
-
-                  <Text style={styles.operator}>→</Text>
-
-                  <View style={styles.metric}>
-                    <Text style={styles.metricLabel}>
-                      Par
-                    </Text>
-
-                    <Text style={styles.metricValue}>
-                      {formatQuantity(
-                        row.product.parLevel ?? 0,
-                      )}
-                    </Text>
-                  </View>
-
-                  <Text style={styles.operator}>=</Text>
-
-                  <View style={styles.metric}>
-                    <Text style={styles.metricLabel}>
-                      Recommended
-                    </Text>
-
-                    <Text style={styles.recommendedValue}>
-                      {formatQuantity(
-                        row.recommendedQuantity,
-                      )}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.actualRow}>
-                  <View style={styles.actualContent}>
-                    <Text style={styles.actualLabel}>
-                      Actual quantity left
-                    </Text>
-
-                    <Text style={styles.actualHint}>
-                      Change this when the delivered quantity differs from
-                      the recommendation.
-                    </Text>
-                  </View>
+                <View style={styles.actual}>
+                  <Text style={styles.actualLabel}>Actual</Text>
 
                   <TextInput
                     accessibilityLabel={`Actual restock quantity for ${row.product.name}`}
                     keyboardType="decimal-pad"
                     onChangeText={(value) => {
-                      updateActualQuantity(
-                        row.product.productId,
-                        value,
-                      );
+                      updateActualQuantity(row.product.productId, value);
                     }}
                     placeholder="0"
                     placeholderTextColor="#a89c8f"
                     style={styles.quantityInput}
-                    value={
-                      actualQuantities[
-                        row.product.productId
-                      ] ?? ""
-                    }
+                    value={actualQuantities[row.product.productId] ?? ""}
                   />
                 </View>
               </View>
-            ))}
-          </View>
-        ),
-      )}
+            </View>
+          ))}
+        </View>
+      ))}
 
       {missingQuantityCount > 0 ? (
         <Text style={styles.helperText}>
-          Confirm the actual quantity for all{" "}
-          {missingQuantityCount} remaining{" "}
-          {missingQuantityCount === 1
-            ? "product"
-            : "products"}.
+          Enter the actual quantity for all products.
         </Text>
       ) : null}
 
       {errorMessage ? (
         <View style={styles.errorCard}>
-          <Text style={styles.errorText}>
-            {errorMessage}
-          </Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       ) : null}
 
@@ -487,19 +342,14 @@ export default function RestockDropStep() {
         }}
         style={({ pressed }) => [
           styles.primaryButton,
-          pressed &&
-            canSubmit &&
-            styles.buttonPressed,
-          !canSubmit &&
-            styles.buttonDisabled,
+          pressed && canSubmit && styles.buttonPressed,
+          !canSubmit && styles.buttonDisabled,
         ]}
       >
         {submitting ? (
           <ActivityIndicator color="#ffffff" />
         ) : (
-          <Text style={styles.primaryButtonText}>
-            Confirm Restock and Continue
-          </Text>
+          <Text style={styles.primaryButtonText}>Confirm & Continue</Text>
         )}
       </Pressable>
     </View>
@@ -514,51 +364,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 18,
   },
-  eyebrow: {
-    color: "#9c5621",
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-  title: {
-    color: "#2e1d12",
-    fontSize: 22,
-    fontWeight: "700",
-    marginTop: 7,
-  },
-  description: {
-    color: "#8a6f53",
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 7,
-  },
   loadingText: {
     color: "#8a6f53",
     marginTop: 10,
     textAlign: "center",
-  },
-  clientCard: {
-    backgroundColor: "#f7eadc",
-    borderRadius: 12,
-    marginTop: 16,
-    padding: 14,
-  },
-  clientLabel: {
-    color: "#9c5621",
-    fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-  clientName: {
-    color: "#2e1d12",
-    fontSize: 16,
-    fontWeight: "700",
-    marginTop: 4,
-  },
-  movementText: {
-    color: "#8a6f53",
-    fontSize: 13,
-    marginTop: 5,
   },
   category: {
     marginTop: 20,
@@ -577,9 +386,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 14,
   },
-  productHeader: {
-    flexDirection: "row",
-  },
   productContent: {
     flex: 1,
   },
@@ -593,61 +399,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 3,
   },
-  calculationRow: {
-    alignItems: "center",
-    backgroundColor: "#f8f2e9",
-    borderRadius: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 12,
-    padding: 12,
-  },
-  metric: {
-    alignItems: "center",
-    flex: 1,
-  },
-  metricLabel: {
-    color: "#8a6f53",
-    fontSize: 10,
-    fontWeight: "700",
-    textTransform: "uppercase",
-  },
-  metricValue: {
-    color: "#2e1d12",
-    fontSize: 17,
-    fontWeight: "700",
-    marginTop: 4,
-  },
   recommendedValue: {
     color: "#9c5621",
     fontSize: 17,
     fontWeight: "800",
     marginTop: 4,
-  },
-  operator: {
-    color: "#aa9279",
-    fontSize: 16,
-    marginHorizontal: 3,
-  },
-  actualRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 14,
-  },
-  actualContent: {
-    flex: 1,
-  },
-  actualLabel: {
-    color: "#2e1d12",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  actualHint: {
-    color: "#8a6f53",
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 3,
   },
   quantityInput: {
     backgroundColor: "#fffdfa",
@@ -700,5 +456,30 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.45,
+  },
+  refillRow: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 12,
+  },
+  recommendation: {
+    flex: 1,
+  },
+  recommendationLabel: {
+    color: "#8a6f53",
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  actual: {
+    alignItems: "center",
+  },
+  actualLabel: {
+    color: "#8a6f53",
+    fontSize: 11,
+    fontWeight: "700",
+    marginBottom: 4,
+    textTransform: "uppercase",
   },
 });

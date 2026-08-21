@@ -16,6 +16,7 @@ export type TodayRouteStop = {
   completedAt: string | null;
   skippedReason: string | null;
   notes: string | null;
+  drinkCountRequired: boolean;
 
   client: {
     id: string;
@@ -25,7 +26,6 @@ export type TodayRouteStop = {
     latitude: number | null;
     longitude: number | null;
     geofenceRadiusMeters: number;
-    signatureRequired: boolean;
   };
 
   machine: {

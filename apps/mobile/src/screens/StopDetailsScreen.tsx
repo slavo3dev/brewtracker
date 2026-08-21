@@ -169,7 +169,6 @@ export default function StopDetailsScreen({
           latitude: stop.client.latitude,
           longitude: stop.client.longitude,
           geofenceRadiusMeters: stop.client.geofenceRadiusMeters,
-          signatureRequired: stop.client.signatureRequired ?? true,
         },
 
         machineTarget: {
@@ -181,6 +180,10 @@ export default function StopDetailsScreen({
           status: stop.machine.status,
           installedAt: stop.machine.installedAt,
           lastServiceAt: stop.machine.lastServiceAt,
+        },
+
+        tasks: {
+          drinkCountRequired: stop.drinkCountRequired,
         },
       });
 
@@ -341,11 +344,6 @@ export default function StopDetailsScreen({
 
         <View style={styles.serviceCard}>
           <Text style={styles.serviceTitle}>Service workflow</Text>
-
-          <Text style={styles.serviceText}>
-            Complete all eight required service steps in sequence. Your progress
-            is saved automatically on this device.
-          </Text>
 
           {hasDifferentActiveVisit ? (
             <View style={styles.activeVisitWarning}>

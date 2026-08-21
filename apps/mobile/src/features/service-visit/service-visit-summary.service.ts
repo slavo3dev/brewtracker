@@ -31,12 +31,6 @@ export async function syncCompletedServiceVisit(
     );
   }
 
-  if (!visit.summary.closingVerification) {
-    throw new Error(
-      "The closing machine verification is missing.",
-    );
-  }
-
   const { data, error } =
     await supabase.functions.invoke<CompleteServiceVisitResponse>(
       "complete-service-visit",
@@ -52,55 +46,38 @@ export async function syncCompletedServiceVisit(
 
           completedAt: visit.completedAt,
 
-          closingVerification:
-            visit.summary.closingVerification,
-
           visitSummary: {
-            clientName:
-              visit.target.clientName,
+            clientName: visit.target.clientName,
 
-            startedAt:
-              visit.startedAt,
+            startedAt: visit.startedAt,
 
-            completedAt:
-              visit.completedAt,
+            completedAt: visit.completedAt,
 
             arrival: visit.arrivalVerification,
 
             machine: {
               id: visit.machineTarget.id,
-              name:
-                visit.machineTarget.name ??
-                null,
-              model:
-                visit.machineTarget.model ??
-                null,
+              name: visit.machineTarget.name ?? null,
+              model: visit.machineTarget.model ?? null,
               serialNumber:
-                visit.machineTarget
-                  .serialNumber ?? null,
+                visit.machineTarget.serialNumber ?? null,
             },
 
-            meterReading:
-              visit.meterReading,
+            /*
+             * FLOW-14:
+             * Drink Count is optional per route stop.
+             */
+            drinkCount: visit.drinkCount,
 
-            inventoryAudit:
-              visit.inventoryAudit,
+            inventoryAudit: visit.inventoryAudit,
 
-            restockDrop:
-              visit.restockDrop,
+            restockDrop: visit.restockDrop,
 
-            signatureRequired:
-              visit.afterService
-                .signatureRequired,
-
-            signatureCaptured:
-              Boolean(
-                visit.afterService.signature,
-              ),
-
-            signatureBypassedAt:
-              visit.afterService
-                .signatureBypassedAt,
+            /*
+             * One after-service photo remains part
+             * of the completed service.
+             */
+            afterPhoto: visit.afterService.afterPhoto,
           },
         },
       },

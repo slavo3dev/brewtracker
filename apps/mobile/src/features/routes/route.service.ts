@@ -35,6 +35,7 @@ type StopRow = Pick<
   | "completed_at"
   | "skipped_reason"
   | "notes"
+  | "drink_count_required"
 >;
 
 type ClientRow = Pick<
@@ -46,7 +47,6 @@ type ClientRow = Pick<
   | "latitude"
   | "longitude"
   | "geofence_radius_meters"
-  | "signature_required"
 >;
 
 type MachineRow = Pick<
@@ -149,7 +149,8 @@ async function fetchRouteStops(routeId: string): Promise<StopRow[]> {
       arrived_at,
       completed_at,
       skipped_reason,
-      notes
+      notes,
+      drink_count_required
     `,
     )
     .eq("route_id", routeId)
@@ -177,8 +178,7 @@ async function fetchClients(clientIds: string[]): Promise<ClientRow[]> {
       city,
       latitude,
       longitude,
-      geofence_radius_meters,
-      signature_required
+      geofence_radius_meters
     `,
     )
     .in("id", clientIds);
@@ -252,6 +252,7 @@ function buildTodayRouteStops(
       completedAt: stop.completed_at,
       skippedReason: stop.skipped_reason,
       notes: stop.notes,
+      drinkCountRequired: stop.drink_count_required,
 
       client: {
         id: client.id,
@@ -261,7 +262,6 @@ function buildTodayRouteStops(
         latitude: client.latitude,
         longitude: client.longitude,
         geofenceRadiusMeters: client.geofence_radius_meters,
-        signatureRequired: client.signature_required,
       },
 
       machine: machine
