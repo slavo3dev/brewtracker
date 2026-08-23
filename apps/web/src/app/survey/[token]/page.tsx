@@ -1,3 +1,6 @@
+import {
+  getGoogleReviewUrl,
+} from "./actions";
 import SurveyForm from "./survey-form";
 
 type Props = {
@@ -6,13 +9,20 @@ type Props = {
   }>;
 };
 
-export default async function SurveyPage({ params }: Props) {
+export default async function SurveyPage({
+  params,
+}: Props) {
   const { token } = await params;
+
+  const googleReviewUrl =
+    await getGoogleReviewUrl();
 
   return (
     <main className="min-h-screen bg-crema-50 px-4 py-16">
       <section className="mx-auto max-w-lg rounded-3xl border border-latte-200 bg-crema-0 p-8 shadow-sm">
-        <p className="text-sm font-medium text-copper-600">BrewTracker</p>
+        <p className="text-sm font-medium text-copper-600">
+          BrewTracker
+        </p>
 
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-espresso-950">
           How was your service?
@@ -23,7 +33,10 @@ export default async function SurveyPage({ params }: Props) {
         </p>
 
         <div className="mt-8">
-          <SurveyForm token={token} />
+          <SurveyForm
+            token={token}
+            googleReviewUrl={googleReviewUrl}
+          />
         </div>
       </section>
     </main>
