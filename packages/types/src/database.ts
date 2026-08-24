@@ -101,6 +101,7 @@ export type Database = {
           name: string
           region: string | null
           service_email: string | null
+          signature_required: boolean
           updated_at: string
         }
         Insert: {
@@ -117,6 +118,7 @@ export type Database = {
           name: string
           region?: string | null
           service_email?: string | null
+          signature_required?: boolean
           updated_at?: string
         }
         Update: {
@@ -133,6 +135,7 @@ export type Database = {
           name?: string
           region?: string | null
           service_email?: string | null
+          signature_required?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -468,11 +471,13 @@ export type Database = {
       }
       machine_meter_readings: {
         Row: {
-          archive_total: number
+          archive_total: number | null
           created_at: string
+          delta: number | null
           id: string
           machine_id: string
           notes: string | null
+          previous_reading: number | null
           reading: number
           recorded_at: string
           recorded_by: string | null
@@ -480,11 +485,13 @@ export type Database = {
           source_visit_id: string
         }
         Insert: {
-          archive_total: number
+          archive_total?: number | null
           created_at?: string
+          delta?: number | null
           id?: string
           machine_id: string
           notes?: string | null
+          previous_reading?: number | null
           reading: number
           recorded_at?: string
           recorded_by?: string | null
@@ -492,11 +499,13 @@ export type Database = {
           source_visit_id: string
         }
         Update: {
-          archive_total?: number
+          archive_total?: number | null
           created_at?: string
+          delta?: number | null
           id?: string
           machine_id?: string
           notes?: string | null
+          previous_reading?: number | null
           reading?: number
           recorded_at?: string
           recorded_by?: string | null
@@ -696,6 +705,74 @@ export type Database = {
           },
         ]
       }
+      service_visit_signatures: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          machine_id: string
+          signed_at: string
+          signed_by: string
+          source_visit_id: string
+          stop_id: string
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          machine_id: string
+          signed_at: string
+          signed_by: string
+          source_visit_id: string
+          stop_id: string
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          machine_id?: string
+          signed_at?: string
+          signed_by?: string
+          source_visit_id?: string
+          stop_id?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_visit_signatures_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_signatures_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_signatures_signed_by_fkey"
+            columns: ["signed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_signatures_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_visit_summaries: {
         Row: {
           client_id: string
@@ -883,6 +960,90 @@ export type Database = {
             columns: ["route_id"]
             isOneToOne: false
             referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technical_tickets: {
+        Row: {
+          assigned_to: string | null
+          client_id: string
+          created_at: string
+          description: string
+          id: string
+          machine_id: string
+          photo_storage_path: string | null
+          reported_by: string
+          resolved_at: string | null
+          source_visit_id: string
+          status: Database["public"]["Enums"]["technical_ticket_status"]
+          stop_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          client_id: string
+          created_at?: string
+          description: string
+          id?: string
+          machine_id: string
+          photo_storage_path?: string | null
+          reported_by: string
+          resolved_at?: string | null
+          source_visit_id: string
+          status?: Database["public"]["Enums"]["technical_ticket_status"]
+          stop_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          client_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          machine_id?: string
+          photo_storage_path?: string | null
+          reported_by?: string
+          resolved_at?: string | null
+          source_visit_id?: string
+          status?: Database["public"]["Enums"]["technical_ticket_status"]
+          stop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technical_tickets_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technical_tickets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technical_tickets_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technical_tickets_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technical_tickets_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
             referencedColumns: ["id"]
           },
         ]
@@ -1218,6 +1379,7 @@ export type Database = {
       service_photo_kind: "exterior" | "interior_hopper" | "completed_machine"
       service_photo_stage: "before" | "after" | "signature"
       stop_status: "pending" | "in_progress" | "completed" | "skipped"
+      technical_ticket_status: "open" | "in_progress" | "resolved" | "cancelled"
       time_entry_review_status: "pending" | "approved" | "flagged" | "rejected"
       time_entry_status: "open" | "closed" | "flagged" | "manager_override"
     }
@@ -1368,6 +1530,7 @@ export const Constants = {
       service_photo_kind: ["exterior", "interior_hopper", "completed_machine"],
       service_photo_stage: ["before", "after", "signature"],
       stop_status: ["pending", "in_progress", "completed", "skipped"],
+      technical_ticket_status: ["open", "in_progress", "resolved", "cancelled"],
       time_entry_review_status: ["pending", "approved", "flagged", "rejected"],
       time_entry_status: ["open", "closed", "flagged", "manager_override"],
     },
