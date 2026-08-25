@@ -12,21 +12,32 @@ type Props = {
   googleReviewUrl: string | null;
 };
 
+type SubmissionState =
+  | "idle"
+  | "created"
+  | "already_submitted";
+
 export default function SurveyForm({
   token,
   googleReviewUrl,
 }: Props) {
-  const [selectedRating, setSelectedRating] =
-    useState<number | null>(null);
+  const [
+    selectedRating,
+    setSelectedRating,
+  ] = useState<number | null>(null);
 
-  const [submittedRating, setSubmittedRating] =
-    useState<number | null>(null);
+  const [
+    submittedRating,
+    setSubmittedRating,
+  ] = useState<number | null>(null);
+
+  const [
+    submissionState,
+    setSubmissionState,
+  ] = useState<SubmissionState>("idle");
 
   const [message, setMessage] =
     useState<string | null>(null);
-
-  const [submitted, setSubmitted] =
-    useState(false);
 
   const [pending, startTransition] =
     useTransition();
@@ -40,20 +51,77 @@ export default function SurveyForm({
     const rating = selectedRating;
 
     startTransition(() => {
-      void submitSurvey(token, rating).then(
-        (result) => {
-          setMessage(result.message);
+      void submitSurvey(
+        token,
+        rating,
+      ).then((result) => {
+        setMessage(result.message);
 
-          if (result.success) {
-            setSubmittedRating(rating);
-            setSubmitted(true);
-          }
-        },
-      );
+        if (!result.success) {
+          return;
+        }
+
+        /*
+         * Only a newly created rating gets the normal
+         * submission success experience.
+         */
+        if (result.status === "created") {
+          setSubmittedRating(rating);
+          setSubmissionState("created");
+          return;
+        }
+
+        /*
+         * Existing feedback is a different UI state.
+         *
+         * Do NOT use the newly selected rating here.
+         * Otherwise someone selecting 5 stars on an
+         * already-rated survey would incorrectly trigger
+         * the five-star animation.
+         */
+        if (
+          result.status ===
+          "already_submitted"
+        ) {
+          setSubmittedRating(null);
+          setSubmissionState(
+            "already_submitted",
+          );
+        }
+      });
     });
   }
 
-  if (submitted) {
+  /*
+   * Existing survey.
+   *
+   * Deliberately no star animation and no claim that
+   * the newly selected rating was recorded.
+   */
+  if (
+    submissionState ===
+    "already_submitted"
+  ) {
+    return (
+      <div className="text-center">
+        <div className="rounded-2xl bg-latte-100 p-5">
+          <p className="font-medium text-espresso-950">
+            Feedback already received
+          </p>
+
+          <p className="mt-1 text-sm leading-6 text-steam-400">
+            Feedback for this service visit
+            has already been recorded.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /*
+   * Genuine new submission.
+   */
+  if (submissionState === "created") {
     const isFiveStar =
       submittedRating === 5;
 
@@ -91,21 +159,13 @@ export default function SurveyForm({
           </p>
         </div>
 
-        {googleReviewUrl ? (
+        {isFiveStar && googleReviewUrl ? (
           <div className="mt-6">
-            {isFiveStar ? (
-              <p className="mb-4 text-sm leading-6 text-steam-400">
-                We're glad you had a great
-                experience. If you'd like, you
-                can also share your experience
-                on Google.
-              </p>
-            ) : (
-              <p className="mb-4 text-sm leading-6 text-steam-400">
-                If you'd like, you can also
-                share your experience on Google.
-              </p>
-            )}
+            <p className="mb-4 text-sm leading-6 text-steam-400">
+              We're glad you had a great experience.
+              If you'd like, you can also share your
+              experience on Google.
+            </p>
 
             <a
               href={googleReviewUrl}
@@ -139,11 +199,15 @@ export default function SurveyForm({
                   selectedRating === rating
                 }
                 onClick={() => {
-                  setSelectedRating(rating);
+                  setSelectedRating(
+                    rating,
+                  );
+
                   setMessage(null);
                 }}
                 className={[
                   "flex h-12 w-12 items-center justify-center rounded-xl border text-xl transition",
+
                   selected
                     ? "border-copper-500 bg-copper-100 text-copper-600"
                     : "border-latte-200 bg-crema-0 text-steam-400",
@@ -159,7 +223,8 @@ export default function SurveyForm({
       <button
         type="button"
         disabled={
-          !selectedRating || pending
+          !selectedRating ||
+          pending
         }
         onClick={handleSubmit}
         className="mt-6 w-full rounded-xl bg-copper-500 px-5 py-3 font-medium text-white disabled:opacity-50"
