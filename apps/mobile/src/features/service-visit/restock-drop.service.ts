@@ -1,6 +1,7 @@
 import type { Database } from "@brewtracker/types";
 
 import { supabase } from "../../lib/supabase";
+
 import type {
   RestockDropQuantityInput,
 } from "./service-visit.types";
@@ -22,7 +23,9 @@ export async function saveRestockDrop(
   input: SaveRestockDropInput,
 ): Promise<string> {
   if (!input.sourceVisitId.trim()) {
-    throw new Error("A service visit ID is required.");
+    throw new Error(
+      "A service visit ID is required.",
+    );
   }
 
   if (!input.inventoryAuditId.trim()) {
@@ -31,13 +34,21 @@ export async function saveRestockDrop(
     );
   }
 
-  if (input.quantities.length === 0) {
-    throw new Error(
-      "At least one restock quantity is required.",
-    );
-  }
+  /*
+   * FLOW-14:
+   *
+   * quantities: [] is valid.
+   *
+   * It means every audited product was already at or
+   * above its configured par level.
+   *
+   * We still call the RPC because the parent
+   * inventory_restock_drops record represents explicit
+   * completion of the refill step.
+   */
 
-  const productIds = new Set<string>();
+  const productIds =
+    new Set<string>();
 
   for (const item of input.quantities) {
     if (!item.productId.trim()) {
@@ -46,14 +57,18 @@ export async function saveRestockDrop(
       );
     }
 
-    if (productIds.has(item.productId)) {
+    if (
+      productIds.has(item.productId)
+    ) {
       throw new Error(
         "A product cannot appear more than once.",
       );
     }
 
     if (
-      !Number.isFinite(item.actualQuantity) ||
+      !Number.isFinite(
+        item.actualQuantity,
+      ) ||
       item.actualQuantity < 0
     ) {
       throw new Error(
@@ -64,25 +79,46 @@ export async function saveRestockDrop(
     productIds.add(item.productId);
   }
 
-  const items: RestockItems = input.quantities.map(
-    (item) => ({
-      product_id: item.productId,
-      actual_quantity: item.actualQuantity,
-    }),
-  );
+  const items: RestockItems =
+    input.quantities.map(
+      (item) => ({
+        product_id:
+          item.productId,
 
-  const { data, error } = await supabase.rpc(
-    "save_inventory_restock_drop",
-    {
-      p_source_visit_id: input.sourceVisitId,
-      p_audit_id: input.inventoryAuditId,
-      p_client_id: input.clientId,
-      p_stop_id: input.stopId,
-      p_machine_id: input.machineId,
-      p_confirmed_at: input.confirmedAt,
-      p_items: items,
-    },
-  );
+        actual_quantity:
+          item.actualQuantity,
+      }),
+    );
+
+  const { data, error } =
+    await supabase.rpc(
+      "save_inventory_restock_drop",
+      {
+        p_source_visit_id:
+          input.sourceVisitId,
+
+        p_audit_id:
+          input.inventoryAuditId,
+
+        p_client_id:
+          input.clientId,
+
+        p_stop_id:
+          input.stopId,
+
+        p_machine_id:
+          input.machineId,
+
+        p_confirmed_at:
+          input.confirmedAt,
+
+        /*
+         * [] intentionally represents
+         * "No refill needed".
+         */
+        p_items: items,
+      },
+    );
 
   if (error) {
     throw new Error(
@@ -90,7 +126,10 @@ export async function saveRestockDrop(
     );
   }
 
-  if (typeof data !== "string" || !data) {
+  if (
+    typeof data !== "string" ||
+    !data
+  ) {
     throw new Error(
       "The restock drop was saved without a valid ID.",
     );

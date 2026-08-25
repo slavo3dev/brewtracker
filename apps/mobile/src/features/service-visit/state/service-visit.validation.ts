@@ -13,11 +13,19 @@ export function validateRestoredVisit(
     return null;
   }
 
-  if (!visit.id || !visit.routeId || !visit.stopId) {
+  if (
+    !visit.id ||
+    !visit.routeId ||
+    !visit.stopId
+  ) {
     return null;
   }
 
-  if (!visit.target || !visit.machineTarget || !visit.tasks) {
+  if (
+    !visit.target ||
+    !visit.machineTarget ||
+    !visit.tasks
+  ) {
     return null;
   }
 
@@ -28,41 +36,61 @@ export function validateRestoredVisit(
     "retired",
   ] as const;
 
-  const hasValidMachineStatus = validMachineStatuses.includes(
-    visit.machineTarget.status as (typeof validMachineStatuses)[number],
-  );
+  const hasValidMachineStatus =
+    validMachineStatuses.includes(
+      visit.machineTarget
+        .status as (typeof validMachineStatuses)[number],
+    );
 
   if (
-    typeof visit.machineTarget.id !== "string" ||
-    visit.machineTarget.id.trim().length === 0 ||
-    typeof visit.machineTarget.qrCode !== "string" ||
-    visit.machineTarget.qrCode.trim().length === 0 ||
-    visit.machineTarget.id !== visit.machineId ||
+    typeof visit.machineTarget.id !==
+      "string" ||
+    visit.machineTarget.id.trim()
+      .length === 0 ||
+    typeof visit.machineTarget.qrCode !==
+      "string" ||
+    visit.machineTarget.qrCode.trim()
+      .length === 0 ||
+    visit.machineTarget.id !==
+      visit.machineId ||
     !hasValidMachineStatus
   ) {
     return null;
   }
 
   const hasValidLatitude =
-    typeof visit.target.latitude === "number" &&
-    Number.isFinite(visit.target.latitude) &&
+    typeof visit.target.latitude ===
+      "number" &&
+    Number.isFinite(
+      visit.target.latitude,
+    ) &&
     visit.target.latitude >= -90 &&
     visit.target.latitude <= 90;
 
   const hasValidLongitude =
-    typeof visit.target.longitude === "number" &&
-    Number.isFinite(visit.target.longitude) &&
+    typeof visit.target.longitude ===
+      "number" &&
+    Number.isFinite(
+      visit.target.longitude,
+    ) &&
     visit.target.longitude >= -180 &&
     visit.target.longitude <= 180;
 
   const hasValidRadius =
-    typeof visit.target.geofenceRadiusMeters === "number" &&
-    Number.isFinite(visit.target.geofenceRadiusMeters) &&
-    visit.target.geofenceRadiusMeters > 0;
+    typeof visit.target
+      .geofenceRadiusMeters ===
+      "number" &&
+    Number.isFinite(
+      visit.target.geofenceRadiusMeters,
+    ) &&
+    visit.target.geofenceRadiusMeters >
+      0;
 
   if (
-    typeof visit.target.clientName !== "string" ||
-    visit.target.clientName.trim().length === 0 ||
+    typeof visit.target.clientName !==
+      "string" ||
+    visit.target.clientName.trim()
+      .length === 0 ||
     !hasValidLatitude ||
     !hasValidLongitude ||
     !hasValidRadius
@@ -74,74 +102,90 @@ export function validateRestoredVisit(
    * FLOW-14:
    * Drink Count is configured per route stop.
    */
-  if (typeof visit.tasks.drinkCountRequired !== "boolean") {
-    return null;
-  }
-
-  /*
-   * Validate against the actual required steps for this visit,
-   * rather than requiring every possible service step.
-   */
-  const requiredSteps = getRequiredServiceVisitSteps(visit.tasks);
-
   if (
-    !SERVICE_VISIT_STEPS.some(
-      (step) => step.id === visit.currentStep,
-    ) ||
-    !Array.isArray(visit.steps) ||
-    visit.steps.length !== requiredSteps.length
+    typeof visit.tasks
+      .drinkCountRequired !== "boolean"
   ) {
     return null;
   }
 
-  const hasExpectedSteps = requiredSteps.every(
-    (expectedStep, index) =>
-      visit.steps[index]?.id === expectedStep.id,
-  );
+  const requiredSteps =
+    getRequiredServiceVisitSteps(
+      visit.tasks,
+    );
+
+  if (
+    !SERVICE_VISIT_STEPS.some(
+      (step) =>
+        step.id === visit.currentStep,
+    ) ||
+    !Array.isArray(visit.steps) ||
+    visit.steps.length !==
+      requiredSteps.length
+  ) {
+    return null;
+  }
+
+  const hasExpectedSteps =
+    requiredSteps.every(
+      (expectedStep, index) =>
+        visit.steps[index]?.id ===
+        expectedStep.id,
+    );
 
   if (!hasExpectedSteps) {
     return null;
   }
 
-  /*
-   * The current step must actually belong to this visit.
-   */
   if (
     !visit.steps.some(
-      (step) => step.id === visit.currentStep,
+      (step) =>
+        step.id === visit.currentStep,
     )
   ) {
     return null;
   }
 
-  const restoredBeforePhotos = Array.isArray(
-    visit.beforePhotos,
-  )
-    ? visit.beforePhotos
-    : [];
+  /*
+   * Before-service photos
+   */
+  const restoredBeforePhotos =
+    Array.isArray(
+      visit.beforePhotos,
+    )
+      ? visit.beforePhotos
+      : [];
 
   const hasValidBeforePhotos =
-    restoredBeforePhotos.every((photo) => {
-      const hasValidKind =
-        BEFORE_PHOTO_KINDS.includes(photo.kind);
+    restoredBeforePhotos.every(
+      (photo) => {
+        const hasValidKind =
+          BEFORE_PHOTO_KINDS.includes(
+            photo.kind,
+          );
 
-      const hasValidLocalUri =
-        typeof photo.localUri === "string" &&
-        photo.localUri.trim().length > 0;
+        const hasValidLocalUri =
+          typeof photo.localUri ===
+            "string" &&
+          photo.localUri.trim()
+            .length > 0;
 
-      const hasValidStatus = [
-        "pending_upload",
-        "uploading",
-        "uploaded",
-        "failed",
-      ].includes(photo.uploadStatus);
+        const hasValidStatus = [
+          "pending_upload",
+          "uploading",
+          "uploaded",
+          "failed",
+        ].includes(
+          photo.uploadStatus,
+        );
 
-      return (
-        hasValidKind &&
-        hasValidLocalUri &&
-        hasValidStatus
-      );
-    });
+        return (
+          hasValidKind &&
+          hasValidLocalUri &&
+          hasValidStatus
+        );
+      },
+    );
 
   if (!hasValidBeforePhotos) {
     return null;
@@ -151,7 +195,7 @@ export function validateRestoredVisit(
    * FLOW-14 Drink Count.
    *
    * Running Total is entered by the driver.
-   * Archive Total is calculated by the service layer.
+   * Archive Total is calculated automatically.
    */
   const restoredDrinkCount =
     visit.drinkCount ?? null;
@@ -161,23 +205,25 @@ export function validateRestoredVisit(
       Number.isSafeInteger(
         restoredDrinkCount.runningTotal,
       ) &&
-      restoredDrinkCount.runningTotal >= 0;
+      restoredDrinkCount.runningTotal >=
+        0;
 
     const hasValidArchiveTotal =
       Number.isSafeInteger(
         restoredDrinkCount.archiveTotal,
       ) &&
-      restoredDrinkCount.archiveTotal >= 0;
+      restoredDrinkCount.archiveTotal >=
+        0;
 
     if (
       typeof restoredDrinkCount.databaseId !==
         "string" ||
-      restoredDrinkCount.databaseId.trim().length ===
-        0 ||
+      restoredDrinkCount.databaseId.trim()
+        .length === 0 ||
       typeof restoredDrinkCount.sourceVisitId !==
         "string" ||
-      restoredDrinkCount.sourceVisitId.trim().length ===
-        0 ||
+      restoredDrinkCount.sourceVisitId.trim()
+        .length === 0 ||
       typeof restoredDrinkCount.recordedAt !==
         "string" ||
       !hasValidRunningTotal ||
@@ -188,8 +234,8 @@ export function validateRestoredVisit(
   }
 
   /*
-   * A Drink Count must not exist on a visit where the
-   * manager did not assign the task.
+   * Drink Count cannot exist if the task wasn't
+   * configured for this stop.
    */
   if (
     !visit.tasks.drinkCountRequired &&
@@ -198,20 +244,32 @@ export function validateRestoredVisit(
     return null;
   }
 
+  /*
+   * Inventory Audit
+   */
   const restoredInventoryAudit =
     visit.inventoryAudit ?? null;
 
   if (restoredInventoryAudit) {
     const hasValidItems =
-      Array.isArray(restoredInventoryAudit.items) &&
-      restoredInventoryAudit.items.length > 0 &&
+      Array.isArray(
+        restoredInventoryAudit.items,
+      ) &&
+      restoredInventoryAudit.items
+        .length > 0 &&
       restoredInventoryAudit.items.every(
         (item) =>
-          typeof item.productId === "string" &&
-          item.productId.trim().length > 0 &&
-          typeof item.name === "string" &&
-          typeof item.unitLabel === "string" &&
-          Number.isFinite(item.quantity) &&
+          typeof item.productId ===
+            "string" &&
+          item.productId.trim()
+            .length > 0 &&
+          typeof item.name ===
+            "string" &&
+          typeof item.unitLabel ===
+            "string" &&
+          Number.isFinite(
+            item.quantity,
+          ) &&
           item.quantity >= 0,
       );
 
@@ -219,7 +277,9 @@ export function validateRestoredVisit(
       "pending_sync",
       "synced",
       "failed",
-    ].includes(restoredInventoryAudit.syncStatus);
+    ].includes(
+      restoredInventoryAudit.syncStatus,
+    );
 
     if (
       typeof restoredInventoryAudit.sourceVisitId !==
@@ -233,28 +293,52 @@ export function validateRestoredVisit(
     }
   }
 
+  /*
+   * FLOW-14 Restock.
+   *
+   * Important distinction:
+   *
+   * items: []
+   *
+   * is now VALID. It represents an explicitly confirmed
+   * refill step where no audited product required refill.
+   *
+   * If an item does exist, its recommended quantity must
+   * be greater than zero.
+   */
   const restoredRestockDrop =
     visit.restockDrop ?? null;
 
   if (restoredRestockDrop) {
     const hasValidItems =
-      Array.isArray(restoredRestockDrop.items) &&
-      restoredRestockDrop.items.length > 0 &&
+      Array.isArray(
+        restoredRestockDrop.items,
+      ) &&
       restoredRestockDrop.items.every(
         (item) =>
-          typeof item.productId === "string" &&
-          item.productId.trim().length > 0 &&
-          typeof item.name === "string" &&
-          typeof item.unitLabel === "string" &&
-          Number.isFinite(item.countedQuantity) &&
+          typeof item.productId ===
+            "string" &&
+          item.productId.trim()
+            .length > 0 &&
+          typeof item.name ===
+            "string" &&
+          typeof item.unitLabel ===
+            "string" &&
+          Number.isFinite(
+            item.countedQuantity,
+          ) &&
           item.countedQuantity >= 0 &&
-          Number.isFinite(item.parLevel) &&
+          Number.isFinite(
+            item.parLevel,
+          ) &&
           item.parLevel >= 0 &&
           Number.isFinite(
             item.recommendedQuantity,
           ) &&
-          item.recommendedQuantity >= 0 &&
-          Number.isFinite(item.actualQuantity) &&
+          item.recommendedQuantity > 0 &&
+          Number.isFinite(
+            item.actualQuantity,
+          ) &&
           item.actualQuantity >= 0,
       );
 
@@ -262,17 +346,19 @@ export function validateRestoredVisit(
       "pending_sync",
       "synced",
       "failed",
-    ].includes(restoredRestockDrop.syncStatus);
+    ].includes(
+      restoredRestockDrop.syncStatus,
+    );
 
     if (
       typeof restoredRestockDrop.sourceVisitId !==
         "string" ||
-      restoredRestockDrop.sourceVisitId.trim()
-        .length === 0 ||
+      restoredRestockDrop.sourceVisitId
+        .trim().length === 0 ||
       typeof restoredRestockDrop.inventoryAuditId !==
         "string" ||
-      restoredRestockDrop.inventoryAuditId.trim()
-        .length === 0 ||
+      restoredRestockDrop.inventoryAuditId
+        .trim().length === 0 ||
       typeof restoredRestockDrop.confirmedAt !==
         "string" ||
       !hasValidItems ||
@@ -284,7 +370,7 @@ export function validateRestoredVisit(
 
   /*
    * FLOW-14:
-   * After Service now contains only one required photo.
+   * After Service contains one required photo.
    * Signature state has been removed.
    */
   const restoredAfterService =
@@ -301,7 +387,8 @@ export function validateRestoredVisit(
 
   if (
     restoredAfterService.afterPhoto &&
-    (!restoredAfterService.afterPhoto.localUri?.trim() ||
+    (!restoredAfterService.afterPhoto
+      .localUri?.trim() ||
       !validUploadStatuses.includes(
         restoredAfterService.afterPhoto
           .uploadStatus,
@@ -311,30 +398,43 @@ export function validateRestoredVisit(
   }
 
   /*
-   * FLOW-10 no longer contains closing QR verification.
+   * FLOW-10/FLOW-14:
+   * Closing QR verification is no longer part of the
+   * final summary.
    */
-  const restoredSummary = visit.summary ?? {
-    syncStatus: "not_started" as const,
-    syncError: null,
+  const restoredSummary =
+    visit.summary ?? {
+      syncStatus:
+        "not_started" as const,
 
-    databaseId: null,
-    surveyToken: null,
-    emailSentAt: null,
-  };
+      syncError: null,
+
+      databaseId: null,
+
+      surveyToken: null,
+
+      emailSentAt: null,
+    };
 
   return {
     ...visit,
 
-    beforePhotos: restoredBeforePhotos,
+    beforePhotos:
+      restoredBeforePhotos,
 
-    drinkCount: restoredDrinkCount,
+    drinkCount:
+      restoredDrinkCount,
 
-    inventoryAudit: restoredInventoryAudit,
+    inventoryAudit:
+      restoredInventoryAudit,
 
-    restockDrop: restoredRestockDrop,
+    restockDrop:
+      restoredRestockDrop,
 
-    afterService: restoredAfterService,
+    afterService:
+      restoredAfterService,
 
-    summary: restoredSummary,
+    summary:
+      restoredSummary,
   };
 }
