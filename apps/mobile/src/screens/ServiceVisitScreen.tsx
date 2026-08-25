@@ -20,6 +20,7 @@ import InventoryAuditStep from "../features/service-visit/InventoryAuditStep";
 import RestockDropStep from "../features/service-visit/RestockDropStep";
 import AfterServiceStep from "../features/service-visit/AfterServiceStep";
 import SummaryStep from "../features/service-visit/SummaryStep";
+import TechBridge from "../features/technical-tickets/TechBridge";
 
 type Props = {
   onBack: () => void;
@@ -133,21 +134,25 @@ export default function ServiceVisitScreen({
         keyboardShouldPersistTaps="handled"
       >
         {activeVisit.status !== "completed" ? (
-          <View style={styles.stepHeader}>
-            <Text style={styles.stepProgress}>
-              Step {currentStepNumber} of {totalSteps}
-            </Text>
+          <>
+            <View style={styles.stepHeader}>
+              <Text style={styles.stepProgress}>
+                Step {currentStepNumber} of {totalSteps}
+              </Text>
 
-            <Text style={styles.stepTitle}>
-              {currentStep?.title ?? "Service visit"}
-            </Text>
+              <Text style={styles.stepTitle}>
+                {currentStep?.title ?? "Service visit"}
+              </Text>
 
-            <Text style={styles.stepContext} numberOfLines={1}>
-              {activeVisit.target.clientName}
-              {" · "}
-              {machineLabel}
-            </Text>
-          </View>
+              <Text style={styles.stepContext} numberOfLines={1}>
+                {activeVisit.target.clientName}
+                {" · "}
+                {machineLabel}
+              </Text>
+            </View>
+
+            <TechBridge />
+          </>
         ) : null}
 
         {errorMessage ? (
