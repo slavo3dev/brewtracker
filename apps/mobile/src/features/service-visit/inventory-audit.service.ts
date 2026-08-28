@@ -19,7 +19,15 @@ type ClientProductQueryRow = {
     sku: string | null;
     name: string;
     category: ClientInventoryProduct["category"];
+
     unit_label: string;
+
+    base_unit: string;
+    issue_unit: string;
+    units_per_issue_unit: number | string;
+    package_description: string | null;
+    allows_loose_units: boolean;
+    allows_partial_base_unit: boolean;
   } | null;
 };
 
@@ -33,10 +41,40 @@ export type SaveInventoryAuditInput = {
 };
 
 const CLIENT_PRODUCTS_CACHE_PREFIX =
-  "brewtracker:client-inventory-products:v2";
+  "brewtracker:client-inventory-products:v3";
 
 function getCacheKey(clientId: string): string {
   return `${CLIENT_PRODUCTS_CACHE_PREFIX}:${clientId}`;
+}
+
+function validatePackaging(
+  value: unknown,
+): value is ClientInventoryProduct["packaging"] {
+  if (
+    typeof value !== "object" ||
+    value === null
+  ) {
+    return false;
+  }
+
+  const packaging =
+    value as Record<string, unknown>;
+
+  return (
+    typeof packaging.baseUnit === "string" &&
+    packaging.baseUnit.trim().length > 0 &&
+    typeof packaging.issueUnit === "string" &&
+    packaging.issueUnit.trim().length > 0 &&
+    typeof packaging.unitsPerIssueUnit === "number" &&
+    Number.isFinite(packaging.unitsPerIssueUnit) &&
+    packaging.unitsPerIssueUnit > 0 &&
+    (
+      packaging.packageDescription === null ||
+      typeof packaging.packageDescription === "string"
+    ) &&
+    typeof packaging.allowsLooseUnits === "boolean" &&
+    typeof packaging.allowsPartialBaseUnit === "boolean"
+  );
 }
 
 function validateProducts(
@@ -53,12 +91,17 @@ function validateProducts(
       typeof product.productId === "string" &&
       typeof product.name === "string" &&
       typeof product.unitLabel === "string" &&
+      validatePackaging(product.packaging) &&
       typeof product.displayOrder === "number" &&
-      typeof product.isRequired === "boolean"  &&
-      (product.parLevel === null ||
-        (typeof product.parLevel === "number" &&
+      typeof product.isRequired === "boolean" &&
+      (
+        product.parLevel === null ||
+        (
+          typeof product.parLevel === "number" &&
           Number.isFinite(product.parLevel) &&
-          product.parLevel >= 0)),
+          product.parLevel >= 0
+        )
+      ),
   );
 }
 
@@ -112,7 +155,13 @@ export async function loadClientInventoryProducts(
         sku,
         name,
         category,
-        unit_label
+        unit_label,
+        base_unit,
+        issue_unit,
+        units_per_issue_unit,
+        package_description,
+        allows_loose_units,
+        allows_partial_base_unit
       )
     `)
     .eq("client_id", normalizedClientId)
@@ -147,9 +196,26 @@ export async function loadClientInventoryProducts(
         sku: row.product.sku,
         name: row.product.name,
         category: row.product.category,
+
         unitLabel: row.product.unit_label,
+
+        packaging: {
+          baseUnit: row.product.base_unit,
+          issueUnit: row.product.issue_unit,
+          unitsPerIssueUnit: Number(
+            row.product.units_per_issue_unit,
+          ),
+          packageDescription:
+            row.product.package_description,
+          allowsLooseUnits:
+            row.product.allows_loose_units,
+          allowsPartialBaseUnit:
+            row.product.allows_partial_base_unit,
+        },
+
         displayOrder: row.display_order,
         isRequired: row.is_required,
+
         parLevel:
           row.par_level === null
             ? null

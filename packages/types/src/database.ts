@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -249,36 +249,54 @@ export type Database = {
       }
       inventory_products: {
         Row: {
+          allows_loose_units: boolean
+          allows_partial_base_unit: boolean
+          base_unit: string
           category: Database["public"]["Enums"]["inventory_product_category"]
           created_at: string
           id: string
           is_active: boolean
+          issue_unit: string
           name: string
+          package_description: string | null
           sku: string | null
           sort_order: number
           unit_label: string
+          units_per_issue_unit: number
           updated_at: string
         }
         Insert: {
+          allows_loose_units?: boolean
+          allows_partial_base_unit?: boolean
+          base_unit: string
           category: Database["public"]["Enums"]["inventory_product_category"]
           created_at?: string
           id?: string
           is_active?: boolean
+          issue_unit: string
           name: string
+          package_description?: string | null
           sku?: string | null
           sort_order?: number
           unit_label: string
+          units_per_issue_unit: number
           updated_at?: string
         }
         Update: {
+          allows_loose_units?: boolean
+          allows_partial_base_unit?: boolean
+          base_unit?: string
           category?: Database["public"]["Enums"]["inventory_product_category"]
           created_at?: string
           id?: string
           is_active?: boolean
+          issue_unit?: string
           name?: string
+          package_description?: string | null
           sku?: string | null
           sort_order?: number
           unit_label?: string
+          units_per_issue_unit?: number
           updated_at?: string
         }
         Relationships: []

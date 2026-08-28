@@ -1,4 +1,7 @@
 import type { Database, GeoPoint } from "@brewtracker/types";
+import type {
+  InventoryProductPackaging,
+} from "@brewtracker/types";
 
 export const SERVICE_VISIT_STEPS = [
   {
@@ -193,7 +196,11 @@ export type ClientInventoryProduct = {
   sku: string | null;
   name: string;
   category: InventoryProductCategory;
+
   unitLabel: string;
+
+  packaging: InventoryProductPackaging;
+
   displayOrder: number;
   isRequired: boolean;
   parLevel: number | null;
