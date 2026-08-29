@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -243,6 +243,174 @@ export type Database = {
             columns: ["stop_id"]
             isOneToOne: false
             referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_locations: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          driver_id: string | null
+          id: string
+          location_type: Database["public"]["Enums"]["inventory_location_type"]
+          machine_id: string | null
+          warehouse_id: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          driver_id?: string | null
+          id?: string
+          location_type: Database["public"]["Enums"]["inventory_location_type"]
+          machine_id?: string | null
+          warehouse_id?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          driver_id?: string | null
+          id?: string
+          location_type?: Database["public"]["Enums"]["inventory_location_type"]
+          machine_id?: string | null
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_locations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_locations_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_locations_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_locations_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_movements: {
+        Row: {
+          base_unit_snapshot: string
+          created_at: string
+          entered_issue_quantity: number
+          entered_loose_quantity: number
+          from_location_id: string | null
+          id: string
+          issue_unit_snapshot: string
+          machine_id: string | null
+          movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          normalized_quantity: number
+          normalized_unit: string
+          occurred_at: string
+          package_description_snapshot: string | null
+          product_id: string
+          recorded_by: string
+          source_visit_id: string | null
+          stop_id: string | null
+          to_location_id: string | null
+          units_per_issue_unit_snapshot: number
+        }
+        Insert: {
+          base_unit_snapshot: string
+          created_at?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          from_location_id?: string | null
+          id?: string
+          issue_unit_snapshot: string
+          machine_id?: string | null
+          movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          normalized_quantity: number
+          normalized_unit: string
+          occurred_at: string
+          package_description_snapshot?: string | null
+          product_id: string
+          recorded_by: string
+          source_visit_id?: string | null
+          stop_id?: string | null
+          to_location_id?: string | null
+          units_per_issue_unit_snapshot: number
+        }
+        Update: {
+          base_unit_snapshot?: string
+          created_at?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          from_location_id?: string | null
+          id?: string
+          issue_unit_snapshot?: string
+          machine_id?: string | null
+          movement_type?: Database["public"]["Enums"]["inventory_movement_type"]
+          normalized_quantity?: number
+          normalized_unit?: string
+          occurred_at?: string
+          package_description_snapshot?: string | null
+          product_id?: string
+          recorded_by?: string
+          source_visit_id?: string | null
+          stop_id?: string | null
+          to_location_id?: string | null
+          units_per_issue_unit_snapshot?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
             referencedColumns: ["id"]
           },
         ]
@@ -1345,6 +1513,13 @@ export type Database = {
         Args: { target_warehouse_id: string }
         Returns: boolean
       }
+      get_inventory_location_id: {
+        Args: {
+          p_entity_id: string
+          p_location_type: Database["public"]["Enums"]["inventory_location_type"]
+        }
+        Returns: string
+      }
       is_ceo: { Args: never; Returns: boolean }
       is_driver: { Args: never; Returns: boolean }
       is_field_staff: { Args: never; Returns: boolean }
@@ -1379,6 +1554,17 @@ export type Database = {
     }
     Enums: {
       app_role: "driver" | "tech" | "manager" | "ceo"
+      inventory_location_type:
+        | "warehouse"
+        | "driver"
+        | "client_reserve"
+        | "machine"
+      inventory_movement_type:
+        | "warehouse_issue"
+        | "client_delivery"
+        | "machine_refill"
+        | "warehouse_return"
+        | "adjustment"
       inventory_product_category:
         | "coffee"
         | "powders"
@@ -1528,6 +1714,19 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["driver", "tech", "manager", "ceo"],
+      inventory_location_type: [
+        "warehouse",
+        "driver",
+        "client_reserve",
+        "machine",
+      ],
+      inventory_movement_type: [
+        "warehouse_issue",
+        "client_delivery",
+        "machine_refill",
+        "warehouse_return",
+        "adjustment",
+      ],
       inventory_product_category: [
         "coffee",
         "powders",
