@@ -86,6 +86,131 @@ export type Database = {
           },
         ]
       }
+      client_reserve_snapshot_items: {
+        Row: {
+          base_unit_snapshot: string
+          created_at: string
+          entered_issue_quantity: number
+          entered_loose_quantity: number
+          id: string
+          issue_unit_snapshot: string
+          normalized_quantity: number
+          normalized_unit: string
+          package_description_snapshot: string | null
+          product_id: string
+          snapshot_id: string
+          units_per_issue_unit_snapshot: number
+        }
+        Insert: {
+          base_unit_snapshot: string
+          created_at?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          id?: string
+          issue_unit_snapshot: string
+          normalized_quantity: number
+          normalized_unit: string
+          package_description_snapshot?: string | null
+          product_id: string
+          snapshot_id: string
+          units_per_issue_unit_snapshot: number
+        }
+        Update: {
+          base_unit_snapshot?: string
+          created_at?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          id?: string
+          issue_unit_snapshot?: string
+          normalized_quantity?: number
+          normalized_unit?: string
+          package_description_snapshot?: string | null
+          product_id?: string
+          snapshot_id?: string
+          units_per_issue_unit_snapshot?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_reserve_snapshot_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_reserve_snapshot_items_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "client_reserve_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_reserve_snapshots: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          machine_id: string
+          recorded_at: string
+          recorded_by: string
+          source_visit_id: string
+          stage: Database["public"]["Enums"]["client_reserve_snapshot_stage"]
+          stop_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          machine_id: string
+          recorded_at: string
+          recorded_by: string
+          source_visit_id: string
+          stage: Database["public"]["Enums"]["client_reserve_snapshot_stage"]
+          stop_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          machine_id?: string
+          recorded_at?: string
+          recorded_by?: string
+          source_visit_id?: string
+          stage?: Database["public"]["Enums"]["client_reserve_snapshot_stage"]
+          stop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_reserve_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_reserve_snapshots_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_reserve_snapshots_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_reserve_snapshots_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
@@ -1484,6 +1609,13 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_client_reserve_decrease: {
+        Args: {
+          p_current_reserve_before: number
+          p_previous_reserve_after: number
+        }
+        Returns: number
+      }
       client_is_in_current_user_region: {
         Args: { target_client_id: string }
         Returns: boolean
@@ -1520,6 +1652,10 @@ export type Database = {
         }
         Returns: string
       }
+      get_previous_client_reserve_balance: {
+        Args: { p_before: string; p_client_id: string; p_product_id: string }
+        Returns: number
+      }
       is_ceo: { Args: never; Returns: boolean }
       is_driver: { Args: never; Returns: boolean }
       is_field_staff: { Args: never; Returns: boolean }
@@ -1554,6 +1690,7 @@ export type Database = {
     }
     Enums: {
       app_role: "driver" | "tech" | "manager" | "ceo"
+      client_reserve_snapshot_stage: "before_service" | "after_service"
       inventory_location_type:
         | "warehouse"
         | "driver"
@@ -1714,6 +1851,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["driver", "tech", "manager", "ceo"],
+      client_reserve_snapshot_stage: ["before_service", "after_service"],
       inventory_location_type: [
         "warehouse",
         "driver",
