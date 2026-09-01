@@ -1660,6 +1660,17 @@ export type Database = {
       is_driver: { Args: never; Returns: boolean }
       is_field_staff: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
+      save_client_reserve_before_service: {
+        Args: {
+          p_client_id: string
+          p_items: Json
+          p_machine_id: string
+          p_recorded_at: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
       save_inventory_audit: {
         Args: {
           p_client_id: string

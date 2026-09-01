@@ -10,6 +10,7 @@ import {
 
 import {
   loadClientInventoryProducts,
+  loadPreviousClientReserveBalances,
 } from "./inventory-audit.service";
 import { useServiceVisit } from "./ServiceVisitProvider";
 import type {
@@ -17,10 +18,7 @@ import type {
   InventoryProductCategory,
 } from "./service-visit.types";
 
-const CATEGORY_LABELS: Record<
-  InventoryProductCategory,
-  string
-> = {
+const CATEGORY_LABELS: Record<InventoryProductCategory, string> = {
   coffee: "Coffee",
   powders: "Powders",
   sweeteners_stirrers: "Sweeteners & Stirrers",
@@ -29,7 +27,19 @@ const CATEGORY_LABELS: Record<
   cleaning: "Cleaning",
 };
 
-type CountValues = Record<string, string>;
+type ProductCountValue = {
+  issueQuantity: string;
+  looseQuantity: string;
+};
+
+type CountValues = Record<string, ProductCountValue>;
+
+function emptyCount(): ProductCountValue {
+  return {
+    issueQuantity: "",
+    looseQuantity: "",
+  };
+}
 
 function normalizeQuantityInput(value: string): string {
   const normalized = value.replace(",", ".");
@@ -41,24 +51,29 @@ function normalizeQuantityInput(value: string): string {
   return normalized;
 }
 
+function normalizeWholeQuantityInput(value: string): string {
+  if (!/^\d*$/.test(value)) {
+    return "";
+  }
+
+  return value;
+}
+
 export default function InventoryAuditStep() {
-  const {
-    activeVisit,
-    completeInventoryAudit,
-  } = useServiceVisit();
+  const { activeVisit, completeInventoryAudit } = useServiceVisit();
 
-  const [products, setProducts] =
-    useState<ClientInventoryProduct[]>([]);
+  const [products, setProducts] = useState<ClientInventoryProduct[]>([]);
 
-  const [counts, setCounts] =
-    useState<CountValues>({});
+  const [counts, setCounts] = useState<CountValues>({});
 
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] =
-    useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [previousBalances, setPreviousBalances] = useState<
+    Map<string, number | null>
+  >(new Map());
 
   const clientId = activeVisit?.clientId ?? null;
 
@@ -74,32 +89,46 @@ export default function InventoryAuditStep() {
       setErrorMessage(null);
 
       try {
-        const result =
-          await loadClientInventoryProducts(clientId);
+        // 1. Load products configured for this client.
+        const result = await loadClientInventoryProducts(clientId);
+
+        // 2. Load previous after-service reserve
+        // balances for those products.
+        const balances = await loadPreviousClientReserveBalances(
+          clientId,
+          result,
+          new Date().toISOString(),
+        );
 
         if (!cancelled) {
+          // 3. Store products and their previous balances.
           setProducts(result);
+          setPreviousBalances(balances);
 
+          // 4. Restore an unfinished local reserve count.
           const savedAudit = activeVisit?.inventoryAudit;
-          const activeVisitId = activeVisit?.id; 
+
+          const activeVisitId = activeVisit?.id;
 
           if (
             savedAudit &&
             activeVisitId &&
-            savedAudit.sourceVisitId === activeVisit.id &&
+            savedAudit.sourceVisitId === activeVisitId &&
             savedAudit.syncStatus !== "synced"
           ) {
             const restoredCounts = Object.fromEntries(
               savedAudit.items.map((item) => [
                 item.productId,
-                String(item.quantity),
+                {
+                  issueQuantity: String(item.issueQuantity ?? 0),
+
+                  looseQuantity: String(item.looseQuantity ?? 0),
+                },
               ]),
             );
 
             setCounts((current) =>
-              Object.keys(current).length > 0
-                ? current
-                : restoredCounts,
+              Object.keys(current).length > 0 ? current : restoredCounts,
             );
           }
         }
@@ -108,7 +137,7 @@ export default function InventoryAuditStep() {
           setErrorMessage(
             error instanceof Error
               ? error.message
-              : "Unable to load the inventory list.",
+              : "Unable to load the client reserve.",
           );
         }
       } finally {
@@ -123,11 +152,7 @@ export default function InventoryAuditStep() {
     return () => {
       cancelled = true;
     };
-  }, [
-    clientId,
-    activeVisit?.id,
-    activeVisit?.inventoryAudit,
-  ]);
+  }, [clientId, activeVisit?.id, activeVisit?.inventoryAudit]);
 
   const groupedProducts = useMemo(() => {
     const groups = new Map<
@@ -136,8 +161,7 @@ export default function InventoryAuditStep() {
     >();
 
     for (const product of products) {
-      const categoryProducts =
-        groups.get(product.category) ?? [];
+      const categoryProducts = groups.get(product.category) ?? [];
 
       categoryProducts.push(product);
       groups.set(product.category, categoryProducts);
@@ -150,22 +174,59 @@ export default function InventoryAuditStep() {
     return null;
   }
 
-  const missingRequiredCount = products.filter(
-    (product) =>
-      product.isRequired &&
-      (counts[product.productId] ?? "").trim() === "",
-  ).length;
-
-  const hasInvalidQuantity = products.some((product) => {
-    const value = counts[product.productId];
-
-    if (value === undefined || value.trim() === "") {
+  const missingRequiredCount = products.filter((product) => {
+    if (!product.isRequired) {
       return false;
     }
 
-    const quantity = Number(value);
+    const count = counts[product.productId];
 
-    return !Number.isFinite(quantity) || quantity < 0;
+    if (!count) {
+      return true;
+    }
+
+    return (
+      count.issueQuantity.trim() === "" && count.looseQuantity.trim() === ""
+    );
+  }).length;
+
+  const hasInvalidQuantity = products.some((product) => {
+    const count = counts[product.productId];
+
+    if (!count) {
+      return false;
+    }
+
+    const issueQuantity =
+      count.issueQuantity.trim() === "" ? 0 : Number(count.issueQuantity);
+
+    const looseQuantity =
+      count.looseQuantity.trim() === "" ? 0 : Number(count.looseQuantity);
+
+    if (
+      !Number.isFinite(issueQuantity) ||
+      issueQuantity < 0 ||
+      !Number.isInteger(issueQuantity)
+    ) {
+      return true;
+    }
+
+    if (!Number.isFinite(looseQuantity) || looseQuantity < 0) {
+      return true;
+    }
+
+    if (
+      !product.packaging.allowsPartialBaseUnit &&
+      !Number.isInteger(looseQuantity)
+    ) {
+      return true;
+    }
+
+    if (!product.packaging.allowsLooseUnits && looseQuantity > 0) {
+      return true;
+    }
+
+    return false;
   });
 
   const canSubmit =
@@ -177,9 +238,13 @@ export default function InventoryAuditStep() {
 
   function updateCount(
     productId: string,
+    field: "issueQuantity" | "looseQuantity",
     value: string,
   ): void {
-    const normalized = normalizeQuantityInput(value);
+    const normalized =
+      field === "issueQuantity"
+        ? normalizeWholeQuantityInput(value)
+        : normalizeQuantityInput(value);
 
     if (value.length > 0 && normalized === "") {
       return;
@@ -187,17 +252,28 @@ export default function InventoryAuditStep() {
 
     setCounts((current) => ({
       ...current,
-      [productId]: normalized,
+
+      [productId]: {
+        ...(current[productId] ?? emptyCount()),
+        [field]: normalized,
+      },
     }));
 
     setErrorMessage(null);
   }
 
-  const answeredProducts = products.filter(
-    (product) =>
-      (counts[product.productId] ?? "").trim() !== "",
-  );
-  
+  const answeredProducts = products.filter((product) => {
+    const count = counts[product.productId];
+
+    if (!count) {
+      return false;
+    }
+
+    return (
+      count.issueQuantity.trim() !== "" || count.looseQuantity.trim() !== ""
+    );
+  });
+
   async function handleSubmit(): Promise<void> {
     if (submitting) {
       return;
@@ -221,10 +297,17 @@ export default function InventoryAuditStep() {
 
     try {
       await completeInventoryAudit({
-        counts: answeredProducts.map((product) => ({
-          productId: product.productId,
-          quantity: Number(counts[product.productId]),
-        })),
+        counts: answeredProducts.map((product) => {
+          const count = counts[product.productId];
+
+          return {
+            productId: product.productId,
+
+            issueQuantity: Number(count?.issueQuantity || 0),
+
+            looseQuantity: Number(count?.looseQuantity || 0),
+          };
+        }),
       });
     } catch (error) {
       setErrorMessage(
@@ -241,77 +324,142 @@ export default function InventoryAuditStep() {
     <View style={styles.card}>
       <Text style={styles.eyebrow}>Step 5</Text>
 
-      <Text style={styles.title}>
-        Count current inventory
-      </Text>
+      <Text style={styles.title}>Count client reserve</Text>
 
       <Text style={styles.description}>
-        Enter what is physically remaining at this location before adding
-        new stock. Use decimals for partial units, for example 0.5 gallon.
+        Count the stock physically available at this location before today's
+        delivery and before using any stock to refill the machine.
       </Text>
 
       <View style={styles.clientCard}>
         <Text style={styles.clientLabel}>Location</Text>
 
-        <Text style={styles.clientName}>
-          {activeVisit.target.clientName}
-        </Text>
+        <Text style={styles.clientName}>{activeVisit.target.clientName}</Text>
       </View>
 
       {products.length === 0 ? (
         <View style={styles.warningCard}>
           <Text style={styles.warningText}>
-            No inventory products are configured for this client. A manager
-            must configure the expected product list before this step can be
+            No inventory products are configured for this client. A manager must
+            configure the expected product list before this step can be
             completed.
           </Text>
         </View>
       ) : null}
 
-      {groupedProducts.map(
-        ([category, categoryProducts]) => (
-          <View key={category} style={styles.category}>
-            <Text style={styles.categoryTitle}>
-              {CATEGORY_LABELS[category]}
-            </Text>
+      {groupedProducts.map(([category, categoryProducts]) => (
+        <View key={category} style={styles.category}>
+          <Text style={styles.categoryTitle}>{CATEGORY_LABELS[category]}</Text>
 
-            {categoryProducts.map((product) => (
-              <View
-                key={product.productId}
-                style={styles.productRow}
-              >
-                <View style={styles.productContent}>
-                  <Text style={styles.productName}>
-                    {product.name}
-                  </Text>
+          {categoryProducts.map((product) => {
+            const count = counts[product.productId] ?? emptyCount();
 
-                  <Text style={styles.productDetail}>
-                    {product.sku
-                      ? `SKU ${product.sku} · `
-                      : ""}
-                    Counted in {product.unitLabel}s
-                  </Text>
+            const issueQuantity = Number(count.issueQuantity || 0);
+
+            const looseQuantity = Number(count.looseQuantity || 0);
+
+            const total =
+              issueQuantity * product.packaging.unitsPerIssueUnit +
+              looseQuantity;
+
+            const previous = previousBalances.get(product.productId) ?? null;
+
+            const decrease = previous === null ? null : previous - total;
+
+            return (
+              <View key={product.productId} style={styles.reserveProduct}>
+                <Text style={styles.productName}>{product.name}</Text>
+
+                {product.sku ? (
+                  <Text style={styles.productDetail}>SKU {product.sku}</Text>
+                ) : null}
+
+                <Text style={styles.packageDescription}>
+                  {product.packaging.packageDescription ??
+                    `${product.packaging.unitsPerIssueUnit} ${product.packaging.baseUnit} per ${product.packaging.issueUnit}`}
+                </Text>
+
+                <View style={styles.quantityRow}>
+                  <View style={styles.quantityField}>
+                    <Text style={styles.quantityLabel} numberOfLines={1}>
+                      {product.packaging.issueUnit}
+                      {product.packaging.issueUnit.endsWith("s") ? "" : "s"}
+                    </Text>
+
+                    <TextInput
+                      accessibilityLabel={`${product.packaging.issueUnit} quantity for ${product.name}`}
+                      keyboardType="number-pad"
+                      onChangeText={(value) => {
+                        updateCount(product.productId, "issueQuantity", value);
+                      }}
+                      placeholder="0"
+                      placeholderTextColor="#a89c8f"
+                      style={styles.compactQuantityInput}
+                      value={count.issueQuantity}
+                    />
+                  </View>
+
+                  {product.packaging.allowsLooseUnits ? (
+                    <View style={styles.quantityField}>
+                      <Text style={styles.quantityLabel} numberOfLines={1}>
+                        Loose {product.packaging.baseUnit}
+                        {product.packaging.baseUnit.endsWith("s") ? "" : "s"}
+                      </Text>
+
+                      <TextInput
+                        accessibilityLabel={`Loose ${product.packaging.baseUnit} quantity for ${product.name}`}
+                        keyboardType={
+                          product.packaging.allowsPartialBaseUnit
+                            ? "decimal-pad"
+                            : "number-pad"
+                        }
+                        onChangeText={(value) => {
+                          updateCount(
+                            product.productId,
+                            "looseQuantity",
+                            value,
+                          );
+                        }}
+                        placeholder="0"
+                        placeholderTextColor="#a89c8f"
+                        style={styles.compactQuantityInput}
+                        value={count.looseQuantity}
+                      />
+                    </View>
+                  ) : null}
                 </View>
 
-                <TextInput
-                  accessibilityLabel={`Quantity for ${product.name}`}
-                  keyboardType="decimal-pad"
-                  onChangeText={(value) => {
-                    updateCount(product.productId, value);
-                  }}
-                  placeholder="0"
-                  placeholderTextColor="#a89c8f"
-                  style={styles.quantityInput}
-                  value={counts[product.productId] ?? ""}
-                />
-              </View>
-            ))}
-          </View>
-        ),
-      )}
+                <View style={styles.reserveSummary}>
+                  <Text style={styles.reserveSummaryText}>
+                    Current:{" "}
+                    <Text style={styles.reserveSummaryValue}>
+                      {total} {product.packaging.baseUnit}
+                      {total === 1 ? "" : "s"}
+                    </Text>
+                  </Text>
 
-      {missingRequiredCount > 0 &&
-      products.length > 0 ? (
+                  {previous === null ? (
+                    <Text style={styles.reserveSummaryText}>
+                      No previous baseline
+                    </Text>
+                  ) : (
+                    <Text style={styles.reserveSummaryText}>
+                      Previous: {previous} ·{" "}
+                      {decrease === 0
+                        ? "No change"
+                        : decrease !== null && decrease > 0
+                          ? `${decrease} fewer`
+                          : `${Math.abs(decrease ?? 0)} more`}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ))}
+
+      {missingRequiredCount > 0 && products.length > 0 ? (
         <Text style={styles.helperText}>
           Enter a quantity for all {missingRequiredCount} remaining required{" "}
           {missingRequiredCount === 1 ? "product" : "products"}. Enter 0 when
@@ -321,9 +469,7 @@ export default function InventoryAuditStep() {
 
       {errorMessage ? (
         <View style={styles.errorCard}>
-          <Text style={styles.errorText}>
-            {errorMessage}
-          </Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       ) : null}
 
@@ -343,7 +489,7 @@ export default function InventoryAuditStep() {
           <ActivityIndicator color="#ffffff" />
         ) : (
           <Text style={styles.primaryButtonText}>
-            Save Inventory and Continue
+            Save Reserve and Continue
           </Text>
         )}
       </Pressable>
@@ -422,17 +568,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 8,
   },
-  productRow: {
-    alignItems: "center",
-    borderBottomColor: "#efe6d8",
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    paddingVertical: 12,
-  },
-  productContent: {
-    flex: 1,
-    paddingRight: 12,
-  },
   productName: {
     color: "#3d2b1f",
     fontSize: 14,
@@ -445,19 +580,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 3,
   },
-  quantityInput: {
-    backgroundColor: "#faf6f0",
-    borderColor: "#d8c7b0",
-    borderRadius: 10,
-    borderWidth: 1,
-    color: "#2e1d12",
-    fontSize: 16,
-    fontWeight: "700",
-    minHeight: 44,
-    paddingHorizontal: 10,
-    textAlign: "center",
-    width: 76,
-  },
+
   helperText: {
     color: "#8a6f53",
     fontSize: 12,
@@ -496,5 +619,65 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.45,
+  },
+  reserveProduct: {
+    borderBottomColor: "#efe6d8",
+    borderBottomWidth: 1,
+    paddingVertical: 14,
+  },
+
+  packageDescription: {
+    color: "#8c8076",
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 4,
+  },
+
+  quantityRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+
+  quantityField: {
+    flex: 1,
+  },
+
+  quantityLabel: {
+    color: "#6b5543",
+    fontSize: 11,
+    fontWeight: "600",
+    marginBottom: 5,
+  },
+
+  compactQuantityInput: {
+    backgroundColor: "#faf6f0",
+    borderColor: "#d8c7b0",
+    borderRadius: 9,
+    borderWidth: 1,
+    color: "#2e1d12",
+    fontSize: 15,
+    fontWeight: "700",
+    height: 40,
+    paddingHorizontal: 10,
+    textAlign: "center",
+  },
+
+  reserveSummary: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+
+  reserveSummaryText: {
+    color: "#8a6f53",
+    fontSize: 11,
+  },
+
+  reserveSummaryValue: {
+    color: "#3d2b1f",
+    fontWeight: "700",
   },
 });
