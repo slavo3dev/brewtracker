@@ -379,76 +379,80 @@ export default function InventoryAuditStep() {
                     `${product.packaging.unitsPerIssueUnit} ${product.packaging.baseUnit} per ${product.packaging.issueUnit}`}
                 </Text>
 
-                <View style={styles.quantityGroup}>
-                  <Text style={styles.quantityLabel}>
-                    {product.packaging.issueUnit}
-                  </Text>
-
-                  <TextInput
-                    accessibilityLabel={`${product.packaging.issueUnit} quantity for ${product.name}`}
-                    keyboardType="number-pad"
-                    onChangeText={(value) => {
-                      updateCount(product.productId, "issueQuantity", value);
-                    }}
-                    placeholder="0"
-                    placeholderTextColor="#a89c8f"
-                    style={styles.quantityInput}
-                    value={count.issueQuantity}
-                  />
-                </View>
-
-                {product.packaging.allowsLooseUnits ? (
-                  <View style={styles.quantityGroup}>
-                    <Text style={styles.quantityLabel}>
-                      Loose {product.packaging.baseUnit}
+                <View style={styles.quantityRow}>
+                  <View style={styles.quantityField}>
+                    <Text style={styles.quantityLabel} numberOfLines={1}>
+                      {product.packaging.issueUnit}
+                      {product.packaging.issueUnit.endsWith("s") ? "" : "s"}
                     </Text>
 
                     <TextInput
-                      accessibilityLabel={`Loose ${product.packaging.baseUnit} quantity for ${product.name}`}
-                      keyboardType={
-                        product.packaging.allowsPartialBaseUnit
-                          ? "decimal-pad"
-                          : "number-pad"
-                      }
+                      accessibilityLabel={`${product.packaging.issueUnit} quantity for ${product.name}`}
+                      keyboardType="number-pad"
                       onChangeText={(value) => {
-                        updateCount(product.productId, "looseQuantity", value);
+                        updateCount(product.productId, "issueQuantity", value);
                       }}
                       placeholder="0"
                       placeholderTextColor="#a89c8f"
-                      style={styles.quantityInput}
-                      value={count.looseQuantity}
+                      style={styles.compactQuantityInput}
+                      value={count.issueQuantity}
                     />
                   </View>
-                ) : null}
 
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Current reserve</Text>
+                  {product.packaging.allowsLooseUnits ? (
+                    <View style={styles.quantityField}>
+                      <Text style={styles.quantityLabel} numberOfLines={1}>
+                        Loose {product.packaging.baseUnit}
+                        {product.packaging.baseUnit.endsWith("s") ? "" : "s"}
+                      </Text>
 
-                  <Text style={styles.totalValue}>
-                    {total} {product.packaging.baseUnit}
-                  </Text>
+                      <TextInput
+                        accessibilityLabel={`Loose ${product.packaging.baseUnit} quantity for ${product.name}`}
+                        keyboardType={
+                          product.packaging.allowsPartialBaseUnit
+                            ? "decimal-pad"
+                            : "number-pad"
+                        }
+                        onChangeText={(value) => {
+                          updateCount(
+                            product.productId,
+                            "looseQuantity",
+                            value,
+                          );
+                        }}
+                        placeholder="0"
+                        placeholderTextColor="#a89c8f"
+                        style={styles.compactQuantityInput}
+                        value={count.looseQuantity}
+                      />
+                    </View>
+                  ) : null}
                 </View>
 
-                {previous === null ? (
-                  <Text style={styles.baselineText}>
-                    No previous reserve baseline
-                  </Text>
-                ) : (
-                  <View style={styles.comparisonCard}>
-                    <Text style={styles.comparisonText}>
-                      Previous reserve: {previous} {product.packaging.baseUnit}
+                <View style={styles.reserveSummary}>
+                  <Text style={styles.reserveSummaryText}>
+                    Current:{" "}
+                    <Text style={styles.reserveSummaryValue}>
+                      {total} {product.packaging.baseUnit}
+                      {total === 1 ? "" : "s"}
                     </Text>
+                  </Text>
 
-                    <Text style={styles.comparisonText}>
-                      Reserve change:{" "}
+                  {previous === null ? (
+                    <Text style={styles.reserveSummaryText}>
+                      No previous baseline
+                    </Text>
+                  ) : (
+                    <Text style={styles.reserveSummaryText}>
+                      Previous: {previous} ·{" "}
                       {decrease === 0
                         ? "No change"
                         : decrease !== null && decrease > 0
                           ? `${decrease} fewer`
                           : `${Math.abs(decrease ?? 0)} more`}
                     </Text>
-                  </View>
-                )}
+                  )}
+                </View>
               </View>
             );
           })}
@@ -576,19 +580,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 3,
   },
-  quantityInput: {
-    backgroundColor: "#faf6f0",
-    borderColor: "#d8c7b0",
-    borderRadius: 10,
-    borderWidth: 1,
-    color: "#2e1d12",
-    fontSize: 16,
-    fontWeight: "700",
-    minHeight: 44,
-    paddingHorizontal: 10,
-    textAlign: "center",
-    width: 76,
-  },
+
   helperText: {
     color: "#8a6f53",
     fontSize: 12,
@@ -641,59 +633,51 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  quantityGroup: {
-    alignItems: "center",
+  quantityRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 12,
+    gap: 10,
+    marginTop: 10,
+  },
+
+  quantityField: {
+    flex: 1,
   },
 
   quantityLabel: {
-    color: "#4a2c1a",
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "600",
-    paddingRight: 12,
-  },
-
-  totalRow: {
-    alignItems: "center",
-    backgroundColor: "#faf6f0",
-    borderRadius: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 12,
-    padding: 10,
-  },
-
-  totalLabel: {
-    color: "#8a6f53",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  totalValue: {
-    color: "#2e1d12",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  baselineText: {
-    color: "#8c8076",
+    color: "#6b5543",
     fontSize: 11,
-    marginTop: 9,
+    fontWeight: "600",
+    marginBottom: 5,
   },
 
-  comparisonCard: {
-    backgroundColor: "#f7eadc",
-    borderRadius: 10,
-    marginTop: 9,
-    padding: 10,
+  compactQuantityInput: {
+    backgroundColor: "#faf6f0",
+    borderColor: "#d8c7b0",
+    borderRadius: 9,
+    borderWidth: 1,
+    color: "#2e1d12",
+    fontSize: 15,
+    fontWeight: "700",
+    height: 40,
+    paddingHorizontal: 10,
+    textAlign: "center",
   },
 
-  comparisonText: {
-    color: "#6b4a32",
-    fontSize: 12,
-    lineHeight: 18,
+  reserveSummary: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+
+  reserveSummaryText: {
+    color: "#8a6f53",
+    fontSize: 11,
+  },
+
+  reserveSummaryValue: {
+    color: "#3d2b1f",
+    fontWeight: "700",
   },
 });
