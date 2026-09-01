@@ -2,10 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Database } from "@brewtracker/types";
 
 import { supabase } from "../../lib/supabase";
-import type {
-  ClientInventoryProduct,
-  InventoryAuditCountInput,
-} from "./service-visit.types";
+import type { ClientInventoryProduct } from "./service-visit.types";
 
 type Json =
   Database["public"]["Functions"]["save_inventory_audit"]["Args"]["p_items"];
@@ -31,17 +28,28 @@ type ClientProductQueryRow = {
   } | null;
 };
 
-export type SaveInventoryAuditInput = {
+export type SaveClientReserveBeforeInput = {
   sourceVisitId: string;
   clientId: string;
   stopId: string;
   machineId: string;
-  countedAt: string;
-  counts: InventoryAuditCountInput[];
+  recordedAt: string;
+
+  quantities: ClientReserveQuantityInput[];
 };
 
-const CLIENT_PRODUCTS_CACHE_PREFIX =
-  "brewtracker:client-inventory-products:v3";
+export type ClientReserveQuantityInput = {
+  productId: string;
+  issueQuantity: number;
+  looseQuantity: number;
+};
+
+export type ClientReservePreviousBalance = {
+  productId: string;
+  previousReserveAfter: number | null;
+};
+
+const CLIENT_PRODUCTS_CACHE_PREFIX = "brewtracker:client-inventory-products:v3";
 
 function getCacheKey(clientId: string): string {
   return `${CLIENT_PRODUCTS_CACHE_PREFIX}:${clientId}`;
@@ -50,15 +58,11 @@ function getCacheKey(clientId: string): string {
 function validatePackaging(
   value: unknown,
 ): value is ClientInventoryProduct["packaging"] {
-  if (
-    typeof value !== "object" ||
-    value === null
-  ) {
+  if (typeof value !== "object" || value === null) {
     return false;
   }
 
-  const packaging =
-    value as Record<string, unknown>;
+  const packaging = value as Record<string, unknown>;
 
   return (
     typeof packaging.baseUnit === "string" &&
@@ -68,18 +72,14 @@ function validatePackaging(
     typeof packaging.unitsPerIssueUnit === "number" &&
     Number.isFinite(packaging.unitsPerIssueUnit) &&
     packaging.unitsPerIssueUnit > 0 &&
-    (
-      packaging.packageDescription === null ||
-      typeof packaging.packageDescription === "string"
-    ) &&
+    (packaging.packageDescription === null ||
+      typeof packaging.packageDescription === "string") &&
     typeof packaging.allowsLooseUnits === "boolean" &&
     typeof packaging.allowsPartialBaseUnit === "boolean"
   );
 }
 
-function validateProducts(
-  value: unknown,
-): value is ClientInventoryProduct[] {
+function validateProducts(value: unknown): value is ClientInventoryProduct[] {
   if (!Array.isArray(value)) {
     return false;
   }
@@ -94,23 +94,17 @@ function validateProducts(
       validatePackaging(product.packaging) &&
       typeof product.displayOrder === "number" &&
       typeof product.isRequired === "boolean" &&
-      (
-        product.parLevel === null ||
-        (
-          typeof product.parLevel === "number" &&
+      (product.parLevel === null ||
+        (typeof product.parLevel === "number" &&
           Number.isFinite(product.parLevel) &&
-          product.parLevel >= 0
-        )
-      ),
+          product.parLevel >= 0)),
   );
 }
 
 async function readCachedProducts(
   clientId: string,
 ): Promise<ClientInventoryProduct[] | null> {
-  const stored = await AsyncStorage.getItem(
-    getCacheKey(clientId),
-  );
+  const stored = await AsyncStorage.getItem(getCacheKey(clientId));
 
   if (!stored) {
     return null;
@@ -129,10 +123,7 @@ async function cacheProducts(
   clientId: string,
   products: ClientInventoryProduct[],
 ): Promise<void> {
-  await AsyncStorage.setItem(
-    getCacheKey(clientId),
-    JSON.stringify(products),
-  );
+  await AsyncStorage.setItem(getCacheKey(clientId), JSON.stringify(products));
 }
 
 export async function loadClientInventoryProducts(
@@ -146,7 +137,8 @@ export async function loadClientInventoryProducts(
 
   const { data, error } = await supabase
     .from("client_inventory_products")
-    .select(`
+    .select(
+      `
       display_order,
       is_required,
       par_level,
@@ -163,7 +155,8 @@ export async function loadClientInventoryProducts(
         allows_loose_units,
         allows_partial_base_unit
       )
-    `)
+    `,
+    )
     .eq("client_id", normalizedClientId)
     .eq("is_active", true)
     .order("display_order", {
@@ -171,8 +164,7 @@ export async function loadClientInventoryProducts(
     });
 
   if (error) {
-    const cachedProducts =
-      await readCachedProducts(normalizedClientId);
+    const cachedProducts = await readCachedProducts(normalizedClientId);
 
     if (cachedProducts) {
       return cachedProducts;
@@ -202,24 +194,16 @@ export async function loadClientInventoryProducts(
         packaging: {
           baseUnit: row.product.base_unit,
           issueUnit: row.product.issue_unit,
-          unitsPerIssueUnit: Number(
-            row.product.units_per_issue_unit,
-          ),
-          packageDescription:
-            row.product.package_description,
-          allowsLooseUnits:
-            row.product.allows_loose_units,
-          allowsPartialBaseUnit:
-            row.product.allows_partial_base_unit,
+          unitsPerIssueUnit: Number(row.product.units_per_issue_unit),
+          packageDescription: row.product.package_description,
+          allowsLooseUnits: row.product.allows_loose_units,
+          allowsPartialBaseUnit: row.product.allows_partial_base_unit,
         },
 
         displayOrder: row.display_order,
         isRequired: row.is_required,
 
-        parLevel:
-          row.par_level === null
-            ? null
-            : Number(row.par_level),
+        parLevel: row.par_level === null ? null : Number(row.par_level),
       },
     ];
   });
@@ -229,56 +213,100 @@ export async function loadClientInventoryProducts(
   return products;
 }
 
-export async function saveInventoryAudit(
-  input: SaveInventoryAuditInput,
+export async function loadPreviousClientReserveBalances(
+  clientId: string,
+  products: ClientInventoryProduct[],
+  before: string,
+): Promise<Map<string, number | null>> {
+  const balances = new Map<string, number | null>();
+
+  await Promise.all(
+    products.map(async (product) => {
+      const { data, error } = await supabase.rpc(
+        "get_previous_client_reserve_balance",
+        {
+          p_client_id: clientId,
+          p_product_id: product.productId,
+          p_before: before,
+        },
+      );
+
+      if (error) {
+        throw new Error(
+          `Unable to load previous client reserve: ${error.message}`,
+        );
+      }
+
+      balances.set(product.productId, data === null ? null : Number(data));
+    }),
+  );
+
+  return balances;
+}
+
+export async function saveClientReserveBefore(
+  input: SaveClientReserveBeforeInput,
 ): Promise<string> {
   if (!input.sourceVisitId.trim()) {
     throw new Error("A service visit ID is required.");
   }
 
-  if (input.counts.length === 0) {
-    throw new Error("At least one inventory count is required.");
+  if (input.quantities.length === 0) {
+    throw new Error("At least one client reserve quantity is required.");
   }
 
-  for (const count of input.counts) {
+  for (const quantity of input.quantities) {
+    if (!quantity.productId.trim()) {
+      throw new Error("Every reserve quantity must reference a product.");
+    }
+
     if (
-      !count.productId.trim() ||
-      !Number.isFinite(count.quantity) ||
-      count.quantity < 0
+      !Number.isFinite(quantity.issueQuantity) ||
+      quantity.issueQuantity < 0 ||
+      !Number.isInteger(quantity.issueQuantity)
     ) {
       throw new Error(
-        "Every product must have a valid non-negative quantity.",
+        "Package quantities must be whole numbers zero or greater.",
       );
+    }
+
+    if (
+      !Number.isFinite(quantity.looseQuantity) ||
+      quantity.looseQuantity < 0
+    ) {
+      throw new Error("Loose quantities must be zero or greater.");
     }
   }
 
-  const items: Json = input.counts.map((count) => ({
-    product_id: count.productId,
-    quantity: count.quantity,
-  }));
-
   const { data, error } = await supabase.rpc(
-    "save_inventory_audit",
+    "save_client_reserve_before_service",
     {
       p_source_visit_id: input.sourceVisitId,
+
       p_client_id: input.clientId,
+
       p_stop_id: input.stopId,
+
       p_machine_id: input.machineId,
-      p_counted_at: input.countedAt,
-      p_items: items,
+
+      p_recorded_at: input.recordedAt,
+
+      p_items: input.quantities.map((quantity) => ({
+        product_id: quantity.productId,
+
+        issue_quantity: quantity.issueQuantity,
+
+        loose_quantity: quantity.looseQuantity,
+      })),
     },
   );
 
   if (error) {
-    throw new Error(
-      `Unable to sync the inventory audit: ${error.message}`,
-    );
+    throw new Error(`Unable to save client reserve: ${error.message}`);
   }
 
   if (typeof data !== "string" || !data) {
-    throw new Error(
-      "The inventory audit was saved without a valid ID.",
-    );
+    throw new Error("Client reserve was saved without a valid ID.");
   }
 
   return data;

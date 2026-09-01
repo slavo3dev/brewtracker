@@ -1,7 +1,5 @@
 import type { Database, GeoPoint } from "@brewtracker/types";
-import type {
-  InventoryProductPackaging,
-} from "@brewtracker/types";
+import type { InventoryProductPackaging } from "@brewtracker/types";
 
 export const SERVICE_VISIT_STEPS = [
   {
@@ -206,22 +204,34 @@ export type ClientInventoryProduct = {
   parLevel: number | null;
 };
 
-export type InventoryAuditCountInput = {
+export type ClientReserveCountInput = {
   productId: string;
-  quantity: number;
+
+  issueQuantity: number;
+  looseQuantity: number;
 };
 
 export type CompleteInventoryAuditInput = {
-  counts: InventoryAuditCountInput[];
+  counts: ClientReserveCountInput[];
 };
 
 export type InventoryAuditItemRecord = {
   productId: string;
+
   sku: string | null;
   name: string;
   category: InventoryProductCategory;
+
   unitLabel: string;
-  quantity: number;
+
+  issueQuantity: number;
+  looseQuantity: number;
+
+  normalizedQuantity: number;
+  normalizedUnit: string;
+
+  previousReserveAfter: number | null;
+  reserveDecrease: number | null;
 };
 
 export type InventoryAuditSyncStatus = "pending_sync" | "synced" | "failed";
@@ -291,11 +301,7 @@ export type ServiceVisitSummaryRecord = {
 export type CompleteServiceVisitResult = {
   summaryId: string;
   surveyToken: string;
-  notificationStatus:
-    | "pending"
-    | "sent"
-    | "failed"
-    | "skipped";
+  notificationStatus: "pending" | "sent" | "failed" | "skipped";
   emailSentAt: string | null;
 };
 
@@ -364,21 +370,15 @@ export function getServiceVisitStep(stepId: ServiceVisitStepId) {
 export function createInitialStepStates(
   tasks: ServiceVisitTasks,
 ): ServiceVisitStepState[] {
-  return getRequiredServiceVisitSteps(tasks).map(
-    (step, index) => ({
-      id: step.id,
-      status: index === 0 ? "current" : "locked",
-      completedAt: null,
-    }),
-  );
+  return getRequiredServiceVisitSteps(tasks).map((step, index) => ({
+    id: step.id,
+    status: index === 0 ? "current" : "locked",
+    completedAt: null,
+  }));
 }
 
-export function getRequiredServiceVisitSteps(
-  tasks: ServiceVisitTasks,
-) {
+export function getRequiredServiceVisitSteps(tasks: ServiceVisitTasks) {
   return SERVICE_VISIT_STEPS.filter(
-    (step) =>
-      step.id !== "drink_count" ||
-      tasks.drinkCountRequired,
+    (step) => step.id !== "drink_count" || tasks.drinkCountRequired,
   );
 }
