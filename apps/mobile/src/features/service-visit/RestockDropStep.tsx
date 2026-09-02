@@ -1,8 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -13,17 +9,11 @@ import {
   View,
 } from "react-native";
 
-import {
-  loadClientInventoryProducts,
-} from "./inventory-audit.service";
+import { loadClientInventoryProducts } from "./inventory-audit.service";
 
-import {
-  useServiceVisit,
-} from "./ServiceVisitProvider";
+import { useServiceVisit } from "./ServiceVisitProvider";
 
-import type {
-  ClientInventoryProduct,
-} from "./service-visit.types";
+import type { ClientInventoryProduct } from "./service-visit.types";
 
 type DeliveryRow = {
   product: ClientInventoryProduct;
@@ -37,8 +27,7 @@ type DeliveryValue = {
   looseQuantity: string;
 };
 
-type DeliveryValues =
-  Record<string, DeliveryValue>;
+type DeliveryValues = Record<string, DeliveryValue>;
 
 function emptyDeliveryValue(): DeliveryValue {
   return {
@@ -47,9 +36,7 @@ function emptyDeliveryValue(): DeliveryValue {
   };
 }
 
-function normalizeWholeInput(
-  value: string,
-): string {
+function normalizeWholeInput(value: string): string {
   if (!/^\d*$/.test(value)) {
     return "";
   }
@@ -57,57 +44,68 @@ function normalizeWholeInput(
   return value;
 }
 
-function normalizeQuantityInput(
-  value: string,
-): string {
-  const normalized =
-    value.replace(",", ".");
+function normalizeQuantityInput(value: string): string {
+  const normalized = value.replace(",", ".");
 
-  if (
-    !/^\d*(\.\d{0,3})?$/.test(
-      normalized,
-    )
-  ) {
+  if (!/^\d*(\.\d{0,3})?$/.test(normalized)) {
     return "";
   }
 
   return normalized;
 }
 
-function formatQuantity(
-  quantity: number,
-): string {
+function formatQuantity(quantity: number): string {
   return Number.isInteger(quantity)
     ? String(quantity)
-    : quantity.toFixed(3)
-        .replace(/0+$/, "")
-        .replace(/\.$/, "");
+    : quantity.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function getRecommendedDeliveryValue(
+  recommendedQuantity: number,
+  unitsPerIssueUnit: number,
+  allowsLooseUnits: boolean,
+): DeliveryValue {
+  if (
+    !Number.isFinite(recommendedQuantity) ||
+    recommendedQuantity <= 0 ||
+    !Number.isFinite(unitsPerIssueUnit) ||
+    unitsPerIssueUnit <= 0
+  ) {
+    return {
+      issueQuantity: "0",
+      looseQuantity: "0",
+    };
+  }
+
+  if (!allowsLooseUnits) {
+    return {
+      issueQuantity: String(Math.ceil(recommendedQuantity / unitsPerIssueUnit)),
+      looseQuantity: "0",
+    };
+  }
+
+  const issueQuantity = Math.floor(recommendedQuantity / unitsPerIssueUnit);
+
+  const looseQuantity = recommendedQuantity - issueQuantity * unitsPerIssueUnit;
+
+  return {
+    issueQuantity: String(issueQuantity),
+    looseQuantity: formatQuantity(looseQuantity),
+  };
 }
 
 export default function RestockDropStep() {
-  const {
-    activeVisit,
-    completeRestockDrop,
-  } = useServiceVisit();
+  const { activeVisit, completeRestockDrop } = useServiceVisit();
 
-  const [products, setProducts] =
-    useState<ClientInventoryProduct[]>(
-      [],
-    );
+  const [products, setProducts] = useState<ClientInventoryProduct[]>([]);
 
-  const [values, setValues] =
-    useState<DeliveryValues>({});
+  const [values, setValues] = useState<DeliveryValues>({});
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [submitting, setSubmitting] =
-    useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,10 +121,7 @@ export default function RestockDropStep() {
       setErrorMessage(null);
 
       try {
-        const result =
-          await loadClientInventoryProducts(
-            activeVisit.clientId,
-          );
+        const result = await loadClientInventoryProducts(activeVisit.clientId);
 
         if (!cancelled) {
           setProducts(result);
@@ -151,87 +146,51 @@ export default function RestockDropStep() {
     return () => {
       cancelled = true;
     };
-  }, [
-    activeVisit?.clientId,
-  ]);
+  }, [activeVisit?.clientId]);
 
-  const reserveBefore =
-    activeVisit?.inventoryAudit ?? null;
+  const reserveBefore = activeVisit?.inventoryAudit ?? null;
 
-  const rows =
-    useMemo<DeliveryRow[]>(() => {
-      if (!reserveBefore) {
-        return [];
-      }
+  const rows = useMemo<DeliveryRow[]>(() => {
+    if (!reserveBefore) {
+      return [];
+    }
 
-      const reserveByProductId =
-        new Map(
-          reserveBefore.items.map(
-            (item) => [
-              item.productId,
-              item,
-            ],
-          ),
-        );
-
-      return products
-        .filter((product) =>
-          reserveByProductId.has(
-            product.productId,
-          ),
-        )
-        .map((product) => {
-          const reserve =
-            reserveByProductId.get(
-              product.productId,
-            )!;
-
-          const recommendedQuantity =
-            product.parLevel === null
-              ? 0
-              : Math.max(
-                  product.parLevel -
-                    reserve.normalizedQuantity,
-                  0,
-                );
-
-          return {
-            product,
-
-            reserveBeforeQuantity:
-              reserve.normalizedQuantity,
-
-            recommendedQuantity,
-          };
-        });
-    }, [
-      products,
-      reserveBefore,
-    ]);
-
-  const deliveryRows =
-    useMemo(
-      () =>
-        rows.filter(
-          (row) =>
-            row.product.parLevel !==
-              null &&
-            row.recommendedQuantity >
-              0,
-        ),
-      [rows],
+    const reserveByProductId = new Map(
+      reserveBefore.items.map((item) => [item.productId, item]),
     );
 
-  const productsWithoutPar =
-    useMemo(
-      () =>
-        rows.filter(
-          (row) =>
-            row.product.parLevel ===
-            null,
-        ),
-      [rows],
-    );
+    return products
+      .filter((product) => reserveByProductId.has(product.productId))
+      .map((product) => {
+        const reserve = reserveByProductId.get(product.productId)!;
+
+        const recommendedQuantity =
+          product.parLevel === null
+            ? 0
+            : Math.max(product.parLevel - reserve.normalizedQuantity, 0);
+
+        return {
+          product,
+
+          reserveBeforeQuantity: reserve.normalizedQuantity,
+
+          recommendedQuantity,
+        };
+      });
+  }, [products, reserveBefore]);
+
+  const deliveryRows = useMemo(
+    () =>
+      rows.filter(
+        (row) => row.product.parLevel !== null && row.recommendedQuantity > 0,
+      ),
+    [rows],
+  );
+
+  const productsWithoutPar = useMemo(
+    () => rows.filter((row) => row.product.parLevel === null),
+    [rows],
+  );
 
   /*
    * Pre-fill the recommended quantity using
@@ -242,41 +201,21 @@ export default function RestockDropStep() {
       const next: DeliveryValues = {};
 
       for (const row of deliveryRows) {
-        const productId =
-          row.product.productId;
+        const productId = row.product.productId;
 
         if (current[productId]) {
-          next[productId] =
-            current[productId];
+          next[productId] = current[productId];
 
           continue;
         }
 
-        const unitsPerIssue =
-          row.product.packaging
-            .unitsPerIssueUnit;
+        const packaging = row.product.packaging;
 
-        const recommended =
-          row.recommendedQuantity;
-
-        const issueQuantity =
-          Math.floor(
-            recommended /
-              unitsPerIssue,
-          );
-
-        const looseQuantity =
-          recommended -
-          issueQuantity *
-            unitsPerIssue;
-
-        next[productId] = {
-          issueQuantity:
-            String(issueQuantity),
-
-          looseQuantity:
-            String(looseQuantity),
-        };
+        next[productId] = getRecommendedDeliveryValue(
+          row.recommendedQuantity,
+          packaging.unitsPerIssueUnit,
+          packaging.allowsLooseUnits,
+        );
       }
 
       return next;
@@ -285,22 +224,15 @@ export default function RestockDropStep() {
 
   function updateValue(
     productId: string,
-    field:
-      | "issueQuantity"
-      | "looseQuantity",
+    field: "issueQuantity" | "looseQuantity",
     value: string,
   ) {
     const normalized =
       field === "issueQuantity"
         ? normalizeWholeInput(value)
-        : normalizeQuantityInput(
-            value,
-          );
+        : normalizeQuantityInput(value);
 
-    if (
-      value.length > 0 &&
-      normalized === ""
-    ) {
+    if (value.length > 0 && normalized === "") {
       return;
     }
 
@@ -308,8 +240,7 @@ export default function RestockDropStep() {
       ...current,
 
       [productId]: {
-        ...(current[productId] ??
-          emptyDeliveryValue()),
+        ...(current[productId] ?? emptyDeliveryValue()),
 
         [field]: normalized,
       },
@@ -318,87 +249,54 @@ export default function RestockDropStep() {
     setErrorMessage(null);
   }
 
-  const missingQuantityCount =
-    deliveryRows.filter((row) => {
-      const value =
-        values[
-          row.product.productId
-        ];
+  const missingQuantityCount = deliveryRows.filter((row) => {
+    const value = values[row.product.productId];
 
-      if (!value) {
-        return true;
-      }
+    if (!value) {
+      return true;
+    }
 
-      return (
-        value.issueQuantity.trim() ===
-          "" &&
-        value.looseQuantity.trim() ===
-          ""
-      );
-    }).length;
+    return (
+      value.issueQuantity.trim() === "" && value.looseQuantity.trim() === ""
+    );
+  }).length;
 
-  const hasInvalidQuantity =
-    deliveryRows.some((row) => {
-      const value =
-        values[
-          row.product.productId
-        ];
+  const hasInvalidQuantity = deliveryRows.some((row) => {
+    const value = values[row.product.productId];
 
-      if (!value) {
-        return false;
-      }
-
-      const issueQuantity =
-        Number(
-          value.issueQuantity || 0,
-        );
-
-      const looseQuantity =
-        Number(
-          value.looseQuantity || 0,
-        );
-
-      if (
-        !Number.isFinite(
-          issueQuantity,
-        ) ||
-        issueQuantity < 0 ||
-        !Number.isInteger(
-          issueQuantity,
-        )
-      ) {
-        return true;
-      }
-
-      if (
-        !Number.isFinite(
-          looseQuantity,
-        ) ||
-        looseQuantity < 0
-      ) {
-        return true;
-      }
-
-      if (
-        !row.product.packaging
-          .allowsLooseUnits &&
-        looseQuantity > 0
-      ) {
-        return true;
-      }
-
-      if (
-        !row.product.packaging
-          .allowsPartialBaseUnit &&
-        !Number.isInteger(
-          looseQuantity,
-        )
-      ) {
-        return true;
-      }
-
+    if (!value) {
       return false;
-    });
+    }
+
+    const issueQuantity = Number(value.issueQuantity || 0);
+
+    const looseQuantity = Number(value.looseQuantity || 0);
+
+    if (
+      !Number.isFinite(issueQuantity) ||
+      issueQuantity < 0 ||
+      !Number.isInteger(issueQuantity)
+    ) {
+      return true;
+    }
+
+    if (!Number.isFinite(looseQuantity) || looseQuantity < 0) {
+      return true;
+    }
+
+    if (!row.product.packaging.allowsLooseUnits && looseQuantity > 0) {
+      return true;
+    }
+
+    if (
+      !row.product.packaging.allowsPartialBaseUnit &&
+      !Number.isInteger(looseQuantity)
+    ) {
+      return true;
+    }
+
+    return false;
+  });
 
   const canSubmit =
     !loading &&
@@ -412,10 +310,7 @@ export default function RestockDropStep() {
   }
 
   async function handleSubmit() {
-    if (
-      !canSubmit ||
-      submitting
-    ) {
+    if (!canSubmit || submitting) {
       return;
     }
 
@@ -424,35 +319,17 @@ export default function RestockDropStep() {
 
     try {
       await completeRestockDrop({
-        quantities:
-          deliveryRows.map(
-            (row) => {
-              const value =
-                values[
-                  row.product
-                    .productId
-                ] ??
-                emptyDeliveryValue();
+        quantities: deliveryRows.map((row) => {
+          const value = values[row.product.productId] ?? emptyDeliveryValue();
 
-              return {
-                productId:
-                  row.product
-                    .productId,
+          return {
+            productId: row.product.productId,
 
-                issueQuantity:
-                  Number(
-                    value.issueQuantity ||
-                      0,
-                  ),
+            issueQuantity: Number(value.issueQuantity || 0),
 
-                looseQuantity:
-                  Number(
-                    value.looseQuantity ||
-                      0,
-                  ),
-              };
-            },
-          ),
+            looseQuantity: Number(value.looseQuantity || 0),
+          };
+        }),
       });
     } catch (error) {
       setErrorMessage(
@@ -467,18 +344,11 @@ export default function RestockDropStep() {
 
   if (loading) {
     return (
-      <View
-        style={
-          styles.loadingContainer
-        }
-      >
+      <View style={styles.loadingContainer}>
         <ActivityIndicator />
 
-        <Text
-          style={styles.loadingText}
-        >
-          Loading delivery
-          recommendations...
+        <Text style={styles.loadingText}>
+          Loading delivery recommendations...
         </Text>
       </View>
     );
@@ -487,12 +357,8 @@ export default function RestockDropStep() {
   if (!reserveBefore) {
     return (
       <View style={styles.errorCard}>
-        <Text
-          style={styles.errorText}
-        >
-          Complete the client reserve
-          count before confirming the
-          delivery.
+        <Text style={styles.errorText}>
+          Complete the client reserve count before confirming the delivery.
         </Text>
       </View>
     );
@@ -501,256 +367,119 @@ export default function RestockDropStep() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>
-          Step 6
-        </Text>
+        <Text style={styles.eyebrow}>Step 6</Text>
 
-        <Text style={styles.title}>
-          Client delivery
-        </Text>
+        <Text style={styles.title}>Client delivery</Text>
 
-        <Text
-          style={styles.description}
-        >
-          Confirm what you are actually
-          delivering from the van to the
-          client's reserve stock.
+        <Text style={styles.description}>
+          Confirm what you are actually delivering from the van to the client's
+          reserve stock.
         </Text>
       </View>
 
-      {productsWithoutPar.length >
-      0 ? (
+      {productsWithoutPar.length > 0 ? (
         <View style={styles.errorCard}>
-          <Text
-            style={styles.errorTitle}
-          >
-            Missing par level
-          </Text>
+          <Text style={styles.errorTitle}>Missing par level</Text>
 
-          <Text
-            style={styles.errorText}
-          >
+          <Text style={styles.errorText}>
             Configure a par level for{" "}
-            {productsWithoutPar
-              .map(
-                (row) =>
-                  row.product.name,
-              )
-              .join(", ")}
-            .
+            {productsWithoutPar.map((row) => row.product.name).join(", ")}.
           </Text>
         </View>
       ) : null}
 
       {errorMessage ? (
         <View style={styles.errorCard}>
-          <Text
-            style={styles.errorText}
-          >
-            {errorMessage}
-          </Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       ) : null}
 
-      {productsWithoutPar.length ===
-        0 &&
-      deliveryRows.length === 0 ? (
+      {productsWithoutPar.length === 0 && deliveryRows.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Text
-            style={styles.emptyCheck}
-          >
-            ✓
-          </Text>
+          <Text style={styles.emptyCheck}>✓</Text>
 
-          <Text
-            style={styles.emptyTitle}
-          >
-            No delivery needed
-          </Text>
+          <Text style={styles.emptyTitle}>No delivery needed</Text>
 
-          <Text
-            style={styles.emptyText}
-          >
-            Client reserve is already at
-            or above the configured
-            level.
+          <Text style={styles.emptyText}>
+            Client reserve is already at or above the configured level.
           </Text>
         </View>
       ) : null}
 
       {deliveryRows.map((row) => {
-        const productId =
-          row.product.productId;
+        const productId = row.product.productId;
 
-        const value =
-          values[productId] ??
-          emptyDeliveryValue();
+        const value = values[productId] ?? emptyDeliveryValue();
 
         const actual =
-          Number(
-            value.issueQuantity || 0,
-          ) *
-            row.product.packaging
-              .unitsPerIssueUnit +
-          Number(
-            value.looseQuantity || 0,
-          );
+          Number(value.issueQuantity || 0) *
+            row.product.packaging.unitsPerIssueUnit +
+          Number(value.looseQuantity || 0);
 
         return (
-          <View
-            key={productId}
-            style={styles.productCard}
-          >
-            <Text
-              style={styles.productName}
-            >
-              {row.product.name}
-            </Text>
+          <View key={productId} style={styles.productCard}>
+            <Text style={styles.productName}>{row.product.name}</Text>
 
-            <Text
-              style={styles.productMeta}
-            >
-              {row.product.packaging
-                .packageDescription ??
+            <Text style={styles.productMeta}>
+              {row.product.packaging.packageDescription ??
                 `${row.product.packaging.unitsPerIssueUnit} ${row.product.packaging.baseUnit} per ${row.product.packaging.issueUnit}`}
             </Text>
 
-            <View
-              style={
-                styles.recommendationRow
-              }
-            >
-              <Text
-                style={
-                  styles.recommendationLabel
-                }
-              >
-                Recommended
-              </Text>
+            <View style={styles.recommendationRow}>
+              <Text style={styles.recommendationLabel}>Recommended</Text>
 
-              <Text
-                style={
-                  styles.recommendationValue
-                }
-              >
-                {formatQuantity(
-                  row.recommendedQuantity,
-                )}{" "}
-                {
-                  row.product.packaging
-                    .baseUnit
-                }
+              <Text style={styles.recommendationValue}>
+                {formatQuantity(row.recommendedQuantity)}{" "}
+                {row.product.packaging.baseUnit}
               </Text>
             </View>
 
-            <View
-              style={
-                styles.quantityRow
-              }
-            >
-              <View
-                style={
-                  styles.quantityField
-                }
-              >
-                <Text
-                  style={
-                    styles.quantityLabel
-                  }
-                >
-                  {
-                    row.product
-                      .packaging
-                      .issueUnit
-                  }
+            <View style={styles.quantityRow}>
+              <View style={styles.quantityField}>
+                <Text style={styles.quantityLabel}>
+                  {row.product.packaging.issueUnit}
                 </Text>
 
                 <TextInput
-                  value={
-                    value.issueQuantity
-                  }
+                  value={value.issueQuantity}
                   editable={!submitting}
                   keyboardType="number-pad"
                   placeholder="0"
                   onChangeText={(text) =>
-                    updateValue(
-                      productId,
-                      "issueQuantity",
-                      text,
-                    )
+                    updateValue(productId, "issueQuantity", text)
                   }
-                  style={
-                    styles.quantityInput
-                  }
+                  style={styles.quantityInput}
                 />
               </View>
 
-              {row.product.packaging
-                .allowsLooseUnits ? (
-                <View
-                  style={
-                    styles.quantityField
-                  }
-                >
-                  <Text
-                    style={
-                      styles.quantityLabel
-                    }
-                  >
-                    Loose{" "}
-                    {
-                      row.product
-                        .packaging
-                        .baseUnit
-                    }
+              {row.product.packaging.allowsLooseUnits ? (
+                <View style={styles.quantityField}>
+                  <Text style={styles.quantityLabel}>
+                    Loose {row.product.packaging.baseUnit}
                   </Text>
 
                   <TextInput
-                    value={
-                      value.looseQuantity
-                    }
-                    editable={
-                      !submitting
-                    }
+                    value={value.looseQuantity}
+                    editable={!submitting}
                     keyboardType={
-                      row.product
-                        .packaging
-                        .allowsPartialBaseUnit
+                      row.product.packaging.allowsPartialBaseUnit
                         ? "decimal-pad"
                         : "number-pad"
                     }
                     placeholder="0"
-                    onChangeText={(
-                      text,
-                    ) =>
-                      updateValue(
-                        productId,
-                        "looseQuantity",
-                        text,
-                      )
+                    onChangeText={(text) =>
+                      updateValue(productId, "looseQuantity", text)
                     }
-                    style={
-                      styles.quantityInput
-                    }
+                    style={styles.quantityInput}
                   />
                 </View>
               ) : null}
             </View>
 
-            <Text
-              style={styles.actualText}
-            >
+            <Text style={styles.actualText}>
               Actual delivery:{" "}
-              <Text
-                style={
-                  styles.actualValue
-                }
-              >
-                {formatQuantity(actual)}{" "}
-                {
-                  row.product.packaging
-                    .baseUnit
-                }
+              <Text style={styles.actualValue}>
+                {formatQuantity(actual)} {row.product.packaging.baseUnit}
               </Text>
             </Text>
           </View>
@@ -766,24 +495,15 @@ export default function RestockDropStep() {
         style={({ pressed }) => [
           styles.confirmButton,
 
-          pressed &&
-            canSubmit &&
-            styles.buttonPressed,
+          pressed && canSubmit && styles.buttonPressed,
 
-          !canSubmit &&
-            styles.buttonDisabled,
+          !canSubmit && styles.buttonDisabled,
         ]}
       >
         {submitting ? (
-          <ActivityIndicator
-            color="#ffffff"
-          />
+          <ActivityIndicator color="#ffffff" />
         ) : (
-          <Text
-            style={
-              styles.confirmButtonText
-            }
-          >
+          <Text style={styles.confirmButtonText}>
             Confirm Delivery & Continue
           </Text>
         )}
