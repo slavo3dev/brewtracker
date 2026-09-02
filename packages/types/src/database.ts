@@ -35,6 +35,160 @@ export type Database = {
         }
         Relationships: []
       }
+      client_deliveries: {
+        Row: {
+          client_id: string
+          confirmed_at: string
+          created_at: string
+          delivered_by: string
+          id: string
+          machine_id: string
+          reserve_snapshot_id: string
+          source_visit_id: string
+          stop_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          confirmed_at: string
+          created_at?: string
+          delivered_by: string
+          id?: string
+          machine_id: string
+          reserve_snapshot_id: string
+          source_visit_id: string
+          stop_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          confirmed_at?: string
+          created_at?: string
+          delivered_by?: string
+          id?: string
+          machine_id?: string
+          reserve_snapshot_id?: string
+          source_visit_id?: string
+          stop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_deliveries_delivered_by_fkey"
+            columns: ["delivered_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_deliveries_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_deliveries_reserve_snapshot_id_fkey"
+            columns: ["reserve_snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "client_reserve_snapshots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_deliveries_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_delivery_items: {
+        Row: {
+          actual_quantity: number
+          base_unit_snapshot: string
+          created_at: string
+          delivery_id: string
+          entered_issue_quantity: number
+          entered_loose_quantity: number
+          id: string
+          issue_unit_snapshot: string
+          movement_id: string | null
+          normalized_unit: string
+          package_description_snapshot: string | null
+          par_level: number
+          product_id: string
+          recommended_quantity: number
+          reserve_before_quantity: number
+          units_per_issue_unit_snapshot: number
+        }
+        Insert: {
+          actual_quantity: number
+          base_unit_snapshot: string
+          created_at?: string
+          delivery_id: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          id?: string
+          issue_unit_snapshot: string
+          movement_id?: string | null
+          normalized_unit: string
+          package_description_snapshot?: string | null
+          par_level: number
+          product_id: string
+          recommended_quantity: number
+          reserve_before_quantity: number
+          units_per_issue_unit_snapshot: number
+        }
+        Update: {
+          actual_quantity?: number
+          base_unit_snapshot?: string
+          created_at?: string
+          delivery_id?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          id?: string
+          issue_unit_snapshot?: string
+          movement_id?: string | null
+          normalized_unit?: string
+          package_description_snapshot?: string | null
+          par_level?: number
+          product_id?: string
+          recommended_quantity?: number
+          reserve_before_quantity?: number
+          units_per_issue_unit_snapshot?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_delivery_items_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "client_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_delivery_items_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_delivery_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_inventory_products: {
         Row: {
           client_id: string
@@ -1660,6 +1814,17 @@ export type Database = {
       is_driver: { Args: never; Returns: boolean }
       is_field_staff: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
+      save_client_delivery: {
+        Args: {
+          p_client_id: string
+          p_confirmed_at: string
+          p_items: Json
+          p_machine_id: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
       save_client_reserve_before_service: {
         Args: {
           p_client_id: string

@@ -4,9 +4,17 @@ import {
   type SetStateAction,
 } from "react";
 
-import { loadClientInventoryProducts } from "../../src/features/service-visit/inventory-audit.service";
-import { saveRestockDrop } from "../../src/features/service-visit/restock-drop.service";
-import { saveServiceVisit } from "../../src/features/service-visit/service-visit.storage";
+import {
+  loadClientInventoryProducts,
+} from "../../src/features/service-visit/inventory-audit.service";
+
+import {
+  saveClientDelivery,
+} from "../../src/features/service-visit/restock-drop.service";
+
+import {
+  saveServiceVisit,
+} from "../../src/features/service-visit/service-visit.storage";
 
 import {
   type CompleteRestockDropInput,
@@ -14,7 +22,9 @@ import {
   type ServiceVisit,
 } from "../../src/features/service-visit/service-visit.types";
 
-import { transitionToNextStep } from "../../src/features/service-visit/state/service-visit.transitions";
+import {
+  transitionToNextStep,
+} from "../../src/features/service-visit/state/service-visit.transitions";
 
 type UseRestockStepParams = {
   activeVisit: ServiceVisit | null;
@@ -33,287 +43,277 @@ export function useRestockStep({
   setActiveVisit,
   setErrorMessage,
 }: UseRestockStepParams) {
-  const completeRestockDrop = useCallback(
-    async (
-      input: CompleteRestockDropInput,
-    ): Promise<ServiceVisit> => {
-      if (!activeVisit) {
-        throw new Error(
-          "There is no active service visit.",
-        );
-      }
+  const completeRestockDrop =
+    useCallback(
+      async (
+        input: CompleteRestockDropInput,
+      ): Promise<ServiceVisit> => {
+        if (!activeVisit) {
+          throw new Error(
+            "There is no active service visit.",
+          );
+        }
 
-      if (
-        activeVisit.currentStep !==
-        "restock"
-      ) {
-        throw new Error(
-          "Restock can only be completed during Step 6.",
-        );
-      }
-
-      const inventoryAudit =
-        activeVisit.inventoryAudit;
-
-      if (
-        !inventoryAudit ||
-        inventoryAudit.syncStatus !==
-          "synced" ||
-        !inventoryAudit.databaseId
-      ) {
-        throw new Error(
-          "The inventory audit must be synced before restocking.",
-        );
-      }
-
-      /*
-       * FLOW-14:
-       *
-       * input.quantities may legitimately be [].
-       * That represents a completed refill step where
-       * every audited product was already at or above par.
-       */
-
-      const productIds =
-        new Set<string>();
-
-      for (const quantity of input.quantities) {
         if (
-          !quantity.productId.trim()
+          activeVisit.currentStep !==
+          "restock"
         ) {
           throw new Error(
-            "Every restock quantity must reference a product.",
+            "Delivery can only be completed during Step 6.",
           );
         }
 
+        const reserveBefore =
+          activeVisit.inventoryAudit;
+
         if (
-          productIds.has(
-            quantity.productId,
-          )
+          !reserveBefore ||
+          reserveBefore.syncStatus !==
+            "synced" ||
+          !reserveBefore.databaseId
         ) {
           throw new Error(
-            "A product cannot appear more than once.",
+            "The client reserve count must be synced before delivery.",
           );
         }
 
-        if (
-          !Number.isFinite(
-            quantity.actualQuantity,
-          ) ||
-          quantity.actualQuantity < 0
-        ) {
-          throw new Error(
-            "Every actual restock quantity must be zero or greater.",
-          );
-        }
-
-        productIds.add(
-          quantity.productId,
-        );
-      }
-
-      const configuredProducts =
-        await loadClientInventoryProducts(
-          activeVisit.clientId,
-        );
-
-      const configuredById =
-        new Map(
-          configuredProducts.map(
-            (product) => [
-              product.productId,
-              product,
-            ],
-          ),
-        );
-
-      const auditByProductId =
-        new Map(
-          inventoryAudit.items.map(
-            (item) => [
-              item.productId,
-              item,
-            ],
-          ),
-        );
-
-      /*
-       * Every audited product must still have a valid
-       * active inventory configuration and par level.
-       */
-      const missingParProduct =
-        inventoryAudit.items.find(
-          (auditItem) => {
-            const configuredProduct =
-              configuredById.get(
-                auditItem.productId,
-              );
-
-            return (
-              !configuredProduct ||
-              configuredProduct.parLevel ===
-                null
-            );
-          },
-        );
-
-      if (missingParProduct) {
-        throw new Error(
-          `${missingParProduct.name} does not have a configured par level.`,
-        );
-      }
-
-      /*
-       * Determine the exact products FLOW-14 requires
-       * the driver to confirm.
-       */
-      const requiredRefillProductIds =
-        new Set<string>();
-
-      for (const auditItem of
-        inventoryAudit.items) {
-        const configuredProduct =
-          configuredById.get(
-            auditItem.productId,
+        const configuredProducts =
+          await loadClientInventoryProducts(
+            activeVisit.clientId,
           );
 
-        if (
-          !configuredProduct ||
-          configuredProduct.parLevel ===
-            null
-        ) {
-          continue;
-        }
-
-        const recommendedQuantity =
-          Math.max(
-            configuredProduct.parLevel -
-              auditItem.quantity,
-            0,
-          );
-
-        if (
-          recommendedQuantity > 0
-        ) {
-          requiredRefillProductIds.add(
-            auditItem.productId,
-          );
-        }
-      }
-
-      /*
-       * All products requiring refill must be present.
-       */
-      const missingRequiredProduct =
-        [
-          ...requiredRefillProductIds,
-        ].find(
-          (productId) =>
-            !productIds.has(productId),
-        );
-
-      if (missingRequiredProduct) {
-        throw new Error(
-          "Confirm the actual quantity for every product that requires refill.",
-        );
-      }
-
-      /*
-       * Products whose recommendation is zero must not
-       * be submitted.
-       */
-      const unexpectedProduct =
-        input.quantities.find(
-          (quantity) =>
-            !requiredRefillProductIds.has(
-              quantity.productId,
+        const configuredById =
+          new Map(
+            configuredProducts.map(
+              (product) => [
+                product.productId,
+                product,
+              ],
             ),
-        );
+          );
 
-      if (unexpectedProduct) {
-        throw new Error(
-          "A submitted product does not require refill. Reload the step and try again.",
-        );
-      }
+        const reserveByProductId =
+          new Map(
+            reserveBefore.items.map(
+              (item) => [
+                item.productId,
+                item,
+              ],
+            ),
+          );
 
-      /*
-       * Only actual refill products are stored in the
-       * local visit record.
-       *
-       * [] means "No refill needed".
-       */
-      const items: RestockDropItemRecord[] =
-        input.quantities.map(
-          (quantity) => {
-            const auditItem =
-              auditByProductId.get(
+        const requiredDeliveryIds =
+          new Set<string>();
+
+        for (const reserveItem of
+          reserveBefore.items) {
+          const product =
+            configuredById.get(
+              reserveItem.productId,
+            );
+
+          if (
+            !product ||
+            product.parLevel === null
+          ) {
+            throw new Error(
+              `${reserveItem.name} does not have a configured par level.`,
+            );
+          }
+
+          const recommended =
+            Math.max(
+              product.parLevel -
+                reserveItem.normalizedQuantity,
+              0,
+            );
+
+          if (recommended > 0) {
+            requiredDeliveryIds.add(
+              reserveItem.productId,
+            );
+          }
+        }
+
+        const suppliedIds =
+          new Set<string>();
+
+        for (const quantity of
+          input.quantities) {
+          if (
+            !quantity.productId.trim()
+          ) {
+            throw new Error(
+              "Every delivery quantity must reference a product.",
+            );
+          }
+
+          if (
+            suppliedIds.has(
+              quantity.productId,
+            )
+          ) {
+            throw new Error(
+              "A product cannot appear more than once.",
+            );
+          }
+
+          if (
+            !Number.isFinite(
+              quantity.issueQuantity,
+            ) ||
+            quantity.issueQuantity < 0 ||
+            !Number.isInteger(
+              quantity.issueQuantity,
+            )
+          ) {
+            throw new Error(
+              "Package quantities must be whole numbers of zero or greater.",
+            );
+          }
+
+          if (
+            !Number.isFinite(
+              quantity.looseQuantity,
+            ) ||
+            quantity.looseQuantity < 0
+          ) {
+            throw new Error(
+              "Loose quantities must be zero or greater.",
+            );
+          }
+
+          suppliedIds.add(
+            quantity.productId,
+          );
+        }
+
+        const missingProduct =
+          [...requiredDeliveryIds].find(
+            (productId) =>
+              !suppliedIds.has(
+                productId,
+              ),
+          );
+
+        if (missingProduct) {
+          throw new Error(
+            "Confirm the actual delivery for every product that requires delivery.",
+          );
+        }
+
+        const unexpected =
+          input.quantities.find(
+            (quantity) =>
+              !requiredDeliveryIds.has(
                 quantity.productId,
-              );
+              ),
+          );
 
-            const configuredProduct =
-              configuredById.get(
-                quantity.productId,
-              );
+        if (unexpected) {
+          throw new Error(
+            "A submitted product does not require delivery.",
+          );
+        }
 
-            if (
-              !auditItem ||
-              !configuredProduct ||
-              configuredProduct.parLevel ===
-                null
-            ) {
-              throw new Error(
-                "The inventory configuration changed. Reload the step and try again.",
-              );
-            }
+        const items: RestockDropItemRecord[] =
+          input.quantities.map(
+            (quantity) => {
+              const reserveItem =
+                reserveByProductId.get(
+                  quantity.productId,
+                );
 
-            const recommendedQuantity =
-              Math.max(
-                configuredProduct.parLevel -
-                  auditItem.quantity,
-                0,
-              );
+              const product =
+                configuredById.get(
+                  quantity.productId,
+                );
 
-            if (
-              recommendedQuantity <= 0
-            ) {
-              throw new Error(
-                `${auditItem.name} does not require refill.`,
-              );
-            }
+              if (
+                !reserveItem ||
+                !product ||
+                product.parLevel === null
+              ) {
+                throw new Error(
+                  "The inventory configuration changed. Reload the step and try again.",
+                );
+              }
 
-            return {
-              productId:
-                auditItem.productId,
+              if (
+                !product.packaging
+                  .allowsLooseUnits &&
+                quantity.looseQuantity > 0
+              ) {
+                throw new Error(
+                  `${product.name} does not allow loose units.`,
+                );
+              }
 
-              sku: auditItem.sku,
+              if (
+                !product.packaging
+                  .allowsPartialBaseUnit &&
+                !Number.isInteger(
+                  quantity.looseQuantity,
+                )
+              ) {
+                throw new Error(
+                  `${product.name} does not allow partial ${product.packaging.baseUnit} quantities.`,
+                );
+              }
 
-              name: auditItem.name,
+              const actualQuantity =
+                quantity.issueQuantity *
+                  product.packaging
+                    .unitsPerIssueUnit +
+                quantity.looseQuantity;
 
-              category:
-                auditItem.category,
+              const recommendedQuantity =
+                Math.max(
+                  product.parLevel -
+                    reserveItem.normalizedQuantity,
+                  0,
+                );
 
-              unitLabel:
-                auditItem.unitLabel,
+              return {
+                productId:
+                  product.productId,
 
-              countedQuantity:
-                auditItem.quantity,
+                sku: product.sku,
 
-              parLevel:
-                configuredProduct.parLevel,
+                name: product.name,
 
-              recommendedQuantity,
+                category:
+                  product.category,
 
-              actualQuantity:
-                quantity.actualQuantity,
-            };
-          },
-        );
+                unitLabel:
+                  product.unitLabel,
 
-      const confirmedAt =
-        new Date().toISOString();
+                reserveBeforeQuantity:
+                  reserveItem.normalizedQuantity,
 
-      const visitWithPendingRestock: ServiceVisit =
-        {
+                parLevel:
+                  product.parLevel,
+
+                recommendedQuantity,
+
+                issueQuantity:
+                  quantity.issueQuantity,
+
+                looseQuantity:
+                  quantity.looseQuantity,
+
+                actualQuantity,
+
+                normalizedUnit:
+                  product.packaging.baseUnit,
+              };
+            },
+          );
+
+        const confirmedAt =
+          new Date().toISOString();
+
+        const pendingVisit: ServiceVisit = {
           ...activeVisit,
 
           restockDrop: {
@@ -321,9 +321,6 @@ export function useRestockStep({
 
             sourceVisitId:
               activeVisit.id,
-
-            inventoryAuditId:
-              inventoryAudit.databaseId,
 
             confirmedAt,
 
@@ -338,56 +335,49 @@ export function useRestockStep({
           updatedAt: confirmedAt,
         };
 
-      /*
-       * Save locally before remote sync so the visit
-       * remains recoverable if the sync fails.
-       */
-      await saveServiceVisit(
-        visitWithPendingRestock,
-      );
+        await saveServiceVisit(
+          pendingVisit,
+        );
 
-      setActiveVisit(
-        visitWithPendingRestock,
-      );
+        setActiveVisit(
+          pendingVisit,
+        );
 
-      try {
-        const databaseId =
-          await saveRestockDrop({
-            sourceVisitId:
-              activeVisit.id,
+        try {
+          const databaseId =
+            await saveClientDelivery({
+              sourceVisitId:
+                activeVisit.id,
 
-            inventoryAuditId:
-              inventoryAudit.databaseId,
+              clientId:
+                activeVisit.clientId,
 
-            clientId:
-              activeVisit.clientId,
+              stopId:
+                activeVisit.stopId,
 
-            stopId:
-              activeVisit.stopId,
+              machineId:
+                activeVisit.machineId,
 
-            machineId:
-              activeVisit.machineId,
+              confirmedAt,
 
-            confirmedAt,
+              quantities:
+                input.quantities,
+            });
 
-            quantities:
-              input.quantities,
-          });
+          const syncedAt =
+            new Date().toISOString();
 
-        const syncedAt =
-          new Date().toISOString();
-
-        const visitWithSyncedRestock: ServiceVisit =
-          {
-            ...visitWithPendingRestock,
+          const syncedVisit: ServiceVisit = {
+            ...pendingVisit,
 
             restockDrop: {
-              ...visitWithPendingRestock
+              ...pendingVisit
                 .restockDrop!,
 
               databaseId,
 
-              syncStatus: "synced",
+              syncStatus:
+                "synced",
 
               syncError: null,
             },
@@ -395,61 +385,69 @@ export function useRestockStep({
             updatedAt: syncedAt,
           };
 
-        const updatedVisit =
-          transitionToNextStep(
-            visitWithSyncedRestock,
-            "restock",
-            syncedAt,
+          const updatedVisit =
+            transitionToNextStep(
+              syncedVisit,
+              "restock",
+              syncedAt,
+            );
+
+          await saveServiceVisit(
+            updatedVisit,
           );
 
-        await saveServiceVisit(
-          updatedVisit,
-        );
+          setActiveVisit(
+            updatedVisit,
+          );
 
-        setActiveVisit(updatedVisit);
+          setErrorMessage(null);
 
-        setErrorMessage(null);
+          return updatedVisit;
+        } catch (error) {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Unable to sync the client delivery.";
 
-        return updatedVisit;
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Unable to sync the restock drop.";
+          const failedVisit: ServiceVisit = {
+            ...pendingVisit,
 
-        const failedVisit: ServiceVisit = {
-          ...visitWithPendingRestock,
+            restockDrop: {
+              ...pendingVisit
+                .restockDrop!,
 
-          restockDrop: {
-            ...visitWithPendingRestock
-              .restockDrop!,
+              syncStatus:
+                "failed",
 
-            syncStatus: "failed",
+              syncError:
+                message,
+            },
 
-            syncError: message,
-          },
+            updatedAt:
+              new Date().toISOString(),
+          };
 
-          updatedAt:
-            new Date().toISOString(),
-        };
+          await saveServiceVisit(
+            failedVisit,
+          );
 
-        await saveServiceVisit(
-          failedVisit,
-        );
+          setActiveVisit(
+            failedVisit,
+          );
 
-        setActiveVisit(failedVisit);
+          setErrorMessage(
+            message,
+          );
 
-        setErrorMessage(message);
-
-        throw new Error(message);
-      }
-    },
-    [
-      activeVisit,
-      setActiveVisit,
-      setErrorMessage,
-    ],
-  );
+          throw error;
+        }
+      },
+      [
+        activeVisit,
+        setActiveVisit,
+        setErrorMessage,
+      ],
+    );
 
   return {
     completeRestockDrop,
