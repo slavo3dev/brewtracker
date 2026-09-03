@@ -1001,6 +1001,141 @@ export type Database = {
           },
         ]
       }
+      machine_refill_items: {
+        Row: {
+          actual_quantity: number
+          base_unit_snapshot: string
+          created_at: string
+          entered_issue_quantity: number
+          entered_loose_quantity: number
+          id: string
+          issue_unit_snapshot: string
+          machine_refill_id: string
+          movement_id: string | null
+          normalized_unit: string
+          package_description_snapshot: string | null
+          product_id: string
+          units_per_issue_unit_snapshot: number
+        }
+        Insert: {
+          actual_quantity: number
+          base_unit_snapshot: string
+          created_at?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          id?: string
+          issue_unit_snapshot: string
+          machine_refill_id: string
+          movement_id?: string | null
+          normalized_unit: string
+          package_description_snapshot?: string | null
+          product_id: string
+          units_per_issue_unit_snapshot: number
+        }
+        Update: {
+          actual_quantity?: number
+          base_unit_snapshot?: string
+          created_at?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          id?: string
+          issue_unit_snapshot?: string
+          machine_refill_id?: string
+          movement_id?: string | null
+          normalized_unit?: string
+          package_description_snapshot?: string | null
+          product_id?: string
+          units_per_issue_unit_snapshot?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_refill_items_machine_refill_id_fkey"
+            columns: ["machine_refill_id"]
+            isOneToOne: false
+            referencedRelation: "machine_refills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_refill_items_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_refill_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machine_refills: {
+        Row: {
+          client_id: string
+          confirmed_at: string
+          created_at: string
+          id: string
+          machine_id: string
+          refilled_by: string
+          source_visit_id: string
+          stop_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          confirmed_at: string
+          created_at?: string
+          id?: string
+          machine_id: string
+          refilled_by: string
+          source_visit_id: string
+          stop_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          confirmed_at?: string
+          created_at?: string
+          id?: string
+          machine_id?: string
+          refilled_by?: string
+          source_visit_id?: string
+          stop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_refills_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_refills_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_refills_refilled_by_fkey"
+            columns: ["refilled_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_refills_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       machines: {
         Row: {
           client_id: string
@@ -1859,6 +1994,17 @@ export type Database = {
         }
         Returns: string
       }
+      save_machine_refill: {
+        Args: {
+          p_client_id: string
+          p_confirmed_at: string
+          p_items: Json
+          p_machine_id: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
       warehouse_is_in_current_user_region: {
         Args: { target_warehouse_id: string }
         Returns: boolean
@@ -1914,12 +2060,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1943,11 +2089,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1968,11 +2114,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1993,11 +2139,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2010,11 +2156,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

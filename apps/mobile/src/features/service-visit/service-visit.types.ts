@@ -23,8 +23,12 @@ export const SERVICE_VISIT_STEPS = [
     title: "Inventory Audit",
   },
   {
-    id: "restock",
-    title: "Recommended Refill",
+  id: "restock",
+  title: "Client Delivery",
+  },
+  {
+    id: "machine_refill",
+    title: "Machine Refill",
   },
   {
     id: "after_service",
@@ -301,6 +305,53 @@ export type RestockDropRecord = {
   syncError: string | null;
 };
 
+export type MachineRefillQuantityInput = {
+  productId: string;
+
+  issueQuantity: number;
+  looseQuantity: number;
+};
+
+export type CompleteMachineRefillInput = {
+  quantities: MachineRefillQuantityInput[];
+};
+
+export type MachineRefillItemRecord = {
+  productId: string;
+
+  sku: string | null;
+  name: string;
+
+  category: InventoryProductCategory;
+
+  unitLabel: string;
+
+  issueQuantity: number;
+  looseQuantity: number;
+
+  actualQuantity: number;
+  normalizedUnit: string;
+};
+
+export type MachineRefillSyncStatus =
+  | "pending_sync"
+  | "synced"
+  | "failed";
+
+export type MachineRefillRecord = {
+  databaseId: string | null;
+
+  sourceVisitId: string;
+
+  confirmedAt: string;
+
+  items: MachineRefillItemRecord[];
+
+  syncStatus: MachineRefillSyncStatus;
+
+  syncError: string | null;
+};
+
 export type CompleteMachineScanInput = {
   scannedValue: string;
 };
@@ -351,6 +402,9 @@ export type ServiceVisit = {
   drinkCount: DrinkCountRecord | null;
   inventoryAudit: InventoryAuditRecord | null;
   restockDrop: RestockDropRecord | null;
+
+  machineRefill: MachineRefillRecord | null;
+
   afterService: AfterServiceRecord;
   summary: ServiceVisitSummaryRecord;
 
