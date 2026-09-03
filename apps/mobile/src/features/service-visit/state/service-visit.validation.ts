@@ -5,10 +5,152 @@ import {
   type ServiceVisit,
 } from "../service-visit.types";
 
+function migratePreFlow18Visit(
+  visit: ServiceVisit,
+): ServiceVisit {
+  if (!Array.isArray(visit.steps)) {
+    return visit;
+  }
+
+  /*
+   * Already using the FLOW-18 step structure.
+   */
+  if (
+    visit.steps.some(
+      (step) => step.id === "machine_refill",
+    )
+  ) {
+    return visit;
+  }
+
+  const restockIndex = visit.steps.findIndex(
+    (step) => step.id === "restock",
+  );
+
+  const afterServiceIndex =
+    visit.steps.findIndex(
+      (step) => step.id === "after_service",
+    );
+
+  /*
+   * Only migrate the known pre-FLOW-18 structure:
+   *
+   * restock -> after_service
+   *
+   * Anything else should continue to fail normal
+   * restore validation.
+   */
+  if (
+    restockIndex < 0 ||
+    afterServiceIndex !== restockIndex + 1
+  ) {
+    return visit;
+  }
+
+  const restockStep =
+    visit.steps[restockIndex];
+
+  const hasProgressedPastRestock =
+    restockStep?.status === "completed" ||
+    visit.currentStep === "after_service" ||
+    visit.currentStep === "summary";
+
+  const machineRefillStep = {
+    id: "machine_refill" as const,
+    status: "locked" as const,
+    completedAt: null,
+  };
+
+  const migratedSteps = [
+    ...visit.steps.slice(
+      0,
+      afterServiceIndex,
+    ),
+
+    machineRefillStep,
+
+    ...visit.steps.slice(
+      afterServiceIndex,
+    ),
+  ];
+
+  /*
+   * If the old visit had already completed Restock,
+   * the new FLOW-18 step becomes the current step.
+   *
+   * Downstream steps are locked again because
+   * Machine Refill is now required before them.
+   */
+  if (hasProgressedPastRestock) {
+    const resetSteps =
+      migratedSteps.map((step) => {
+        if (
+          step.id === "machine_refill"
+        ) {
+          return {
+            ...step,
+            status: "current" as const,
+            completedAt: null,
+          };
+        }
+
+        if (
+          step.id === "after_service" ||
+          step.id === "summary"
+        ) {
+          return {
+            ...step,
+            status: "locked" as const,
+            completedAt: null,
+          };
+        }
+
+        return step;
+      });
+
+    return {
+      ...visit,
+
+      currentStep: "machine_refill",
+
+      steps: resetSteps,
+
+      machineRefill: null,
+
+      /*
+       * An old After Service photo may have been
+       * captured before the newly required machine
+       * refill. Require it again after FLOW-18.
+       */
+      afterService: {
+        afterPhoto: null,
+      },
+    };
+  }
+
+  /*
+   * The old visit has not passed Restock yet.
+   *
+   * Insert FLOW-18 as a locked future step.
+   * Normal transition logic will unlock it after
+   * Client Delivery is completed.
+   */
+  return {
+    ...visit,
+
+    steps: migratedSteps,
+
+    machineRefill: null,
+  };
+}
+
 export function validateRestoredVisit(
   visit: ServiceVisit,
   userId: string,
 ): ServiceVisit | null {
+
+  visit = migratePreFlow18Visit(visit);
+
   if (visit.userId !== userId) {
     return null;
   }
@@ -298,6 +440,98 @@ export function validateRestoredVisit(
   }
 
   /*
+  * FLOW-18:
+  * Machine refill.
+  *
+  * Stock is moved directly:
+  *
+  * Driver / Van -> Machine
+  *
+  * It does not reduce client reserve.
+  */
+  const restoredMachineRefill =
+    visit.machineRefill ?? null;
+
+  if (restoredMachineRefill) {
+    const hasValidItems =
+      Array.isArray(
+        restoredMachineRefill.items,
+      ) &&
+      restoredMachineRefill.items.every(
+        (item) =>
+          typeof item.productId ===
+            "string" &&
+          item.productId.trim().length >
+            0 &&
+          (item.sku === null ||
+            typeof item.sku ===
+              "string") &&
+          typeof item.name ===
+            "string" &&
+          typeof item.unitLabel ===
+            "string" &&
+          Number.isFinite(
+            item.issueQuantity,
+          ) &&
+          item.issueQuantity >= 0 &&
+          Number.isInteger(
+            item.issueQuantity,
+          ) &&
+          Number.isFinite(
+            item.looseQuantity,
+          ) &&
+          item.looseQuantity >= 0 &&
+          Number.isFinite(
+            item.actualQuantity,
+          ) &&
+          item.actualQuantity >= 0 &&
+          typeof item.normalizedUnit ===
+            "string" &&
+          item.normalizedUnit
+            .trim().length > 0,
+      );
+
+    const hasValidSyncStatus = [
+      "pending_sync",
+      "synced",
+      "failed",
+    ].includes(
+      restoredMachineRefill.syncStatus,
+    );
+
+    const hasValidDatabaseId =
+      restoredMachineRefill.databaseId ===
+        null ||
+      (
+        typeof restoredMachineRefill.databaseId ===
+          "string" &&
+        restoredMachineRefill.databaseId
+          .trim().length > 0
+      );
+
+    const hasValidSyncError =
+      restoredMachineRefill.syncError ===
+        null ||
+      typeof restoredMachineRefill.syncError ===
+        "string";
+
+    if (
+      !hasValidDatabaseId ||
+      typeof restoredMachineRefill.sourceVisitId !==
+        "string" ||
+      restoredMachineRefill.sourceVisitId
+        .trim().length === 0 ||
+      typeof restoredMachineRefill.confirmedAt !==
+        "string" ||
+      !hasValidItems ||
+      !hasValidSyncStatus ||
+      !hasValidSyncError
+    ) {
+      return null;
+    }
+  }
+
+  /*
    * FLOW-14:
    * After Service contains one required photo.
    * Signature state has been removed.
@@ -350,6 +584,9 @@ export function validateRestoredVisit(
     inventoryAudit: restoredInventoryAudit,
 
     restockDrop: restoredRestockDrop,
+    
+    machineRefill:
+      restoredMachineRefill,
 
     afterService: restoredAfterService,
 

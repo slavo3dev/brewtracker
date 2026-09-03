@@ -151,7 +151,7 @@ export function assertInventoryMovementPath(
     ) ||
     (
       movementType === "machine_refill" &&
-      fromType === "client_reserve" &&
+      fromType === "driver" &&
       toType === "machine"
     ) ||
     (

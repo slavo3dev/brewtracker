@@ -18,6 +18,7 @@ import BeforePhotosStep from "../features/service-visit/BeforePhotosStep";
 import DrinkCountStep from "../features/service-visit/DrinkCountStep";
 import InventoryAuditStep from "../features/service-visit/InventoryAuditStep";
 import RestockDropStep from "../features/service-visit/RestockDropStep";
+import MachineRefillStep from "../features/service-visit/MachineRefillStep";
 import AfterServiceStep from "../features/service-visit/AfterServiceStep";
 import SummaryStep from "../features/service-visit/SummaryStep";
 import TechBridge from "../features/technical-tickets/TechBridge";
@@ -238,6 +239,8 @@ export default function ServiceVisitScreen({
           <InventoryAuditStep />
         ) : activeVisit.currentStep === "restock" ? (
           <RestockDropStep />
+        ) : activeVisit.currentStep === "machine_refill" ? (
+          <MachineRefillStep />
         ) : activeVisit.currentStep === "after_service" ? (
           <AfterServiceStep />
         ) : activeVisit.currentStep === "summary" ? (

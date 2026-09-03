@@ -17,7 +17,7 @@ import { useDrinkCountStep } from "../../hooks/useDrinkCountStep";
 import { useRestockStep } from "../../hooks/useRestockStep";
 import { useVisitMutation } from "../../hooks/useVisitMutation";
 import { useSummaryStep } from "../../hooks/useSummaryStep";
-
+import { useMachineRefillStep } from "../../hooks/useMachineRefillStep";
 import {
   loadServiceVisit,
   removeServiceVisit,
@@ -32,6 +32,7 @@ import {
   type CompleteInventoryAuditInput,
   type CompleteMachineScanInput,
   type CompleteRestockDropInput,
+  type CompleteMachineRefillInput,
   type SaveAfterPhotoInput,
   type SaveBeforePhotoInput,
   type ServiceVisit,
@@ -78,6 +79,10 @@ type ServiceVisitContextValue = {
 
   completeRestockDrop: (
     input: CompleteRestockDropInput,
+  ) => Promise<ServiceVisit>;
+
+  completeMachineRefill: (
+    input: CompleteMachineRefillInput,
   ) => Promise<ServiceVisit>;
 
   saveAfterPhoto: (input: SaveAfterPhotoInput) => Promise<ServiceVisit>;
@@ -187,6 +192,13 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
    * Step 6 - Restock / drop
    */
   const { completeRestockDrop } = useRestockStep({
+    activeVisit,
+    setActiveVisit,
+    setErrorMessage,
+  });
+
+  const { completeMachineRefill } =
+  useMachineRefillStep({
     activeVisit,
     setActiveVisit,
     setErrorMessage,
@@ -363,6 +375,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
         inventoryAudit: null,
         restockDrop: null,
+        machineRefill: null,
 
         afterService: {
           afterPhoto: null,
@@ -637,6 +650,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       completeInventoryAudit,
 
       completeRestockDrop,
+      completeMachineRefill,
 
       saveAfterPhoto,
       updateAfterPhotoUpload,
