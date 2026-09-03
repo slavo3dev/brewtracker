@@ -3,24 +3,26 @@ import type { Database } from "@brewtracker/types";
 import { supabase } from "../../lib/supabase";
 
 import type {
-  RestockDropQuantityInput,
+  ClientDeliveryQuantityInput,
 } from "./service-visit.types";
 
-type RestockItems =
-  Database["public"]["Functions"]["save_inventory_restock_drop"]["Args"]["p_items"];
+type DeliveryItems =
+  Database["public"]["Functions"]["save_client_delivery"]["Args"]["p_items"];
 
-export type SaveRestockDropInput = {
+export type SaveClientDeliveryInput = {
   sourceVisitId: string;
-  inventoryAuditId: string;
+
   clientId: string;
   stopId: string;
   machineId: string;
+
   confirmedAt: string;
-  quantities: RestockDropQuantityInput[];
+
+  quantities: ClientDeliveryQuantityInput[];
 };
 
-export async function saveRestockDrop(
-  input: SaveRestockDropInput,
+export async function saveClientDelivery(
+  input: SaveClientDeliveryInput,
 ): Promise<string> {
   if (!input.sourceVisitId.trim()) {
     throw new Error(
@@ -28,77 +30,60 @@ export async function saveRestockDrop(
     );
   }
 
-  if (!input.inventoryAuditId.trim()) {
-    throw new Error(
-      "A synced inventory audit is required before restocking.",
-    );
-  }
-
-  /*
-   * FLOW-14:
-   *
-   * quantities: [] is valid.
-   *
-   * It means every audited product was already at or
-   * above its configured par level.
-   *
-   * We still call the RPC because the parent
-   * inventory_restock_drops record represents explicit
-   * completion of the refill step.
-   */
-
-  const productIds =
-    new Set<string>();
+  const productIds = new Set<string>();
 
   for (const item of input.quantities) {
     if (!item.productId.trim()) {
       throw new Error(
-        "Every restock entry must reference a product.",
+        "Every delivery entry must reference a product.",
       );
     }
 
-    if (
-      productIds.has(item.productId)
-    ) {
+    if (productIds.has(item.productId)) {
       throw new Error(
         "A product cannot appear more than once.",
       );
     }
 
     if (
-      !Number.isFinite(
-        item.actualQuantity,
-      ) ||
-      item.actualQuantity < 0
+      !Number.isFinite(item.issueQuantity) ||
+      item.issueQuantity < 0 ||
+      !Number.isInteger(item.issueQuantity)
     ) {
       throw new Error(
-        "Every actual restock quantity must be zero or greater.",
+        "Every package quantity must be a whole number of zero or greater.",
+      );
+    }
+
+    if (
+      !Number.isFinite(item.looseQuantity) ||
+      item.looseQuantity < 0
+    ) {
+      throw new Error(
+        "Every loose quantity must be zero or greater.",
       );
     }
 
     productIds.add(item.productId);
   }
 
-  const items: RestockItems =
-    input.quantities.map(
-      (item) => ({
-        product_id:
-          item.productId,
+  const items: DeliveryItems =
+    input.quantities.map((item) => ({
+      product_id: item.productId,
 
-        actual_quantity:
-          item.actualQuantity,
-      }),
-    );
+      issue_quantity:
+        item.issueQuantity,
+
+      loose_quantity:
+        item.looseQuantity,
+    }));
 
   const { data, error } =
     await supabase.rpc(
-      "save_inventory_restock_drop",
+      "save_client_delivery",
       {
         p_source_visit_id:
           input.sourceVisitId,
-
-        p_audit_id:
-          input.inventoryAuditId,
 
         p_client_id:
           input.clientId,
@@ -112,17 +97,13 @@ export async function saveRestockDrop(
         p_confirmed_at:
           input.confirmedAt,
 
-        /*
-         * [] intentionally represents
-         * "No refill needed".
-         */
         p_items: items,
       },
     );
 
   if (error) {
     throw new Error(
-      `Unable to sync the restock drop: ${error.message}`,
+      `Unable to sync the client delivery: ${error.message}`,
     );
   }
 
@@ -131,7 +112,7 @@ export async function saveRestockDrop(
     !data
   ) {
     throw new Error(
-      "The restock drop was saved without a valid ID.",
+      "The client delivery was saved without a valid ID.",
     );
   }
 

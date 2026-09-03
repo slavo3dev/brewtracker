@@ -245,36 +245,58 @@ export type InventoryAuditRecord = {
   syncError: string | null;
 };
 
-export type RestockDropQuantityInput = {
+export type ClientDeliveryQuantityInput = {
   productId: string;
-  actualQuantity: number;
+
+  issueQuantity: number;
+  looseQuantity: number;
 };
 
 export type CompleteRestockDropInput = {
-  quantities: RestockDropQuantityInput[];
+  quantities: ClientDeliveryQuantityInput[];
 };
 
 export type RestockDropItemRecord = {
   productId: string;
+
   sku: string | null;
   name: string;
   category: InventoryProductCategory;
+
   unitLabel: string;
 
-  countedQuantity: number;
+  reserveBeforeQuantity: number;
+
   parLevel: number;
   recommendedQuantity: number;
+
+  issueQuantity: number;
+  looseQuantity: number;
+
   actualQuantity: number;
+  normalizedUnit: string;
 };
 
-export type RestockDropSyncStatus = "pending_sync" | "synced" | "failed";
+export type RestockDropSyncStatus =
+  | "pending_sync"
+  | "synced"
+  | "failed";
 
 export type RestockDropRecord = {
   databaseId: string | null;
+
   sourceVisitId: string;
-  inventoryAuditId: string;
+
+  /*
+   * Kept under restockDrop temporarily so existing
+   * persisted ServiceVisit objects remain compatible.
+   *
+   * FLOW-17 databaseId now references client_deliveries.
+   */
   confirmedAt: string;
+
   items: RestockDropItemRecord[];
+
   syncStatus: RestockDropSyncStatus;
   syncError: string | null;
 };

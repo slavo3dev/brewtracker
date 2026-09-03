@@ -13,19 +13,11 @@ export function validateRestoredVisit(
     return null;
   }
 
-  if (
-    !visit.id ||
-    !visit.routeId ||
-    !visit.stopId
-  ) {
+  if (!visit.id || !visit.routeId || !visit.stopId) {
     return null;
   }
 
-  if (
-    !visit.target ||
-    !visit.machineTarget ||
-    !visit.tasks
-  ) {
+  if (!visit.target || !visit.machineTarget || !visit.tasks) {
     return null;
   }
 
@@ -36,61 +28,41 @@ export function validateRestoredVisit(
     "retired",
   ] as const;
 
-  const hasValidMachineStatus =
-    validMachineStatuses.includes(
-      visit.machineTarget
-        .status as (typeof validMachineStatuses)[number],
-    );
+  const hasValidMachineStatus = validMachineStatuses.includes(
+    visit.machineTarget.status as (typeof validMachineStatuses)[number],
+  );
 
   if (
-    typeof visit.machineTarget.id !==
-      "string" ||
-    visit.machineTarget.id.trim()
-      .length === 0 ||
-    typeof visit.machineTarget.qrCode !==
-      "string" ||
-    visit.machineTarget.qrCode.trim()
-      .length === 0 ||
-    visit.machineTarget.id !==
-      visit.machineId ||
+    typeof visit.machineTarget.id !== "string" ||
+    visit.machineTarget.id.trim().length === 0 ||
+    typeof visit.machineTarget.qrCode !== "string" ||
+    visit.machineTarget.qrCode.trim().length === 0 ||
+    visit.machineTarget.id !== visit.machineId ||
     !hasValidMachineStatus
   ) {
     return null;
   }
 
   const hasValidLatitude =
-    typeof visit.target.latitude ===
-      "number" &&
-    Number.isFinite(
-      visit.target.latitude,
-    ) &&
+    typeof visit.target.latitude === "number" &&
+    Number.isFinite(visit.target.latitude) &&
     visit.target.latitude >= -90 &&
     visit.target.latitude <= 90;
 
   const hasValidLongitude =
-    typeof visit.target.longitude ===
-      "number" &&
-    Number.isFinite(
-      visit.target.longitude,
-    ) &&
+    typeof visit.target.longitude === "number" &&
+    Number.isFinite(visit.target.longitude) &&
     visit.target.longitude >= -180 &&
     visit.target.longitude <= 180;
 
   const hasValidRadius =
-    typeof visit.target
-      .geofenceRadiusMeters ===
-      "number" &&
-    Number.isFinite(
-      visit.target.geofenceRadiusMeters,
-    ) &&
-    visit.target.geofenceRadiusMeters >
-      0;
+    typeof visit.target.geofenceRadiusMeters === "number" &&
+    Number.isFinite(visit.target.geofenceRadiusMeters) &&
+    visit.target.geofenceRadiusMeters > 0;
 
   if (
-    typeof visit.target.clientName !==
-      "string" ||
-    visit.target.clientName.trim()
-      .length === 0 ||
+    typeof visit.target.clientName !== "string" ||
+    visit.target.clientName.trim().length === 0 ||
     !hasValidLatitude ||
     !hasValidLongitude ||
     !hasValidRadius
@@ -102,90 +74,54 @@ export function validateRestoredVisit(
    * FLOW-14:
    * Drink Count is configured per route stop.
    */
-  if (
-    typeof visit.tasks
-      .drinkCountRequired !== "boolean"
-  ) {
+  if (typeof visit.tasks.drinkCountRequired !== "boolean") {
     return null;
   }
 
-  const requiredSteps =
-    getRequiredServiceVisitSteps(
-      visit.tasks,
-    );
+  const requiredSteps = getRequiredServiceVisitSteps(visit.tasks);
 
   if (
-    !SERVICE_VISIT_STEPS.some(
-      (step) =>
-        step.id === visit.currentStep,
-    ) ||
+    !SERVICE_VISIT_STEPS.some((step) => step.id === visit.currentStep) ||
     !Array.isArray(visit.steps) ||
-    visit.steps.length !==
-      requiredSteps.length
+    visit.steps.length !== requiredSteps.length
   ) {
     return null;
   }
 
-  const hasExpectedSteps =
-    requiredSteps.every(
-      (expectedStep, index) =>
-        visit.steps[index]?.id ===
-        expectedStep.id,
-    );
+  const hasExpectedSteps = requiredSteps.every(
+    (expectedStep, index) => visit.steps[index]?.id === expectedStep.id,
+  );
 
   if (!hasExpectedSteps) {
     return null;
   }
 
-  if (
-    !visit.steps.some(
-      (step) =>
-        step.id === visit.currentStep,
-    )
-  ) {
+  if (!visit.steps.some((step) => step.id === visit.currentStep)) {
     return null;
   }
 
   /*
    * Before-service photos
    */
-  const restoredBeforePhotos =
-    Array.isArray(
-      visit.beforePhotos,
-    )
-      ? visit.beforePhotos
-      : [];
+  const restoredBeforePhotos = Array.isArray(visit.beforePhotos)
+    ? visit.beforePhotos
+    : [];
 
-  const hasValidBeforePhotos =
-    restoredBeforePhotos.every(
-      (photo) => {
-        const hasValidKind =
-          BEFORE_PHOTO_KINDS.includes(
-            photo.kind,
-          );
+  const hasValidBeforePhotos = restoredBeforePhotos.every((photo) => {
+    const hasValidKind = BEFORE_PHOTO_KINDS.includes(photo.kind);
 
-        const hasValidLocalUri =
-          typeof photo.localUri ===
-            "string" &&
-          photo.localUri.trim()
-            .length > 0;
+    const hasValidLocalUri =
+      typeof photo.localUri === "string" && photo.localUri.trim().length > 0;
 
-        const hasValidStatus = [
-          "pending_upload",
-          "uploading",
-          "uploaded",
-          "failed",
-        ].includes(
-          photo.uploadStatus,
-        );
+    const hasValidStatus = [
+      "pending_upload",
+      "uploading",
+      "uploaded",
+      "failed",
+    ].includes(photo.uploadStatus);
 
-        return (
-          hasValidKind &&
-          hasValidLocalUri &&
-          hasValidStatus
-        );
-      },
-    );
+    return hasValidKind && hasValidLocalUri && hasValidStatus;
+  });
 
   if (!hasValidBeforePhotos) {
     return null;
@@ -197,35 +133,23 @@ export function validateRestoredVisit(
    * Running Total is entered by the driver.
    * Archive Total is calculated automatically.
    */
-  const restoredDrinkCount =
-    visit.drinkCount ?? null;
+  const restoredDrinkCount = visit.drinkCount ?? null;
 
   if (restoredDrinkCount) {
     const hasValidRunningTotal =
-      Number.isSafeInteger(
-        restoredDrinkCount.runningTotal,
-      ) &&
-      restoredDrinkCount.runningTotal >=
-        0;
+      Number.isSafeInteger(restoredDrinkCount.runningTotal) &&
+      restoredDrinkCount.runningTotal >= 0;
 
     const hasValidArchiveTotal =
-      Number.isSafeInteger(
-        restoredDrinkCount.archiveTotal,
-      ) &&
-      restoredDrinkCount.archiveTotal >=
-        0;
+      Number.isSafeInteger(restoredDrinkCount.archiveTotal) &&
+      restoredDrinkCount.archiveTotal >= 0;
 
     if (
-      typeof restoredDrinkCount.databaseId !==
-        "string" ||
-      restoredDrinkCount.databaseId.trim()
-        .length === 0 ||
-      typeof restoredDrinkCount.sourceVisitId !==
-        "string" ||
-      restoredDrinkCount.sourceVisitId.trim()
-        .length === 0 ||
-      typeof restoredDrinkCount.recordedAt !==
-        "string" ||
+      typeof restoredDrinkCount.databaseId !== "string" ||
+      restoredDrinkCount.databaseId.trim().length === 0 ||
+      typeof restoredDrinkCount.sourceVisitId !== "string" ||
+      restoredDrinkCount.sourceVisitId.trim().length === 0 ||
+      typeof restoredDrinkCount.recordedAt !== "string" ||
       !hasValidRunningTotal ||
       !hasValidArchiveTotal
     ) {
@@ -237,132 +161,137 @@ export function validateRestoredVisit(
    * Drink Count cannot exist if the task wasn't
    * configured for this stop.
    */
-  if (
-    !visit.tasks.drinkCountRequired &&
-    restoredDrinkCount
-  ) {
+  if (!visit.tasks.drinkCountRequired && restoredDrinkCount) {
     return null;
   }
 
   /*
-   * Inventory Audit
+   * FLOW-16:
+   * Client Reserve Before Service.
+   *
+   * The local property name `inventoryAudit` is retained
+   * for persisted visit compatibility, but it now stores
+   * the V2 client reserve count.
    */
-  const restoredInventoryAudit =
-    visit.inventoryAudit ?? null;
+  const restoredInventoryAudit = visit.inventoryAudit ?? null;
 
   if (restoredInventoryAudit) {
     const hasValidItems =
-      Array.isArray(
-        restoredInventoryAudit.items,
-      ) &&
-      restoredInventoryAudit.items
-        .length > 0 &&
+      Array.isArray(restoredInventoryAudit.items) &&
+      restoredInventoryAudit.items.length > 0 &&
       restoredInventoryAudit.items.every(
         (item) =>
-          typeof item.productId ===
-            "string" &&
-          item.productId.trim()
-            .length > 0 &&
-          typeof item.name ===
-            "string" &&
-          typeof item.unitLabel ===
-            "string" &&
-          Number.isFinite(
-            item.quantity,
-          ) &&
-          item.quantity >= 0,
+          typeof item.productId === "string" &&
+          item.productId.trim().length > 0 &&
+          (item.sku === null || typeof item.sku === "string") &&
+          typeof item.name === "string" &&
+          typeof item.unitLabel === "string" &&
+          Number.isFinite(item.issueQuantity) &&
+          item.issueQuantity >= 0 &&
+          Number.isInteger(item.issueQuantity) &&
+          Number.isFinite(item.looseQuantity) &&
+          item.looseQuantity >= 0 &&
+          Number.isFinite(item.normalizedQuantity) &&
+          item.normalizedQuantity >= 0 &&
+          typeof item.normalizedUnit === "string" &&
+          item.normalizedUnit.trim().length > 0 &&
+          (item.previousReserveAfter === null ||
+            (Number.isFinite(item.previousReserveAfter) &&
+              item.previousReserveAfter >= 0)) &&
+          (item.reserveDecrease === null ||
+            Number.isFinite(item.reserveDecrease)),
       );
 
-    const hasValidSyncStatus = [
-      "pending_sync",
-      "synced",
-      "failed",
-    ].includes(
+    const hasValidSyncStatus = ["pending_sync", "synced", "failed"].includes(
       restoredInventoryAudit.syncStatus,
     );
 
+    const hasValidDatabaseId =
+      restoredInventoryAudit.databaseId === null ||
+      (typeof restoredInventoryAudit.databaseId === "string" &&
+        restoredInventoryAudit.databaseId.trim().length > 0);
+
+    const hasValidSyncError =
+      restoredInventoryAudit.syncError === null ||
+      typeof restoredInventoryAudit.syncError === "string";
+
     if (
-      typeof restoredInventoryAudit.sourceVisitId !==
-        "string" ||
-      typeof restoredInventoryAudit.countedAt !==
-        "string" ||
+      !hasValidDatabaseId ||
+      typeof restoredInventoryAudit.sourceVisitId !== "string" ||
+      restoredInventoryAudit.sourceVisitId.trim().length === 0 ||
+      typeof restoredInventoryAudit.countedAt !== "string" ||
       !hasValidItems ||
-      !hasValidSyncStatus
+      !hasValidSyncStatus ||
+      !hasValidSyncError
     ) {
       return null;
     }
   }
 
   /*
-   * FLOW-14 Restock.
+   * FLOW-17:
+   * Client Delivery.
    *
-   * Important distinction:
+   * `restockDrop` is retained as the local property name
+   * for persisted visit compatibility.
    *
-   * items: []
+   * An empty items array is valid when no products require
+   * delivery.
    *
-   * is now VALID. It represents an explicitly confirmed
-   * refill step where no audited product required refill.
-   *
-   * If an item does exist, its recommended quantity must
-   * be greater than zero.
+   * Actual delivery may also be zero when delivery is
+   * recommended but the driver does not have stock
+   * available.
    */
-  const restoredRestockDrop =
-    visit.restockDrop ?? null;
+  const restoredRestockDrop = visit.restockDrop ?? null;
 
   if (restoredRestockDrop) {
     const hasValidItems =
-      Array.isArray(
-        restoredRestockDrop.items,
-      ) &&
+      Array.isArray(restoredRestockDrop.items) &&
       restoredRestockDrop.items.every(
         (item) =>
-          typeof item.productId ===
-            "string" &&
-          item.productId.trim()
-            .length > 0 &&
-          typeof item.name ===
-            "string" &&
-          typeof item.unitLabel ===
-            "string" &&
-          Number.isFinite(
-            item.countedQuantity,
-          ) &&
-          item.countedQuantity >= 0 &&
-          Number.isFinite(
-            item.parLevel,
-          ) &&
+          typeof item.productId === "string" &&
+          item.productId.trim().length > 0 &&
+          (item.sku === null || typeof item.sku === "string") &&
+          typeof item.name === "string" &&
+          typeof item.unitLabel === "string" &&
+          Number.isFinite(item.reserveBeforeQuantity) &&
+          item.reserveBeforeQuantity >= 0 &&
+          Number.isFinite(item.parLevel) &&
           item.parLevel >= 0 &&
-          Number.isFinite(
-            item.recommendedQuantity,
-          ) &&
+          Number.isFinite(item.recommendedQuantity) &&
           item.recommendedQuantity > 0 &&
-          Number.isFinite(
-            item.actualQuantity,
-          ) &&
-          item.actualQuantity >= 0,
+          Number.isFinite(item.issueQuantity) &&
+          item.issueQuantity >= 0 &&
+          Number.isInteger(item.issueQuantity) &&
+          Number.isFinite(item.looseQuantity) &&
+          item.looseQuantity >= 0 &&
+          Number.isFinite(item.actualQuantity) &&
+          item.actualQuantity >= 0 &&
+          typeof item.normalizedUnit === "string" &&
+          item.normalizedUnit.trim().length > 0,
       );
 
-    const hasValidSyncStatus = [
-      "pending_sync",
-      "synced",
-      "failed",
-    ].includes(
+    const hasValidSyncStatus = ["pending_sync", "synced", "failed"].includes(
       restoredRestockDrop.syncStatus,
     );
 
+    const hasValidDatabaseId =
+      restoredRestockDrop.databaseId === null ||
+      (typeof restoredRestockDrop.databaseId === "string" &&
+        restoredRestockDrop.databaseId.trim().length > 0);
+
+    const hasValidSyncError =
+      restoredRestockDrop.syncError === null ||
+      typeof restoredRestockDrop.syncError === "string";
+
     if (
-      typeof restoredRestockDrop.sourceVisitId !==
-        "string" ||
-      restoredRestockDrop.sourceVisitId
-        .trim().length === 0 ||
-      typeof restoredRestockDrop.inventoryAuditId !==
-        "string" ||
-      restoredRestockDrop.inventoryAuditId
-        .trim().length === 0 ||
-      typeof restoredRestockDrop.confirmedAt !==
-        "string" ||
+      !hasValidDatabaseId ||
+      typeof restoredRestockDrop.sourceVisitId !== "string" ||
+      restoredRestockDrop.sourceVisitId.trim().length === 0 ||
+      typeof restoredRestockDrop.confirmedAt !== "string" ||
       !hasValidItems ||
-      !hasValidSyncStatus
+      !hasValidSyncStatus ||
+      !hasValidSyncError
     ) {
       return null;
     }
@@ -373,10 +302,9 @@ export function validateRestoredVisit(
    * After Service contains one required photo.
    * Signature state has been removed.
    */
-  const restoredAfterService =
-    visit.afterService ?? {
-      afterPhoto: null,
-    };
+  const restoredAfterService = visit.afterService ?? {
+    afterPhoto: null,
+  };
 
   const validUploadStatuses = [
     "pending_upload",
@@ -387,11 +315,9 @@ export function validateRestoredVisit(
 
   if (
     restoredAfterService.afterPhoto &&
-    (!restoredAfterService.afterPhoto
-      .localUri?.trim() ||
+    (!restoredAfterService.afterPhoto.localUri?.trim() ||
       !validUploadStatuses.includes(
-        restoredAfterService.afterPhoto
-          .uploadStatus,
+        restoredAfterService.afterPhoto.uploadStatus,
       ))
   ) {
     return null;
@@ -402,39 +328,31 @@ export function validateRestoredVisit(
    * Closing QR verification is no longer part of the
    * final summary.
    */
-  const restoredSummary =
-    visit.summary ?? {
-      syncStatus:
-        "not_started" as const,
+  const restoredSummary = visit.summary ?? {
+    syncStatus: "not_started" as const,
 
-      syncError: null,
+    syncError: null,
 
-      databaseId: null,
+    databaseId: null,
 
-      surveyToken: null,
+    surveyToken: null,
 
-      emailSentAt: null,
-    };
+    emailSentAt: null,
+  };
 
   return {
     ...visit,
 
-    beforePhotos:
-      restoredBeforePhotos,
+    beforePhotos: restoredBeforePhotos,
 
-    drinkCount:
-      restoredDrinkCount,
+    drinkCount: restoredDrinkCount,
 
-    inventoryAudit:
-      restoredInventoryAudit,
+    inventoryAudit: restoredInventoryAudit,
 
-    restockDrop:
-      restoredRestockDrop,
+    restockDrop: restoredRestockDrop,
 
-    afterService:
-      restoredAfterService,
+    afterService: restoredAfterService,
 
-    summary:
-      restoredSummary,
+    summary: restoredSummary,
   };
 }
