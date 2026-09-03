@@ -1,358 +1,324 @@
-import {
-  useCallback,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
+import { useCallback, type Dispatch, type SetStateAction } from "react";
 
-import {
-  loadClientInventoryProducts,
-} from "../features/service-visit/inventory-audit.service";
+import { loadClientInventoryProducts } from "../features/service-visit/inventory-audit.service";
 
-import {
-  saveMachineRefill,
-} from "../features/service-visit/machine-refill.service";
+import { saveMachineRefill } from "../features/service-visit/machine-refill.service";
 
-import {
-  saveServiceVisit,
-} from "../features/service-visit/service-visit.storage";
+import { saveServiceVisit } from "../features/service-visit/service-visit.storage";
 
 import type {
   CompleteMachineRefillInput,
   MachineRefillItemRecord,
+  MachineRefillQuantityInput,
+  MachineRefillZeroReason,
   ServiceVisit,
 } from "../features/service-visit/service-visit.types";
 
-import {
-  transitionToNextStep,
-} from "../features/service-visit/state/service-visit.transitions";
+import { transitionToNextStep } from "../features/service-visit/state/service-visit.transitions";
 
 type UseMachineRefillStepParams = {
   activeVisit: ServiceVisit | null;
 
-  setActiveVisit: Dispatch<
-    SetStateAction<ServiceVisit | null>
-  >;
+  setActiveVisit: Dispatch<SetStateAction<ServiceVisit | null>>;
 
-  setErrorMessage: Dispatch<
-    SetStateAction<string | null>
-  >;
+  setErrorMessage: Dispatch<SetStateAction<string | null>>;
 };
+
+const MACHINE_REFILL_ZERO_REASONS = new Set<MachineRefillZeroReason>([
+  "refill_not_required",
+  "product_unavailable",
+  "machine_issue",
+  "other",
+]);
 
 export function useMachineRefillStep({
   activeVisit,
   setActiveVisit,
   setErrorMessage,
 }: UseMachineRefillStepParams) {
-  const completeMachineRefill =
-    useCallback(
-      async (
-        input: CompleteMachineRefillInput,
-      ): Promise<ServiceVisit> => {
-        if (!activeVisit) {
+  const completeMachineRefill = useCallback(
+    async (input: CompleteMachineRefillInput): Promise<ServiceVisit> => {
+      if (!activeVisit) {
+        throw new Error("There is no active service visit.");
+      }
+
+      if (activeVisit.currentStep !== "machine_refill") {
+        throw new Error("Machine refill cannot be completed yet.");
+      }
+
+      /*
+       * FLOW-18 follows FLOW-17.
+       *
+       * The delivery is NOT the source of the
+       * machine stock. This dependency only ensures
+       * the workflow happened in order.
+       */
+      if (
+        !activeVisit.restockDrop ||
+        activeVisit.restockDrop.syncStatus !== "synced" ||
+        !activeVisit.restockDrop.databaseId
+      ) {
+        throw new Error(
+          "Client delivery must be synced before machine refill.",
+        );
+      }
+
+      const configuredProducts = await loadClientInventoryProducts(
+        activeVisit.clientId,
+      );
+
+      const configuredById = new Map(
+        configuredProducts.map((product) => [product.productId, product]),
+      );
+
+      const productIds = new Set<string>();
+
+      const items: MachineRefillItemRecord[] = [];
+
+      /*
+       * Use normalized quantities for both:
+       *
+       * 1. local persisted visit state
+       * 2. Supabase RPC
+       *
+       * This prevents the local record and database
+       * record from disagreeing about zero reasons.
+       */
+      const normalizedQuantities: MachineRefillQuantityInput[] = [];
+
+      for (const quantity of input.quantities) {
+        if (!quantity.productId.trim()) {
           throw new Error(
-            "There is no active service visit.",
+            "Every machine refill quantity must reference a product.",
+          );
+        }
+
+        if (productIds.has(quantity.productId)) {
+          throw new Error("A product cannot appear more than once.");
+        }
+
+        const product = configuredById.get(quantity.productId);
+
+        if (!product) {
+          throw new Error(
+            "A selected product is no longer configured for this client.",
           );
         }
 
         if (
-          activeVisit.currentStep !==
-          "machine_refill"
+          !Number.isFinite(quantity.issueQuantity) ||
+          quantity.issueQuantity < 0 ||
+          !Number.isInteger(quantity.issueQuantity)
         ) {
           throw new Error(
-            "Machine refill cannot be completed yet.",
+            `${product.name}: package quantity must be a whole number.`,
           );
         }
 
+        if (
+          !Number.isFinite(quantity.looseQuantity) ||
+          quantity.looseQuantity < 0
+        ) {
+          throw new Error(
+            `${product.name}: loose quantity cannot be negative.`,
+          );
+        }
+
+        if (!product.packaging.allowsLooseUnits && quantity.looseQuantity > 0) {
+          throw new Error(`${product.name} does not allow loose units.`);
+        }
+
+        if (
+          !product.packaging.allowsPartialBaseUnit &&
+          !Number.isInteger(quantity.looseQuantity)
+        ) {
+          throw new Error(
+            `${product.name} does not allow partial ${product.packaging.baseUnit} quantities.`,
+          );
+        }
+
+        const actualQuantity =
+          quantity.issueQuantity * product.packaging.unitsPerIssueUnit +
+          quantity.looseQuantity;
+
         /*
-         * FLOW-18 follows FLOW-17.
+         * FLOW-18 QA:
          *
-         * The delivery is NOT the source of the
-         * machine stock. This dependency only ensures
-         * the workflow happened in order.
+         * A zero reason is optional and only makes
+         * sense when actualQuantity === 0.
+         *
+         * Positive refill quantities always clear
+         * zero-reason metadata.
          */
-        if (
-          !activeVisit.restockDrop ||
-          activeVisit.restockDrop
-            .syncStatus !== "synced" ||
-          !activeVisit.restockDrop
-            .databaseId
-        ) {
-          throw new Error(
-            "Client delivery must be synced before machine refill.",
-          );
+        let zeroReason: MachineRefillZeroReason | null = null;
+
+        let zeroReasonNote: string | null = null;
+
+        if (actualQuantity === 0) {
+          if (
+            quantity.zeroReason !== null &&
+            !MACHINE_REFILL_ZERO_REASONS.has(quantity.zeroReason)
+          ) {
+            throw new Error(`${product.name}: invalid zero refill reason.`);
+          }
+
+          zeroReason = quantity.zeroReason;
+
+          if (zeroReason === "other") {
+            const trimmedNote = quantity.zeroReasonNote?.trim() ?? "";
+
+            if (!trimmedNote) {
+              throw new Error(
+                `${product.name}: enter a reason when Other is selected.`,
+              );
+            }
+
+            zeroReasonNote = trimmedNote;
+          }
         }
 
-        const configuredProducts =
-          await loadClientInventoryProducts(
-            activeVisit.clientId,
-          );
+        const normalizedQuantity: MachineRefillQuantityInput = {
+          productId: quantity.productId,
 
-        const configuredById =
-          new Map(
-            configuredProducts.map(
-              (product) => [
-                product.productId,
-                product,
-              ],
-            ),
-          );
+          issueQuantity: quantity.issueQuantity,
 
-        const productIds =
-          new Set<string>();
+          looseQuantity: quantity.looseQuantity,
 
-        const items: MachineRefillItemRecord[] =
-          [];
+          zeroReason,
 
-        for (const quantity of
-          input.quantities) {
-          if (
-            !quantity.productId.trim()
-          ) {
-            throw new Error(
-              "Every machine refill quantity must reference a product.",
-            );
-          }
+          zeroReasonNote,
+        };
 
-          if (
-            productIds.has(
-              quantity.productId,
-            )
-          ) {
-            throw new Error(
-              "A product cannot appear more than once.",
-            );
-          }
+        normalizedQuantities.push(normalizedQuantity);
 
-          const product =
-            configuredById.get(
-              quantity.productId,
-            );
+        items.push({
+          productId: product.productId,
 
-          if (!product) {
-            throw new Error(
-              "A selected product is no longer configured for this client.",
-            );
-          }
+          sku: product.sku,
 
-          if (
-            !Number.isFinite(
-              quantity.issueQuantity,
-            ) ||
-            quantity.issueQuantity < 0 ||
-            !Number.isInteger(
-              quantity.issueQuantity,
-            )
-          ) {
-            throw new Error(
-              `${product.name}: package quantity must be a whole number.`,
-            );
-          }
+          name: product.name,
 
-          if (
-            !Number.isFinite(
-              quantity.looseQuantity,
-            ) ||
-            quantity.looseQuantity < 0
-          ) {
-            throw new Error(
-              `${product.name}: loose quantity cannot be negative.`,
-            );
-          }
+          category: product.category,
 
-          if (
-            !product.packaging
-              .allowsLooseUnits &&
-            quantity.looseQuantity > 0
-          ) {
-            throw new Error(
-              `${product.name} does not allow loose units.`,
-            );
-          }
+          unitLabel: product.unitLabel,
 
-          if (
-            !product.packaging
-              .allowsPartialBaseUnit &&
-            !Number.isInteger(
-              quantity.looseQuantity,
-            )
-          ) {
-            throw new Error(
-              `${product.name} does not allow partial ${product.packaging.baseUnit} quantities.`,
-            );
-          }
+          issueQuantity: quantity.issueQuantity,
 
-          const actualQuantity =
-            quantity.issueQuantity *
-              product.packaging
-                .unitsPerIssueUnit +
-            quantity.looseQuantity;
+          looseQuantity: quantity.looseQuantity,
 
-          items.push({
-            productId:
-              product.productId,
+          actualQuantity,
 
-            sku:
-              product.sku,
+          normalizedUnit: product.packaging.baseUnit,
 
-            name:
-              product.name,
+          zeroReason,
 
-            category:
-              product.category,
+          zeroReasonNote,
+        });
 
-            unitLabel:
-              product.unitLabel,
+        productIds.add(quantity.productId);
+      }
 
-            issueQuantity:
-              quantity.issueQuantity,
+      const now = new Date().toISOString();
 
-            looseQuantity:
-              quantity.looseQuantity,
+      const pendingVisit: ServiceVisit = {
+        ...activeVisit,
 
-            actualQuantity,
+        machineRefill: {
+          databaseId: null,
 
-            normalizedUnit:
-              product.packaging
-                .baseUnit,
-          });
+          sourceVisitId: activeVisit.id,
 
-          productIds.add(
-            quantity.productId,
-          );
-        }
+          confirmedAt: now,
 
-        const now =
-          new Date().toISOString();
+          items,
 
-        const pendingVisit: ServiceVisit =
-          {
-            ...activeVisit,
+          syncStatus: "pending_sync",
 
-            machineRefill: {
-              databaseId: null,
+          syncError: null,
+        },
 
-              sourceVisitId:
-                activeVisit.id,
+        updatedAt: now,
+      };
 
-              confirmedAt: now,
+      /*
+       * Persist BEFORE network sync so an app
+       * restart cannot lose the driver's input.
+       */
+      await saveServiceVisit(pendingVisit);
 
-              items,
+      setActiveVisit(pendingVisit);
 
-              syncStatus:
-                "pending_sync",
+      try {
+        const databaseId = await saveMachineRefill({
+          sourceVisitId: activeVisit.id,
 
-              syncError: null,
-            },
+          clientId: activeVisit.clientId,
 
-            updatedAt: now,
-          };
+          stopId: activeVisit.stopId,
 
-        /*
-         * Persist BEFORE network sync so an app
-         * restart cannot lose the driver's input.
-         */
-        await saveServiceVisit(
-          pendingVisit,
+          machineId: activeVisit.machineId,
+
+          confirmedAt: now,
+
+          quantities: normalizedQuantities,
+        });
+
+        const syncedVisit: ServiceVisit = {
+          ...pendingVisit,
+
+          machineRefill: {
+            ...pendingVisit.machineRefill!,
+
+            databaseId,
+
+            syncStatus: "synced",
+
+            syncError: null,
+          },
+        };
+
+        const transitionedVisit = transitionToNextStep(
+          syncedVisit,
+          "machine_refill",
+          now,
         );
 
-        setActiveVisit(
-          pendingVisit,
-        );
+        await saveServiceVisit(transitionedVisit);
 
-        try {
-          const databaseId =
-            await saveMachineRefill({
-              sourceVisitId:
-                activeVisit.id,
+        setActiveVisit(transitionedVisit);
 
-              clientId:
-                activeVisit.clientId,
+        setErrorMessage(null);
 
-              stopId:
-                activeVisit.stopId,
+        return transitionedVisit;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to sync machine refill.";
 
-              machineId:
-                activeVisit.machineId,
+        const failedVisit: ServiceVisit = {
+          ...pendingVisit,
 
-              confirmedAt: now,
+          machineRefill: {
+            ...pendingVisit.machineRefill!,
 
-              quantities:
-                input.quantities,
-            });
+            syncStatus: "failed",
 
-          const syncedVisit: ServiceVisit =
-            {
-              ...pendingVisit,
+            syncError: message,
+          },
+        };
 
-              machineRefill: {
-                ...pendingVisit.machineRefill!,
+        await saveServiceVisit(failedVisit);
 
-                databaseId,
+        setActiveVisit(failedVisit);
 
-                syncStatus:
-                  "synced",
+        setErrorMessage(message);
 
-                syncError: null,
-              },
-            };
-
-          const transitionedVisit =
-            transitionToNextStep(
-              syncedVisit,
-              "machine_refill",
-              now,
-            );
-
-          await saveServiceVisit(
-            transitionedVisit,
-          );
-
-          setActiveVisit(
-            transitionedVisit,
-          );
-
-          setErrorMessage(null);
-
-          return transitionedVisit;
-        } catch (error) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Unable to sync machine refill.";
-
-          const failedVisit: ServiceVisit =
-            {
-              ...pendingVisit,
-
-              machineRefill: {
-                ...pendingVisit.machineRefill!,
-
-                syncStatus:
-                  "failed",
-
-                syncError: message,
-              },
-            };
-
-          await saveServiceVisit(
-            failedVisit,
-          );
-
-          setActiveVisit(
-            failedVisit,
-          );
-
-          setErrorMessage(message);
-
-          throw error;
-        }
-      },
-      [
-        activeVisit,
-        setActiveVisit,
-        setErrorMessage,
-      ],
-    );
+        throw error;
+      }
+    },
+    [activeVisit, setActiveVisit, setErrorMessage],
+  );
 
   return {
     completeMachineRefill,

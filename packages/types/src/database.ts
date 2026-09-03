@@ -1016,6 +1016,8 @@ export type Database = {
           package_description_snapshot: string | null
           product_id: string
           units_per_issue_unit_snapshot: number
+          zero_reason: string | null
+          zero_reason_note: string | null
         }
         Insert: {
           actual_quantity: number
@@ -1031,6 +1033,8 @@ export type Database = {
           package_description_snapshot?: string | null
           product_id: string
           units_per_issue_unit_snapshot: number
+          zero_reason?: string | null
+          zero_reason_note?: string | null
         }
         Update: {
           actual_quantity?: number
@@ -1046,6 +1050,8 @@ export type Database = {
           package_description_snapshot?: string | null
           product_id?: string
           units_per_issue_unit_snapshot?: number
+          zero_reason?: string | null
+          zero_reason_note?: string | null
         }
         Relationships: [
           {
@@ -2007,6 +2013,10 @@ export type Database = {
       }
       warehouse_is_in_current_user_region: {
         Args: { target_warehouse_id: string }
+        Returns: boolean
+      }
+      was_machine_refilled: {
+        Args: { p_machine_refill_id: string }
         Returns: boolean
       }
     }
