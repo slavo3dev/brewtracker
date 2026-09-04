@@ -264,7 +264,9 @@ export default function MachineRefillStep() {
 
     const issueQuantity = Number(value.issueQuantity || 0);
 
-    const looseQuantity = Number(value.looseQuantity || 0);
+    const looseQuantity = product.packaging.allowsLooseUnits
+      ? Number(value.looseQuantity || 0)
+      : 0;
 
     if (!Number.isInteger(issueQuantity) || issueQuantity < 0) {
       return true;
@@ -274,11 +276,8 @@ export default function MachineRefillStep() {
       return true;
     }
 
-    if (!product.packaging.allowsLooseUnits && looseQuantity > 0) {
-      return true;
-    }
-
     if (
+      product.packaging.allowsLooseUnits &&
       !product.packaging.allowsPartialBaseUnit &&
       !Number.isInteger(looseQuantity)
     ) {
@@ -297,9 +296,14 @@ export default function MachineRefillStep() {
   const hasInvalidZeroReason = refillProducts.some((product) => {
     const value = values[product.productId] ?? emptyValue();
 
+    const issueQuantity = Number(value.issueQuantity || 0);
+
+    const looseQuantity = product.packaging.allowsLooseUnits
+      ? Number(value.looseQuantity || 0)
+      : 0;
+
     const actualQuantity =
-      Number(value.issueQuantity || 0) * product.packaging.unitsPerIssueUnit +
-      Number(value.looseQuantity || 0);
+      issueQuantity * product.packaging.unitsPerIssueUnit + looseQuantity;
 
     if (actualQuantity > 0) {
       return false;
@@ -308,13 +312,6 @@ export default function MachineRefillStep() {
     const zeroReason = zeroReasons[product.productId];
 
     return zeroReason?.reason === "other" && zeroReason.note.trim() === "";
-  });
-
-  console.log("Machine refill submit state", {
-    loading,
-    submitting,
-    hasInvalidQuantity,
-    hasInvalidZeroReason,
   });
 
   const canSubmit =
@@ -339,7 +336,9 @@ export default function MachineRefillStep() {
 
           const issueQuantity = Number(value.issueQuantity || 0);
 
-          const looseQuantity = Number(value.looseQuantity || 0);
+          const looseQuantity = product.packaging.allowsLooseUnits
+            ? Number(value.looseQuantity || 0)
+            : 0;
 
           const actualQuantity =
             issueQuantity * product.packaging.unitsPerIssueUnit + looseQuantity;
@@ -417,7 +416,9 @@ export default function MachineRefillStep() {
 
         const issueQuantity = Number(value.issueQuantity || 0);
 
-        const looseQuantity = Number(value.looseQuantity || 0);
+        const looseQuantity = product.packaging.allowsLooseUnits
+          ? Number(value.looseQuantity || 0)
+          : 0;
 
         const actual =
           issueQuantity * product.packaging.unitsPerIssueUnit + looseQuantity;
@@ -479,70 +480,72 @@ export default function MachineRefillStep() {
                 </View>
               </View>
 
-              {product.packaging.allowsPartialBaseUnit ? (
-                <View style={styles.quantityField}>
-                  <Text style={styles.quantityLabel}>
-                    {product.packaging.baseUnit}
-                  </Text>
-
-                  <TextInput
-                    value={value.looseQuantity}
-                    editable={!submitting}
-                    keyboardType="decimal-pad"
-                    placeholder="0"
-                    placeholderTextColor="#a89c8f"
-                    onChangeText={(text) =>
-                      updateValue(product.productId, "looseQuantity", text)
-                    }
-                    style={styles.quantityInput}
-                  />
-                </View>
-              ) : (
-                <View style={styles.quantityField}>
-                  <Text style={styles.quantityLabel}>
-                    {product.packaging.baseUnit}
-                  </Text>
-
-                  <View style={styles.stepper}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Decrease loose ${product.packaging.baseUnit} quantity for ${product.name}`}
-                      disabled={submitting || looseQuantity <= 0}
-                      onPress={() => adjustLooseQuantity(product.productId, -1)}
-                      style={({ pressed }) => [
-                        styles.stepperButton,
-
-                        pressed && !submitting && styles.stepperButtonPressed,
-
-                        (submitting || looseQuantity <= 0) &&
-                          styles.stepperButtonDisabled,
-                      ]}
-                    >
-                      <Text style={styles.stepperButtonText}>−</Text>
-                    </Pressable>
-
-                    <Text style={styles.stepperValue}>
-                      {value.looseQuantity || "0"}
+              {product.packaging.allowsLooseUnits ? (
+                product.packaging.allowsPartialBaseUnit ? (
+                  <View style={styles.quantityField}>
+                    <Text style={styles.quantityLabel}>
+                      {product.packaging.baseUnit}
                     </Text>
 
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Increase loose ${product.packaging.baseUnit} quantity for ${product.name}`}
-                      disabled={submitting}
-                      onPress={() => adjustLooseQuantity(product.productId, 1)}
-                      style={({ pressed }) => [
-                        styles.stepperButton,
-
-                        pressed && !submitting && styles.stepperButtonPressed,
-
-                        submitting && styles.stepperButtonDisabled,
-                      ]}
-                    >
-                      <Text style={styles.stepperButtonText}>+</Text>
-                    </Pressable>
+                    <TextInput
+                      value={value.looseQuantity}
+                      editable={!submitting}
+                      keyboardType="decimal-pad"
+                      placeholder="0"
+                      placeholderTextColor="#a89c8f"
+                      onChangeText={(text) =>
+                        updateValue(product.productId, "looseQuantity", text)
+                      }
+                      style={styles.quantityInput}
+                    />
                   </View>
-                </View>
-              )}
+                ) : (
+                  <View style={styles.quantityField}>
+                    <Text style={styles.quantityLabel}>
+                      {product.packaging.baseUnit}
+                    </Text>
+
+                    <View style={styles.stepper}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Decrease loose ${product.packaging.baseUnit} quantity for ${product.name}`}
+                        disabled={submitting || looseQuantity <= 0}
+                        onPress={() =>
+                          adjustLooseQuantity(product.productId, -1)
+                        }
+                        style={({ pressed }) => [
+                          styles.stepperButton,
+                          pressed && !submitting && styles.stepperButtonPressed,
+                          (submitting || looseQuantity <= 0) &&
+                            styles.stepperButtonDisabled,
+                        ]}
+                      >
+                        <Text style={styles.stepperButtonText}>−</Text>
+                      </Pressable>
+
+                      <Text style={styles.stepperValue}>
+                        {value.looseQuantity || "0"}
+                      </Text>
+
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Increase loose ${product.packaging.baseUnit} quantity for ${product.name}`}
+                        disabled={submitting}
+                        onPress={() =>
+                          adjustLooseQuantity(product.productId, 1)
+                        }
+                        style={({ pressed }) => [
+                          styles.stepperButton,
+                          pressed && !submitting && styles.stepperButtonPressed,
+                          submitting && styles.stepperButtonDisabled,
+                        ]}
+                      >
+                        <Text style={styles.stepperButtonText}>+</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )
+              ) : null}
             </View>
 
             <Text style={styles.actual}>
