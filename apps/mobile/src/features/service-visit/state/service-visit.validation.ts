@@ -555,6 +555,113 @@ export function validateRestoredVisit(
     }
   }
 
+    /*
+   * FLOW-19:
+   * Client Reserve After Service.
+   *
+   * This is a derived snapshot:
+   *
+   * Reserve After =
+   *   Reserve Before + Actual Client Delivery
+   *
+   * FLOW-18 machine refill is intentionally excluded
+   * because machine stock moves directly:
+   *
+   * Driver / Van -> Machine
+   *
+   * Older persisted visits created before FLOW-19
+   * will not contain reserveAfter. Treat those as null
+   * for backwards compatibility.
+   */
+  const restoredReserveAfter = visit.reserveAfter ?? null;
+
+  if (restoredReserveAfter) {
+    const hasValidItems =
+      Array.isArray(restoredReserveAfter.items) &&
+      restoredReserveAfter.items.every((item) => {
+        const hasValidBaseFields =
+          typeof item.productId === "string" &&
+          item.productId.trim().length > 0 &&
+          Number.isFinite(item.reserveBeforeQuantity) &&
+          item.reserveBeforeQuantity >= 0 &&
+          Number.isFinite(item.deliveredQuantity) &&
+          item.deliveredQuantity >= 0 &&
+          Number.isFinite(item.reserveAfterQuantity) &&
+          item.reserveAfterQuantity >= 0 &&
+          typeof item.normalizedUnit === "string" &&
+          item.normalizedUnit.trim().length > 0;
+
+        if (!hasValidBaseFields) {
+          return false;
+        }
+
+        /*
+         * FLOW-19 invariant:
+         *
+         * Reserve After =
+         *   Reserve Before + Actual Client Delivery
+         *
+         * Use a small tolerance because normalized
+         * quantities may contain decimal values.
+         */
+        const expectedReserveAfter =
+          item.reserveBeforeQuantity +
+          item.deliveredQuantity;
+
+        const hasValidReserveFormula =
+          Math.abs(
+            item.reserveAfterQuantity -
+              expectedReserveAfter,
+          ) < 0.001;
+
+        return hasValidReserveFormula;
+      });
+
+    const hasValidSyncStatus = [
+      "pending_sync",
+      "synced",
+      "failed",
+    ].includes(restoredReserveAfter.syncStatus);
+
+    const hasValidDatabaseId =
+      restoredReserveAfter.databaseId === null ||
+      (typeof restoredReserveAfter.databaseId === "string" &&
+        restoredReserveAfter.databaseId.trim().length > 0);
+
+    const hasValidSourceVisitId =
+      typeof restoredReserveAfter.sourceVisitId === "string" &&
+      restoredReserveAfter.sourceVisitId.trim().length > 0;
+
+    /*
+     * Prevent a reserve-after record belonging to
+     * another visit from being restored here.
+     */
+    const hasMatchingSourceVisitId =
+      restoredReserveAfter.sourceVisitId === visit.id;
+
+    const hasValidCalculatedAt =
+      typeof restoredReserveAfter.calculatedAt === "string" &&
+      !Number.isNaN(
+        Date.parse(restoredReserveAfter.calculatedAt),
+      );
+
+    const hasValidSyncError =
+      restoredReserveAfter.syncError === null ||
+      typeof restoredReserveAfter.syncError === "string";
+
+    if (
+      !hasValidItems ||
+      !hasValidSyncStatus ||
+      !hasValidDatabaseId ||
+      !hasValidSourceVisitId ||
+      !hasMatchingSourceVisitId ||
+      !hasValidCalculatedAt ||
+      !hasValidSyncError
+    ) {
+      return null;
+    }
+  }
+
   /*
    * FLOW-14:
    * After Service contains one required photo.
@@ -610,6 +717,8 @@ export function validateRestoredVisit(
     restockDrop: restoredRestockDrop,
 
     machineRefill: normalizedMachineRefill,
+
+    reserveAfter: restoredReserveAfter,
 
     afterService: restoredAfterService,
 
