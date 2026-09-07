@@ -9,7 +9,11 @@ import {
 import { useState } from "react";
 
 import { useServiceVisit } from "./ServiceVisitProvider";
-import type { ServiceVisitStepId } from "./service-visit.types";
+
+import {
+  wasMachineRefilled,
+  type ServiceVisitStepId,
+} from "./service-visit.types";
 
 export default function SummaryStep() {
   const { activeVisit, completeSummary } = useServiceVisit();
@@ -25,6 +29,8 @@ export default function SummaryStep() {
   const completedTasks = activeVisit.steps.filter(
     (step) => step.id !== "summary",
   );
+
+  const machineRefilled = wasMachineRefilled(activeVisit.machineRefill);
 
   async function handleComplete(): Promise<void> {
     if (submitting) {
@@ -60,10 +66,13 @@ export default function SummaryStep() {
         return "Drink Count recorded";
 
       case "inventory_audit":
-        return "Inventory audited";
+        return "Client reserve counted";
 
       case "restock":
-        return "Refill completed";
+        return "Client delivery completed";
+
+      case "machine_refill":
+        return "Machine refill completed";
 
       case "after_service":
         return "After-service photo added";
@@ -85,6 +94,19 @@ export default function SummaryStep() {
         ))}
       </View>
 
+      <View style={styles.summaryCard}>
+        <Text style={styles.summaryLabel}>Machine refilled</Text>
+
+        <Text
+          style={[
+            styles.summaryValue,
+            machineRefilled ? styles.summaryValueYes : styles.summaryValueNo,
+          ]}
+        >
+          {machineRefilled ? "Yes" : "No"}
+        </Text>
+      </View>
+
       {errorMessage ? (
         <View style={styles.errorCard}>
           <Text style={styles.errorText}>{errorMessage}</Text>
@@ -99,7 +121,9 @@ export default function SummaryStep() {
         }}
         style={({ pressed }) => [
           styles.completeButton,
+
           pressed && styles.buttonPressed,
+
           submitting && styles.buttonDisabled,
         ]}
       >
@@ -123,8 +147,8 @@ const styles = StyleSheet.create({
   },
 
   taskRow: {
-    flexDirection: "row",
     alignItems: "center",
+    flexDirection: "row",
     gap: 10,
   },
 
@@ -140,12 +164,42 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  completeButton: {
-    minHeight: 54,
-    borderRadius: 14,
-    backgroundColor: "#b6692b",
+  summaryCard: {
     alignItems: "center",
+    backgroundColor: "#f6f2ea",
+    borderColor: "#e2d4c0",
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 14,
+  },
+
+  summaryLabel: {
+    color: "#6b5543",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  summaryValue: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  summaryValueYes: {
+    color: "#38734d",
+  },
+
+  summaryValueNo: {
+    color: "#8a6f53",
+  },
+
+  completeButton: {
+    alignItems: "center",
+    backgroundColor: "#b6692b",
+    borderRadius: 14,
     justifyContent: "center",
+    minHeight: 54,
     paddingHorizontal: 20,
   },
 
@@ -164,11 +218,11 @@ const styles = StyleSheet.create({
   },
 
   errorCard: {
-    borderWidth: 1,
+    backgroundColor: "#fff6f3",
     borderColor: "#e7b9aa",
     borderRadius: 12,
+    borderWidth: 1,
     padding: 12,
-    backgroundColor: "#fff6f3",
   },
 
   errorText: {

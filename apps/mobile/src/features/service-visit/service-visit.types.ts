@@ -23,8 +23,8 @@ export const SERVICE_VISIT_STEPS = [
     title: "Inventory Audit",
   },
   {
-  id: "restock",
-  title: "Client Delivery",
+    id: "restock",
+    title: "Client Delivery",
   },
   {
     id: "machine_refill",
@@ -281,10 +281,7 @@ export type RestockDropItemRecord = {
   normalizedUnit: string;
 };
 
-export type RestockDropSyncStatus =
-  | "pending_sync"
-  | "synced"
-  | "failed";
+export type RestockDropSyncStatus = "pending_sync" | "synced" | "failed";
 
 export type RestockDropRecord = {
   databaseId: string | null;
@@ -305,11 +302,30 @@ export type RestockDropRecord = {
   syncError: string | null;
 };
 
+export type MachineRefillZeroReason =
+  | "refill_not_required"
+  | "product_unavailable"
+  | "machine_issue"
+  | "other";
+
 export type MachineRefillQuantityInput = {
   productId: string;
 
   issueQuantity: number;
   looseQuantity: number;
+
+  /*
+   * Optional explanation when this product was
+   * not added to the machine.
+   *
+   * Must be null when actual quantity > 0.
+   */
+  zeroReason: MachineRefillZeroReason | null;
+
+  /*
+   * Used only when zeroReason === "other".
+   */
+  zeroReasonNote: string | null;
 };
 
 export type CompleteMachineRefillInput = {
@@ -331,12 +347,16 @@ export type MachineRefillItemRecord = {
 
   actualQuantity: number;
   normalizedUnit: string;
+
+  /*
+   * Persisted reason for an explicit zero refill.
+   */
+  zeroReason: MachineRefillZeroReason | null;
+
+  zeroReasonNote: string | null;
 };
 
-export type MachineRefillSyncStatus =
-  | "pending_sync"
-  | "synced"
-  | "failed";
+export type MachineRefillSyncStatus = "pending_sync" | "synced" | "failed";
 
 export type MachineRefillRecord = {
   databaseId: string | null;
@@ -351,6 +371,19 @@ export type MachineRefillRecord = {
 
   syncError: string | null;
 };
+
+/*
+ * Machine-refilled is intentionally derived rather
+ * than persisted as another source of truth.
+ *
+ * true  -> at least one product was added
+ * false -> every product has quantity 0
+ */
+export function wasMachineRefilled(
+  machineRefill: MachineRefillRecord | null,
+): boolean {
+  return machineRefill?.items.some((item) => item.actualQuantity > 0) ?? false;
+}
 
 export type CompleteMachineScanInput = {
   scannedValue: string;

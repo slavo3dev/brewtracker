@@ -2,12 +2,18 @@ import {
   BEFORE_PHOTO_KINDS,
   getRequiredServiceVisitSteps,
   SERVICE_VISIT_STEPS,
+  type MachineRefillZeroReason,
   type ServiceVisit,
 } from "../service-visit.types";
 
-function migratePreFlow18Visit(
-  visit: ServiceVisit,
-): ServiceVisit {
+const MACHINE_REFILL_ZERO_REASONS = new Set<MachineRefillZeroReason>([
+  "refill_not_required",
+  "product_unavailable",
+  "machine_issue",
+  "other",
+]);
+
+function migratePreFlow18Visit(visit: ServiceVisit): ServiceVisit {
   if (!Array.isArray(visit.steps)) {
     return visit;
   }
@@ -15,22 +21,15 @@ function migratePreFlow18Visit(
   /*
    * Already using the FLOW-18 step structure.
    */
-  if (
-    visit.steps.some(
-      (step) => step.id === "machine_refill",
-    )
-  ) {
+  if (visit.steps.some((step) => step.id === "machine_refill")) {
     return visit;
   }
 
-  const restockIndex = visit.steps.findIndex(
-    (step) => step.id === "restock",
-  );
+  const restockIndex = visit.steps.findIndex((step) => step.id === "restock");
 
-  const afterServiceIndex =
-    visit.steps.findIndex(
-      (step) => step.id === "after_service",
-    );
+  const afterServiceIndex = visit.steps.findIndex(
+    (step) => step.id === "after_service",
+  );
 
   /*
    * Only migrate the known pre-FLOW-18 structure:
@@ -40,15 +39,11 @@ function migratePreFlow18Visit(
    * Anything else should continue to fail normal
    * restore validation.
    */
-  if (
-    restockIndex < 0 ||
-    afterServiceIndex !== restockIndex + 1
-  ) {
+  if (restockIndex < 0 || afterServiceIndex !== restockIndex + 1) {
     return visit;
   }
 
-  const restockStep =
-    visit.steps[restockIndex];
+  const restockStep = visit.steps[restockIndex];
 
   const hasProgressedPastRestock =
     restockStep?.status === "completed" ||
@@ -62,16 +57,11 @@ function migratePreFlow18Visit(
   };
 
   const migratedSteps = [
-    ...visit.steps.slice(
-      0,
-      afterServiceIndex,
-    ),
+    ...visit.steps.slice(0, afterServiceIndex),
 
     machineRefillStep,
 
-    ...visit.steps.slice(
-      afterServiceIndex,
-    ),
+    ...visit.steps.slice(afterServiceIndex),
   ];
 
   /*
@@ -82,31 +72,25 @@ function migratePreFlow18Visit(
    * Machine Refill is now required before them.
    */
   if (hasProgressedPastRestock) {
-    const resetSteps =
-      migratedSteps.map((step) => {
-        if (
-          step.id === "machine_refill"
-        ) {
-          return {
-            ...step,
-            status: "current" as const,
-            completedAt: null,
-          };
-        }
+    const resetSteps = migratedSteps.map((step) => {
+      if (step.id === "machine_refill") {
+        return {
+          ...step,
+          status: "current" as const,
+          completedAt: null,
+        };
+      }
 
-        if (
-          step.id === "after_service" ||
-          step.id === "summary"
-        ) {
-          return {
-            ...step,
-            status: "locked" as const,
-            completedAt: null,
-          };
-        }
+      if (step.id === "after_service" || step.id === "summary") {
+        return {
+          ...step,
+          status: "locked" as const,
+          completedAt: null,
+        };
+      }
 
-        return step;
-      });
+      return step;
+    });
 
     return {
       ...visit,
@@ -148,7 +132,6 @@ export function validateRestoredVisit(
   visit: ServiceVisit,
   userId: string,
 ): ServiceVisit | null {
-
   visit = migratePreFlow18Visit(visit);
 
   if (visit.userId !== userId) {
@@ -440,89 +423,130 @@ export function validateRestoredVisit(
   }
 
   /*
-  * FLOW-18:
-  * Machine refill.
-  *
-  * Stock is moved directly:
-  *
-  * Driver / Van -> Machine
-  *
-  * It does not reduce client reserve.
-  */
-  const restoredMachineRefill =
-    visit.machineRefill ?? null;
+   * FLOW-18:
+   * Machine refill.
+   *
+   * Stock is moved directly:
+   *
+   * Driver / Van -> Machine
+   *
+   * It does not reduce client reserve.
+   *
+   * FLOW-18 QA:
+   * Older persisted visits may not contain
+   * zeroReason / zeroReasonNote. Missing values
+   * are normalized to null for compatibility.
+   */
+  const restoredMachineRefill = visit.machineRefill ?? null;
 
-  if (restoredMachineRefill) {
+  const normalizedMachineRefill = restoredMachineRefill
+    ? {
+        ...restoredMachineRefill,
+
+        items: Array.isArray(restoredMachineRefill.items)
+          ? restoredMachineRefill.items.map((item) => ({
+              ...item,
+
+              zeroReason: item.zeroReason ?? null,
+
+              zeroReasonNote: item.zeroReasonNote ?? null,
+            }))
+          : restoredMachineRefill.items,
+      }
+    : null;
+
+  if (normalizedMachineRefill) {
     const hasValidItems =
-      Array.isArray(
-        restoredMachineRefill.items,
-      ) &&
-      restoredMachineRefill.items.every(
-        (item) =>
-          typeof item.productId ===
-            "string" &&
-          item.productId.trim().length >
-            0 &&
-          (item.sku === null ||
-            typeof item.sku ===
-              "string") &&
-          typeof item.name ===
-            "string" &&
-          typeof item.unitLabel ===
-            "string" &&
-          Number.isFinite(
-            item.issueQuantity,
-          ) &&
+      Array.isArray(normalizedMachineRefill.items) &&
+      normalizedMachineRefill.items.every((item) => {
+        const hasValidBaseFields =
+          typeof item.productId === "string" &&
+          item.productId.trim().length > 0 &&
+          (item.sku === null || typeof item.sku === "string") &&
+          typeof item.name === "string" &&
+          typeof item.unitLabel === "string" &&
+          Number.isFinite(item.issueQuantity) &&
           item.issueQuantity >= 0 &&
-          Number.isInteger(
-            item.issueQuantity,
-          ) &&
-          Number.isFinite(
-            item.looseQuantity,
-          ) &&
+          Number.isInteger(item.issueQuantity) &&
+          Number.isFinite(item.looseQuantity) &&
           item.looseQuantity >= 0 &&
-          Number.isFinite(
-            item.actualQuantity,
-          ) &&
+          Number.isFinite(item.actualQuantity) &&
           item.actualQuantity >= 0 &&
-          typeof item.normalizedUnit ===
-            "string" &&
-          item.normalizedUnit
-            .trim().length > 0,
-      );
+          typeof item.normalizedUnit === "string" &&
+          item.normalizedUnit.trim().length > 0;
 
-    const hasValidSyncStatus = [
-      "pending_sync",
-      "synced",
-      "failed",
-    ].includes(
-      restoredMachineRefill.syncStatus,
+        if (!hasValidBaseFields) {
+          return false;
+        }
+
+        const hasValidZeroReason =
+          item.zeroReason === null ||
+          MACHINE_REFILL_ZERO_REASONS.has(item.zeroReason);
+
+        if (!hasValidZeroReason) {
+          return false;
+        }
+
+        const hasValidZeroReasonNote =
+          item.zeroReasonNote === null ||
+          typeof item.zeroReasonNote === "string";
+
+        if (!hasValidZeroReasonNote) {
+          return false;
+        }
+
+        /*
+         * Positive refill quantities cannot
+         * carry zero-refill metadata.
+         */
+        if (
+          item.actualQuantity > 0 &&
+          (item.zeroReason !== null || item.zeroReasonNote !== null)
+        ) {
+          return false;
+        }
+
+        /*
+         * A note only belongs to the "other"
+         * reason.
+         */
+        if (item.zeroReason !== "other" && item.zeroReasonNote !== null) {
+          return false;
+        }
+
+        /*
+         * Selecting Other requires a
+         * meaningful explanation.
+         */
+        if (
+          item.zeroReason === "other" &&
+          (item.zeroReasonNote === null ||
+            item.zeroReasonNote.trim().length === 0)
+        ) {
+          return false;
+        }
+
+        return true;
+      });
+
+    const hasValidSyncStatus = ["pending_sync", "synced", "failed"].includes(
+      normalizedMachineRefill.syncStatus,
     );
 
     const hasValidDatabaseId =
-      restoredMachineRefill.databaseId ===
-        null ||
-      (
-        typeof restoredMachineRefill.databaseId ===
-          "string" &&
-        restoredMachineRefill.databaseId
-          .trim().length > 0
-      );
+      normalizedMachineRefill.databaseId === null ||
+      (typeof normalizedMachineRefill.databaseId === "string" &&
+        normalizedMachineRefill.databaseId.trim().length > 0);
 
     const hasValidSyncError =
-      restoredMachineRefill.syncError ===
-        null ||
-      typeof restoredMachineRefill.syncError ===
-        "string";
+      normalizedMachineRefill.syncError === null ||
+      typeof normalizedMachineRefill.syncError === "string";
 
     if (
       !hasValidDatabaseId ||
-      typeof restoredMachineRefill.sourceVisitId !==
-        "string" ||
-      restoredMachineRefill.sourceVisitId
-        .trim().length === 0 ||
-      typeof restoredMachineRefill.confirmedAt !==
-        "string" ||
+      typeof normalizedMachineRefill.sourceVisitId !== "string" ||
+      normalizedMachineRefill.sourceVisitId.trim().length === 0 ||
+      typeof normalizedMachineRefill.confirmedAt !== "string" ||
       !hasValidItems ||
       !hasValidSyncStatus ||
       !hasValidSyncError
@@ -584,9 +608,8 @@ export function validateRestoredVisit(
     inventoryAudit: restoredInventoryAudit,
 
     restockDrop: restoredRestockDrop,
-    
-    machineRefill:
-      restoredMachineRefill,
+
+    machineRefill: normalizedMachineRefill,
 
     afterService: restoredAfterService,
 
