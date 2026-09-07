@@ -376,6 +376,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         inventoryAudit: null,
         restockDrop: null,
         machineRefill: null,
+        reserveAfter: null,
 
         afterService: {
           afterPhoto: null,

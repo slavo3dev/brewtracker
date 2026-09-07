@@ -1966,6 +1966,16 @@ export type Database = {
         }
         Returns: string
       }
+      save_client_reserve_after_service: {
+        Args: {
+          p_calculated_at: string
+          p_client_id: string
+          p_machine_id: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
       save_client_reserve_before_service: {
         Args: {
           p_client_id: string

@@ -411,6 +411,33 @@ export type CompleteServiceVisitResult = {
   emailSentAt: string | null;
 };
 
+export type ClientReserveAfterItemRecord = {
+  productId: string;
+
+  reserveBeforeQuantity: number;
+  deliveredQuantity: number;
+  reserveAfterQuantity: number;
+
+  normalizedUnit: string;
+};
+
+export type ClientReserveAfterSyncStatus =
+  | "pending_sync"
+  | "synced"
+  | "failed";
+
+export type ClientReserveAfterRecord = {
+  databaseId: string | null;
+
+  sourceVisitId: string;
+  calculatedAt: string;
+
+  items: ClientReserveAfterItemRecord[];
+
+  syncStatus: ClientReserveAfterSyncStatus;
+  syncError: string | null;
+};
+
 export type ServiceVisit = {
   id: string;
   userId: string;
@@ -437,7 +464,7 @@ export type ServiceVisit = {
   restockDrop: RestockDropRecord | null;
 
   machineRefill: MachineRefillRecord | null;
-
+  reserveAfter: ClientReserveAfterRecord | null;
   afterService: AfterServiceRecord;
   summary: ServiceVisitSummaryRecord;
 
