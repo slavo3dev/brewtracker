@@ -225,6 +225,174 @@ Deno.serve(async (request: Request) => {
   }
 
   //--------------------------------------------------
+  // FLOW-20:
+  // Verify required client / manager signature
+  //--------------------------------------------------
+
+  const {
+    data: serviceSignature,
+    error: signatureError,
+  } = await supabaseAdmin
+    .from("service_visit_signatures")
+    .select(
+      `
+        id,
+        source_visit_id,
+        stop_id,
+        client_id,
+        machine_id,
+        signed_by,
+        storage_path,
+        signed_at
+      `,
+    )
+    .eq("source_visit_id", payload.sourceVisitId)
+    .maybeSingle();
+
+  if (signatureError) {
+    console.error(
+      "Unable to verify service signature:",
+      signatureError,
+    );
+
+    return jsonResponse(
+      {
+        error: "Unable to verify the client signature.",
+      },
+      500,
+    );
+  }
+
+  if (!serviceSignature) {
+    return jsonResponse(
+      {
+        error:
+          "Client signature is required before completing service.",
+      },
+      400,
+    );
+  }
+
+  if (
+    serviceSignature.stop_id !== payload.stopId ||
+    serviceSignature.client_id !== payload.clientId ||
+    serviceSignature.machine_id !== payload.machineId ||
+    serviceSignature.signed_by !== user.id
+  ) {
+    return jsonResponse(
+      {
+        error:
+          "The client signature does not match this service visit.",
+      },
+      403,
+    );
+  }
+
+  if (!serviceSignature.storage_path?.trim()) {
+    return jsonResponse(
+      {
+        error:
+          "The client signature has not been stored successfully.",
+      },
+      400,
+    );
+  }
+
+  //--------------------------------------------------
+  // FLOW-20:
+  // Verify required client / manager signature
+  //--------------------------------------------------
+
+  const {
+    data: serviceSignature,
+    error: signatureError,
+  } = await supabaseAdmin
+    .from("service_visit_signatures")
+    .select(
+      `
+        id,
+        source_visit_id,
+        stop_id,
+        client_id,
+        machine_id,
+        signed_by,
+        storage_path,
+        signed_at
+      `,
+    )
+    .eq("source_visit_id", payload.sourceVisitId)
+    .maybeSingle();
+
+  if (signatureError) {
+    console.error(
+      "Unable to verify service signature:",
+      signatureError,
+    );
+
+    return jsonResponse(
+      {
+        error: "Unable to verify the client signature.",
+      },
+      500,
+    );
+  }
+
+  if (!serviceSignature) {
+    return jsonResponse(
+      {
+        error:
+          "Client signature is required before completing service.",
+      },
+      400,
+    );
+  }
+
+  if (
+    serviceSignature.stop_id !== payload.stopId ||
+    serviceSignature.client_id !== payload.clientId ||
+    serviceSignature.machine_id !== payload.machineId ||
+    serviceSignature.signed_by !== user.id
+  ) {
+    return jsonResponse(
+      {
+        error:
+          "The client signature does not match this service visit.",
+      },
+      403,
+    );
+  }
+
+  if (!serviceSignature.storage_path?.trim()) {
+    return jsonResponse(
+      {
+        error:
+          "The client signature has not been stored successfully.",
+      },
+      400,
+    );
+  }
+
+  const signedAt =
+    Date.parse(serviceSignature.signed_at);
+
+  const completedAt =
+    Date.parse(payload.completedAt);
+
+  if (
+    Number.isNaN(signedAt) ||
+    Number.isNaN(completedAt) ||
+    signedAt > completedAt
+  ) {
+    return jsonResponse(
+      {
+        error:
+          "The client signature timestamp is invalid.",
+      },
+      400,
+    );
+  }
+
+  //--------------------------------------------------
   // Idempotent summary upsert
   //--------------------------------------------------
 
@@ -244,7 +412,16 @@ Deno.serve(async (request: Request) => {
 
         completed_at: payload.completedAt,
 
-        summary: payload.visitSummary,
+        summary: {
+          ...payload.visitSummary,
+
+          clientConfirmation: {
+            signatureId: serviceSignature.id,
+            storagePath: serviceSignature.storage_path,
+            signedAt: serviceSignature.signed_at,
+            confirmedAt: serviceSignature.signed_at,
+          },
+        },
 
         updated_at: new Date().toISOString(),
       },
