@@ -176,6 +176,26 @@ export type UpdateMediaUploadInput = {
   uploadedAt?: string | null;
 };
 
+export type ServiceSignatureRecord = {
+  localUri: string;
+  storagePath: string | null;
+  databaseId: string | null;
+  uploadStatus: MediaUploadStatus;
+  uploadError: string | null;
+  signedAt: string;
+  uploadedAt: string | null;
+};
+
+export type ClientConfirmationRecord = {
+  signature: ServiceSignatureRecord | null;
+  confirmedAt: string | null;
+};
+
+export type SaveSignatureInput = {
+  localUri: string;
+  signedAt: string;
+};
+
 export type DrinkCountRecord = {
   databaseId: string;
   sourceVisitId: string;
@@ -466,6 +486,7 @@ export type ServiceVisit = {
   machineRefill: MachineRefillRecord | null;
   reserveAfter: ClientReserveAfterRecord | null;
   afterService: AfterServiceRecord;
+  clientConfirmation: ClientConfirmationRecord;
   summary: ServiceVisitSummaryRecord;
 
   startedAt: string;

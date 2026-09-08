@@ -18,6 +18,7 @@ import { useRestockStep } from "../../hooks/useRestockStep";
 import { useVisitMutation } from "../../hooks/useVisitMutation";
 import { useSummaryStep } from "../../hooks/useSummaryStep";
 import { useMachineRefillStep } from "../../hooks/useMachineRefillStep";
+import { useClientConfirmation } from "../../hooks/useClientConfirmation";
 import {
   loadServiceVisit,
   removeServiceVisit,
@@ -35,6 +36,7 @@ import {
   type CompleteMachineRefillInput,
   type SaveAfterPhotoInput,
   type SaveBeforePhotoInput,
+  type SaveSignatureInput,
   type ServiceVisit,
   type StartServiceVisitInput,
   type UpdateBeforePhotoUploadInput,
@@ -92,6 +94,17 @@ type ServiceVisitContextValue = {
     input: UpdateMediaUploadInput,
   ) => Promise<ServiceVisit>;
 
+  saveSignature: (
+    input: SaveSignatureInput,
+  ) => Promise<ServiceVisit>;
+
+  updateSignatureUpload: (
+    localUri: string,
+    input: UpdateMediaUploadInput,
+  ) => Promise<ServiceVisit>;
+
+  removeSignature: () => Promise<ServiceVisit>;
+
   completeAfterService: () => Promise<ServiceVisit>;
 
   cancelVisit: () => Promise<void>;
@@ -146,6 +159,15 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   const { commitVisitMutation } = useVisitMutation({
     activeVisit,
     setActiveVisit,
+  });
+
+  const {
+    saveSignature,
+    updateSignatureUpload,
+    removeSignature,
+  } = useClientConfirmation({
+    commitVisitMutation,
+    setErrorMessage,
   });
 
   const { completeSummary, retrySummarySync } = useSummaryStep({
@@ -380,6 +402,11 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
         afterService: {
           afterPhoto: null,
+        },
+
+        clientConfirmation: {
+          signature: null,
+          confirmedAt: null,
         },
 
         summary: {
@@ -656,6 +683,10 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       saveAfterPhoto,
       updateAfterPhotoUpload,
 
+      saveSignature,
+      updateSignatureUpload,
+      removeSignature,
+      
       completeAfterService,
 
       completeSummary,
@@ -692,6 +723,10 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
       saveAfterPhoto,
       updateAfterPhotoUpload,
+
+      saveSignature,
+      updateSignatureUpload,
+      removeSignature,
 
       completeAfterService,
 

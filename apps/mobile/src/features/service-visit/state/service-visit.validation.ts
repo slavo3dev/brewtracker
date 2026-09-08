@@ -663,10 +663,12 @@ export function validateRestoredVisit(
   }
 
   /*
-   * FLOW-14:
-   * After Service contains one required photo.
-   * Signature state has been removed.
-   */
+  * FLOW-14:
+  * After Service contains one required photo.
+  *
+  * FLOW-20 client confirmation is stored separately
+  * from After Service.
+  */
   const restoredAfterService = visit.afterService ?? {
     afterPhoto: null,
   };
@@ -684,6 +686,145 @@ export function validateRestoredVisit(
       !validUploadStatuses.includes(
         restoredAfterService.afterPhoto.uploadStatus,
       ))
+  ) {
+    return null;
+  }
+
+  /*
+  * FLOW-20:
+  * Client / Manager Confirmation.
+  *
+  * The signature is intentionally stored separately
+  * from After Service. Older persisted visits created
+  * before FLOW-20 will not contain clientConfirmation,
+  * so normalize them to an empty confirmation.
+  */
+  const restoredClientConfirmation =
+    visit.clientConfirmation ?? {
+      signature: null,
+      confirmedAt: null,
+    };
+
+  const restoredSignature =
+    restoredClientConfirmation.signature;
+
+  if (restoredSignature) {
+    const hasValidLocalUri =
+      typeof restoredSignature.localUri === "string" &&
+      restoredSignature.localUri.trim().length > 0;
+
+    const hasValidUploadStatus =
+      validUploadStatuses.includes(
+        restoredSignature.uploadStatus,
+      );
+
+    const hasValidSignedAt =
+      typeof restoredSignature.signedAt === "string" &&
+      !Number.isNaN(
+        Date.parse(restoredSignature.signedAt),
+      );
+
+    const hasValidStoragePath =
+      restoredSignature.storagePath === null ||
+      (typeof restoredSignature.storagePath === "string" &&
+        restoredSignature.storagePath.trim().length > 0);
+
+    const hasValidDatabaseId =
+      restoredSignature.databaseId === null ||
+      (typeof restoredSignature.databaseId === "string" &&
+        restoredSignature.databaseId.trim().length > 0);
+
+    const hasValidUploadError =
+      restoredSignature.uploadError === null ||
+      typeof restoredSignature.uploadError === "string";
+
+    const hasValidUploadedAt =
+      restoredSignature.uploadedAt === null ||
+      (typeof restoredSignature.uploadedAt === "string" &&
+        !Number.isNaN(
+          Date.parse(restoredSignature.uploadedAt),
+        ));
+
+    if (
+      !hasValidLocalUri ||
+      !hasValidUploadStatus ||
+      !hasValidSignedAt ||
+      !hasValidStoragePath ||
+      !hasValidDatabaseId ||
+      !hasValidUploadError ||
+      !hasValidUploadedAt
+    ) {
+      return null;
+    }
+
+    /*
+    * An uploaded signature must contain the
+    * persisted Storage and database references.
+    */
+    if (
+      restoredSignature.uploadStatus === "uploaded" &&
+      (
+        restoredSignature.storagePath === null ||
+        restoredSignature.databaseId === null ||
+        restoredSignature.uploadedAt === null
+      )
+    ) {
+      return null;
+    }
+  }
+
+  /*
+  * FLOW-20 visit timing invariant:
+  *
+  * Arrival verification marks the beginning of the
+  * client visit and the client signature marks the end.
+  *
+  * A signature therefore cannot predate arrival.
+  */
+  if (
+    restoredSignature &&
+    visit.arrivalVerification
+  ) {
+    const arrivalVerifiedAt =
+      Date.parse(
+        visit.arrivalVerification.verifiedAt,
+      );
+
+    const signatureSignedAt =
+      Date.parse(restoredSignature.signedAt);
+
+    if (
+      Number.isNaN(arrivalVerifiedAt) ||
+      signatureSignedAt < arrivalVerifiedAt
+    ) {
+      return null;
+    }
+  }
+
+  const hasValidConfirmedAt =
+    restoredClientConfirmation.confirmedAt === null ||
+    (typeof restoredClientConfirmation.confirmedAt === "string" &&
+      !Number.isNaN(
+        Date.parse(
+          restoredClientConfirmation.confirmedAt,
+        ),
+      ));
+
+  if (!hasValidConfirmedAt) {
+    return null;
+  }
+
+  /*
+  * confirmedAt represents a successfully persisted
+  * client confirmation. It therefore cannot exist
+  * without an uploaded signature.
+  */
+  if (
+    restoredClientConfirmation.confirmedAt !== null &&
+    (
+      !restoredSignature ||
+      restoredSignature.uploadStatus !== "uploaded"
+    )
   ) {
     return null;
   }
@@ -721,6 +862,9 @@ export function validateRestoredVisit(
     reserveAfter: restoredReserveAfter,
 
     afterService: restoredAfterService,
+
+    clientConfirmation:
+      restoredClientConfirmation,
 
     summary: restoredSummary,
   };
