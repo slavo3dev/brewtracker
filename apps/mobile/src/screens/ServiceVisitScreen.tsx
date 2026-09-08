@@ -39,6 +39,8 @@ export default function ServiceVisitScreen({
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [signatureActive, setSignatureActive] = useState(false);
+
   if (!activeVisit) {
     return (
       <SafeAreaView style={styles.container}>
@@ -133,6 +135,7 @@ export default function ServiceVisitScreen({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        scrollEnabled={!signatureActive}
       >
         {activeVisit.status !== "completed" ? (
           <>
@@ -244,7 +247,14 @@ export default function ServiceVisitScreen({
         ) : activeVisit.currentStep === "after_service" ? (
           <AfterServiceStep />
         ) : activeVisit.currentStep === "summary" ? (
-          <SummaryStep />
+          <SummaryStep
+            onSignatureStart={() => {
+              setSignatureActive(true);
+            }}
+            onSignatureEnd={() => {
+              setSignatureActive(false);
+            }}
+          />
         ) : null}
       </ScrollView>
     </SafeAreaView>

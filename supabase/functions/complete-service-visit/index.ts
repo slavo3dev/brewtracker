@@ -229,10 +229,7 @@ Deno.serve(async (request: Request) => {
   // Verify required client / manager signature
   //--------------------------------------------------
 
-  const {
-    data: serviceSignature,
-    error: signatureError,
-  } = await supabaseAdmin
+  const { data: serviceSignature, error: signatureError } = await supabaseAdmin
     .from("service_visit_signatures")
     .select(
       `
@@ -250,10 +247,7 @@ Deno.serve(async (request: Request) => {
     .maybeSingle();
 
   if (signatureError) {
-    console.error(
-      "Unable to verify service signature:",
-      signatureError,
-    );
+    console.error("Unable to verify service signature:", signatureError);
 
     return jsonResponse(
       {
@@ -266,8 +260,7 @@ Deno.serve(async (request: Request) => {
   if (!serviceSignature) {
     return jsonResponse(
       {
-        error:
-          "Client signature is required before completing service.",
+        error: "Client signature is required before completing service.",
       },
       400,
     );
@@ -281,8 +274,7 @@ Deno.serve(async (request: Request) => {
   ) {
     return jsonResponse(
       {
-        error:
-          "The client signature does not match this service visit.",
+        error: "The client signature does not match this service visit.",
       },
       403,
     );
@@ -291,92 +283,15 @@ Deno.serve(async (request: Request) => {
   if (!serviceSignature.storage_path?.trim()) {
     return jsonResponse(
       {
-        error:
-          "The client signature has not been stored successfully.",
+        error: "The client signature has not been stored successfully.",
       },
       400,
     );
   }
 
-  //--------------------------------------------------
-  // FLOW-20:
-  // Verify required client / manager signature
-  //--------------------------------------------------
+  const signedAt = Date.parse(serviceSignature.signed_at);
 
-  const {
-    data: serviceSignature,
-    error: signatureError,
-  } = await supabaseAdmin
-    .from("service_visit_signatures")
-    .select(
-      `
-        id,
-        source_visit_id,
-        stop_id,
-        client_id,
-        machine_id,
-        signed_by,
-        storage_path,
-        signed_at
-      `,
-    )
-    .eq("source_visit_id", payload.sourceVisitId)
-    .maybeSingle();
-
-  if (signatureError) {
-    console.error(
-      "Unable to verify service signature:",
-      signatureError,
-    );
-
-    return jsonResponse(
-      {
-        error: "Unable to verify the client signature.",
-      },
-      500,
-    );
-  }
-
-  if (!serviceSignature) {
-    return jsonResponse(
-      {
-        error:
-          "Client signature is required before completing service.",
-      },
-      400,
-    );
-  }
-
-  if (
-    serviceSignature.stop_id !== payload.stopId ||
-    serviceSignature.client_id !== payload.clientId ||
-    serviceSignature.machine_id !== payload.machineId ||
-    serviceSignature.signed_by !== user.id
-  ) {
-    return jsonResponse(
-      {
-        error:
-          "The client signature does not match this service visit.",
-      },
-      403,
-    );
-  }
-
-  if (!serviceSignature.storage_path?.trim()) {
-    return jsonResponse(
-      {
-        error:
-          "The client signature has not been stored successfully.",
-      },
-      400,
-    );
-  }
-
-  const signedAt =
-    Date.parse(serviceSignature.signed_at);
-
-  const completedAt =
-    Date.parse(payload.completedAt);
+  const completedAt = Date.parse(payload.completedAt);
 
   if (
     Number.isNaN(signedAt) ||
@@ -385,8 +300,7 @@ Deno.serve(async (request: Request) => {
   ) {
     return jsonResponse(
       {
-        error:
-          "The client signature timestamp is invalid.",
+        error: "The client signature timestamp is invalid.",
       },
       400,
     );

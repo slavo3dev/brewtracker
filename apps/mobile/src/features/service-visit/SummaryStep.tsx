@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import {
   ActivityIndicator,
@@ -8,7 +8,9 @@ import {
   View,
 } from "react-native";
 
-import SignatureCanvas from "react-native-signature-canvas";
+import SignatureCanvas, {
+  type SignatureViewRef,
+} from "react-native-signature-canvas";
 
 import {
   persistSignatureLocally,
@@ -23,102 +25,95 @@ import {
   type ServiceVisitStepId,
 } from "./service-visit.types";
 
+type Props = {
+  onSignatureStart?: () => void;
+  onSignatureEnd?: () => void;
+};
+
 const SIGNATURE_WEB_STYLE = `
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+
   .m-signature-pad {
+    width: 100%;
+    height: 100%;
     box-shadow: none;
     border: none;
     margin: 0;
   }
 
   .m-signature-pad--body {
-    border: 1px solid #e2d4c0;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    border: 1px solid #d6c3ab;
     border-radius: 12px;
   }
 
   .m-signature-pad--footer {
-    margin: 12px 0 0;
+    display: none;
   }
 
-  .m-signature-pad--footer .button {
-    background-color: #b6692b;
-    color: #ffffff;
-    border-radius: 8px;
-  }
-
-  body,
-  html {
-    width: 100%;
-    height: 100%;
+  canvas {
+    touch-action: none;
   }
 `;
 
-export default function SummaryStep() {
-  const {
-    activeVisit,
-    completeSummary,
-    saveSignature,
-    updateSignatureUpload,
-  } = useServiceVisit();
+export default function SummaryStep({
+  onSignatureStart,
+  onSignatureEnd,
+}: Props) {
+  const signatureRef = useRef<SignatureViewRef | null>(null);
 
-  const [submitting, setSubmitting] =
-    useState(false);
+  const { activeVisit, completeSummary, saveSignature, updateSignatureUpload } =
+    useServiceVisit();
 
-  const [
-    signatureSaving,
-    setSignatureSaving,
-  ] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null);
+  const [signatureSaving, setSignatureSaving] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const uploadSavedSignature = useCallback(
-    async (
-      visitWithSignature: ServiceVisit,
-    ): Promise<void> => {
-      const signature =
-        visitWithSignature.clientConfirmation
-          .signature;
+    async (visitWithSignature: ServiceVisit): Promise<void> => {
+      const signature = visitWithSignature.clientConfirmation.signature;
 
       if (!signature) {
-        throw new Error(
-          "The saved client signature could not be found.",
-        );
+        throw new Error("The saved client signature could not be found.");
       }
 
       try {
-        await updateSignatureUpload(
-          signature.localUri,
-          {
-            uploadStatus: "uploading",
-            uploadError: null,
-          },
-        );
+        await updateSignatureUpload(signature.localUri, {
+          uploadStatus: "uploading",
+          uploadError: null,
+        });
 
-        const uploaded =
-          await uploadSignature({
-            userId: visitWithSignature.userId,
-            visitId: visitWithSignature.id,
-            stopId: visitWithSignature.stopId,
-            clientId: visitWithSignature.clientId,
-            machineId:
-              visitWithSignature.machineId,
-            localUri: signature.localUri,
-            signedAt: signature.signedAt,
-          });
+        const uploaded = await uploadSignature({
+          userId: visitWithSignature.userId,
+          visitId: visitWithSignature.id,
+          stopId: visitWithSignature.stopId,
+          clientId: visitWithSignature.clientId,
+          machineId: visitWithSignature.machineId,
+          localUri: signature.localUri,
+          signedAt: signature.signedAt,
+        });
 
-        await updateSignatureUpload(
-          signature.localUri,
-          {
-            uploadStatus: "uploaded",
-            storagePath:
-              uploaded.storagePath,
-            databaseId:
-              uploaded.databaseId,
-            uploadError: null,
-            uploadedAt:
-              new Date().toISOString(),
-          },
-        );
+        await updateSignatureUpload(signature.localUri, {
+          uploadStatus: "uploaded",
+          storagePath: uploaded.storagePath,
+          databaseId: uploaded.databaseId,
+          uploadError: null,
+          uploadedAt: new Date().toISOString(),
+        });
 
         setErrorMessage(null);
       } catch (error) {
@@ -128,13 +123,10 @@ export default function SummaryStep() {
             : "Unable to upload the client signature.";
 
         try {
-          await updateSignatureUpload(
-            signature.localUri,
-            {
-              uploadStatus: "failed",
-              uploadError: message,
-            },
-          );
+          await updateSignatureUpload(signature.localUri, {
+            uploadStatus: "failed",
+            uploadError: message,
+          });
         } catch {
           /*
            * The signature may have been replaced
@@ -156,44 +148,27 @@ export default function SummaryStep() {
 
   const visit = activeVisit;
 
-  const completedTasks =
-    visit.steps.filter(
-      (step) => step.id !== "summary",
-    );
+  const completedTasks = visit.steps.filter((step) => step.id !== "summary");
 
-  const machineRefilled =
-    wasMachineRefilled(
-      visit.machineRefill,
-    );
+  const machineRefilled = wasMachineRefilled(visit.machineRefill);
 
-  const signature =
-    visit.clientConfirmation.signature;
+  const signature = visit.clientConfirmation.signature;
 
   const signatureUploaded =
     signature?.uploadStatus === "uploaded" &&
     Boolean(signature.databaseId) &&
     Boolean(signature.storagePath) &&
     Boolean(signature.uploadedAt) &&
-    Boolean(
-      activeVisit.clientConfirmation
-        .confirmedAt,
-    );
+    Boolean(activeVisit.clientConfirmation.confirmedAt);
 
-  const signatureUploading =
-    signature?.uploadStatus === "uploading";
+  const signatureUploading = signature?.uploadStatus === "uploading";
 
-  const signatureFailed =
-    signature?.uploadStatus === "failed";
+  const signatureFailed = signature?.uploadStatus === "failed";
 
   const canComplete =
-    signatureUploaded &&
-    !submitting &&
-    !signatureSaving &&
-    !signatureUploading;
+    signatureUploaded && !submitting && !signatureSaving && !signatureUploading;
 
-  async function handleSignature(
-    dataUrl: string,
-  ): Promise<void> {
+  async function handleSignature(dataUrl: string): Promise<void> {
     if (signatureSaving) {
       return;
     }
@@ -202,24 +177,16 @@ export default function SummaryStep() {
     setErrorMessage(null);
 
     try {
-      const signedAt =
-        new Date().toISOString();
+      const signedAt = new Date().toISOString();
 
-      const localUri =
-        await persistSignatureLocally(
-          visit.id,
-          dataUrl,
-        );
+      const localUri = await persistSignatureLocally(visit.id, dataUrl);
 
-      const visitWithSignature =
-        await saveSignature({
-          localUri,
-          signedAt,
-        });
+      const visitWithSignature = await saveSignature({
+        localUri,
+        signedAt,
+      });
 
-      await uploadSavedSignature(
-        visitWithSignature,
-      );
+      await uploadSavedSignature(visitWithSignature);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -231,13 +198,8 @@ export default function SummaryStep() {
     }
   }
 
-  async function handleRetrySignature():
-    Promise<void> {
-    if (
-      !signature ||
-      signatureSaving ||
-      signatureUploading
-    ) {
+  async function handleRetrySignature(): Promise<void> {
+    if (!signature || signatureSaving || signatureUploading) {
       return;
     }
 
@@ -245,9 +207,7 @@ export default function SummaryStep() {
     setErrorMessage(null);
 
     try {
-      await uploadSavedSignature(
-        visit,
-      );
+      await uploadSavedSignature(visit);
     } catch {
       // uploadSavedSignature already sets UI error.
     } finally {
@@ -255,8 +215,7 @@ export default function SummaryStep() {
     }
   }
 
-  async function handleComplete():
-    Promise<void> {
+  async function handleComplete(): Promise<void> {
     if (!canComplete) {
       return;
     }
@@ -268,18 +227,14 @@ export default function SummaryStep() {
       await completeSummary();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to complete service.",
+        error instanceof Error ? error.message : "Unable to complete service.",
       );
     } finally {
       setSubmitting(false);
     }
   }
 
-  function getTaskLabel(
-    id: ServiceVisitStepId,
-  ): string {
+  function getTaskLabel(id: ServiceVisitStepId): string {
     switch (id) {
       case "arrival":
         return "Arrival confirmed";
@@ -310,33 +265,21 @@ export default function SummaryStep() {
     }
   }
 
-  function getMachineRefillQuantity(
-    productId: string,
-  ): number {
+  function getMachineRefillQuantity(productId: string): number {
     return (
-      visit.machineRefill?.items.find(
-        (item) =>
-          item.productId === productId,
-      )?.actualQuantity ?? 0
+      visit.machineRefill?.items.find((item) => item.productId === productId)
+        ?.actualQuantity ?? 0
     );
   }
 
-  function getProductName(
-    productId: string,
-  ): string {
+  function getProductName(productId: string): string {
     return (
-      visit.inventoryAudit?.items.find(
-        (item) =>
-          item.productId === productId,
-      )?.name ??
-      visit.restockDrop?.items.find(
-        (item) =>
-          item.productId === productId,
-      )?.name ??
-      visit.machineRefill?.items.find(
-        (item) =>
-          item.productId === productId,
-      )?.name ??
+      visit.inventoryAudit?.items.find((item) => item.productId === productId)
+        ?.name ??
+      visit.restockDrop?.items.find((item) => item.productId === productId)
+        ?.name ??
+      visit.machineRefill?.items.find((item) => item.productId === productId)
+        ?.name ??
       "Product"
     );
   }
@@ -344,285 +287,198 @@ export default function SummaryStep() {
   return (
     <View style={styles.container}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Service completed
-        </Text>
+        <Text style={styles.sectionTitle}>Service completed</Text>
 
         <View style={styles.taskList}>
           {completedTasks.map((step) => (
-            <View
-              key={step.id}
-              style={styles.taskRow}
-            >
-              <Text style={styles.check}>
-                ✓
-              </Text>
+            <View key={step.id} style={styles.taskRow}>
+              <Text style={styles.check}>✓</Text>
 
-              <Text style={styles.taskText}>
-                {getTaskLabel(step.id)}
-              </Text>
+              <Text style={styles.taskText}>{getTaskLabel(step.id)}</Text>
             </View>
           ))}
         </View>
       </View>
 
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryLabel}>
-          Machine refilled
-        </Text>
+        <Text style={styles.summaryLabel}>Machine refilled</Text>
 
         <Text
           style={[
             styles.summaryValue,
-            machineRefilled
-              ? styles.summaryValueYes
-              : styles.summaryValueNo,
+            machineRefilled ? styles.summaryValueYes : styles.summaryValueNo,
           ]}
         >
-          {machineRefilled
-            ? "Yes"
-            : "No"}
+          {machineRefilled ? "Yes" : "No"}
         </Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Inventory summary
-        </Text>
+        <Text style={styles.sectionTitle}>Inventory summary</Text>
 
         <Text style={styles.sectionDescription}>
-          Review the client reserve and
-          machine refill quantities before
+          Review the client reserve and machine refill quantities before
           confirmation.
         </Text>
 
-        {visit.reserveAfter?.items.map(
-          (item) => {
-            const machineQuantity =
-              getMachineRefillQuantity(
-                item.productId,
-              );
+        {visit.reserveAfter?.items.map((item) => {
+          const machineQuantity = getMachineRefillQuantity(item.productId);
 
-            return (
-              <View
-                key={item.productId}
-                style={styles.inventoryCard}
-              >
-                <Text
-                  style={styles.productName}
-                >
-                  {getProductName(
-                    item.productId,
-                  )}
+          return (
+            <View key={item.productId} style={styles.inventoryCard}>
+              <Text style={styles.productName}>
+                {getProductName(item.productId)}
+              </Text>
+
+              <View style={styles.inventoryRow}>
+                <Text style={styles.inventoryLabel}>Client reserve before</Text>
+
+                <Text style={styles.inventoryValue}>
+                  {item.reserveBeforeQuantity} {item.normalizedUnit}
+                </Text>
+              </View>
+
+              <View style={styles.inventoryRow}>
+                <Text style={styles.inventoryLabel}>Delivered to client</Text>
+
+                <Text style={styles.inventoryValue}>
+                  {item.deliveredQuantity} {item.normalizedUnit}
+                </Text>
+              </View>
+
+              <View style={[styles.inventoryRow, styles.reserveAfterRow]}>
+                <Text style={styles.reserveAfterLabel}>
+                  Client reserve after
                 </Text>
 
-                <View
-                  style={styles.inventoryRow}
-                >
-                  <Text
-                    style={
-                      styles.inventoryLabel
-                    }
-                  >
-                    Client reserve before
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.inventoryValue
-                    }
-                  >
-                    {
-                      item.reserveBeforeQuantity
-                    }{" "}
-                    {item.normalizedUnit}
-                  </Text>
-                </View>
-
-                <View
-                  style={styles.inventoryRow}
-                >
-                  <Text
-                    style={
-                      styles.inventoryLabel
-                    }
-                  >
-                    Delivered to client
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.inventoryValue
-                    }
-                  >
-                    {item.deliveredQuantity}{" "}
-                    {item.normalizedUnit}
-                  </Text>
-                </View>
-
-                <View
-                  style={[
-                    styles.inventoryRow,
-                    styles.reserveAfterRow,
-                  ]}
-                >
-                  <Text
-                    style={
-                      styles.reserveAfterLabel
-                    }
-                  >
-                    Client reserve after
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.reserveAfterValue
-                    }
-                  >
-                    {
-                      item.reserveAfterQuantity
-                    }{" "}
-                    {item.normalizedUnit}
-                  </Text>
-                </View>
-
-                <View
-                  style={styles.inventoryDivider}
-                />
-
-                <View
-                  style={styles.inventoryRow}
-                >
-                  <Text
-                    style={
-                      styles.inventoryLabel
-                    }
-                  >
-                    Added to machine
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.inventoryValue
-                    }
-                  >
-                    {machineQuantity}{" "}
-                    {item.normalizedUnit}
-                  </Text>
-                </View>
+                <Text style={styles.reserveAfterValue}>
+                  {item.reserveAfterQuantity} {item.normalizedUnit}
+                </Text>
               </View>
-            );
-          },
-        )}
+
+              <View style={styles.inventoryDivider} />
+
+              <View style={styles.inventoryRow}>
+                <Text style={styles.inventoryLabel}>Added to machine</Text>
+
+                <Text style={styles.inventoryValue}>
+                  {machineQuantity} {item.normalizedUnit}
+                </Text>
+              </View>
+            </View>
+          );
+        })}
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Client confirmation
-        </Text>
+        <Text style={styles.sectionTitle}>Client confirmation</Text>
 
         <Text style={styles.confirmationText}>
-          By signing below, the client or
-          responsible person confirms that
-          the service was completed, the
-          machine was serviced and cleaned,
-          product delivery is correct where
-          applicable, and the inventory count
-          was recorded.
+          By signing below, the client or responsible person confirms that the
+          service was completed, the machine was serviced and cleaned, product
+          delivery is correct where applicable, and the inventory count was
+          recorded.
         </Text>
 
         {!signature ? (
-          <View
-            style={
-              styles.signatureContainer
-            }
-          >
-            <SignatureCanvas
-              onOK={(dataUrl) => {
-                void handleSignature(
-                  dataUrl,
-                );
-              }}
-              onEmpty={() => {
-                setErrorMessage(
-                  "Ask the client to sign before saving.",
-                );
-              }}
-              descriptionText="Sign inside the box"
-              clearText="Clear"
-              confirmText="Save signature"
-              webStyle={SIGNATURE_WEB_STYLE}
-              autoClear={false}
-              imageType="image/png"
-            />
-          </View>
+          <>
+            <View style={styles.signatureContainer}>
+              <SignatureCanvas
+                ref={signatureRef}
+                onBegin={() => {
+                  onSignatureStart?.();
+                  setErrorMessage(null);
+                }}
+                onEnd={() => {
+                  onSignatureEnd?.();
+                }}
+                onOK={(dataUrl) => {
+                  onSignatureEnd?.();
+                  void handleSignature(dataUrl);
+                }}
+                onEmpty={() => {
+                  onSignatureEnd?.();
+                  setErrorMessage("Ask the client to sign before saving.");
+                }}
+                descriptionText=""
+                webStyle={SIGNATURE_WEB_STYLE}
+                autoClear={false}
+                imageType="image/png"
+              />
+            </View>
+
+            <View style={styles.signatureActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={signatureSaving}
+                onPress={() => {
+                  signatureRef.current?.clearSignature();
+                  setErrorMessage(null);
+                }}
+                style={({ pressed }) => [
+                  styles.signatureSecondaryButton,
+                  pressed && styles.buttonPressed,
+                ]}
+              >
+                <Text style={styles.signatureSecondaryButtonText}>Clear</Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={signatureSaving}
+                onPress={() => {
+                  onSignatureEnd?.();
+                  signatureRef.current?.readSignature();
+                }}
+                style={({ pressed }) => [
+                  styles.signatureSaveButton,
+                  pressed && styles.buttonPressed,
+                  signatureSaving && styles.buttonDisabled,
+                ]}
+              >
+                {signatureSaving ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.signatureSaveButtonText}>
+                    Save signature
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </>
         ) : (
-          <View
-            style={
-              styles.signatureStatusCard
-            }
-          >
-            {signatureUploading ||
-            signatureSaving ? (
+          <View style={styles.signatureStatusCard}>
+            {signatureUploading || signatureSaving ? (
               <>
                 <ActivityIndicator />
 
-                <Text
-                  style={
-                    styles.signatureStatusText
-                  }
-                >
+                <Text style={styles.signatureStatusText}>
                   Saving client signature…
                 </Text>
               </>
             ) : signatureUploaded ? (
               <>
-                <Text
-                  style={
-                    styles.signatureSuccessIcon
-                  }
-                >
-                  ✓
-                </Text>
+                <Text style={styles.signatureSuccessIcon}>✓</Text>
 
                 <View style={styles.flex}>
-                  <Text
-                    style={
-                      styles.signatureSuccessTitle
-                    }
-                  >
+                  <Text style={styles.signatureSuccessTitle}>
                     Signature saved
                   </Text>
 
-                  <Text
-                    style={
-                      styles.signatureStatusText
-                    }
-                  >
-                    Client confirmation has
-                    been recorded.
+                  <Text style={styles.signatureStatusText}>
+                    Client confirmation has been recorded.
                   </Text>
                 </View>
               </>
             ) : signatureFailed ? (
               <View style={styles.flex}>
-                <Text
-                  style={
-                    styles.signatureErrorTitle
-                  }
-                >
+                <Text style={styles.signatureErrorTitle}>
                   Signature upload failed
                 </Text>
 
                 {signature.uploadError ? (
-                  <Text
-                    style={
-                      styles.signatureStatusText
-                    }
-                  >
-                    {
-                      signature.uploadError
-                    }
+                  <Text style={styles.signatureStatusText}>
+                    {signature.uploadError}
                   </Text>
                 ) : null}
 
@@ -634,27 +490,17 @@ export default function SummaryStep() {
                   }}
                   style={({ pressed }) => [
                     styles.retryButton,
-                    pressed &&
-                      styles.buttonPressed,
+                    pressed && styles.buttonPressed,
                   ]}
                 >
-                  <Text
-                    style={
-                      styles.retryButtonText
-                    }
-                  >
+                  <Text style={styles.retryButtonText}>
                     Retry signature upload
                   </Text>
                 </Pressable>
               </View>
             ) : (
-              <Text
-                style={
-                  styles.signatureStatusText
-                }
-              >
-                Signature is waiting to be
-                uploaded.
+              <Text style={styles.signatureStatusText}>
+                Signature is waiting to be uploaded.
               </Text>
             )}
           </View>
@@ -663,9 +509,7 @@ export default function SummaryStep() {
 
       {errorMessage ? (
         <View style={styles.errorCard}>
-          <Text style={styles.errorText}>
-            {errorMessage}
-          </Text>
+          <Text style={styles.errorText}>{errorMessage}</Text>
         </View>
       ) : null}
 
@@ -678,24 +522,15 @@ export default function SummaryStep() {
         style={({ pressed }) => [
           styles.completeButton,
 
-          pressed &&
-            canComplete &&
-            styles.buttonPressed,
+          pressed && canComplete && styles.buttonPressed,
 
-          !canComplete &&
-            styles.buttonDisabled,
+          !canComplete && styles.buttonDisabled,
         ]}
       >
         {submitting ? (
-          <ActivityIndicator
-            color="#ffffff"
-          />
+          <ActivityIndicator color="#ffffff" />
         ) : (
-          <Text
-            style={
-              styles.completeButtonText
-            }
-          >
+          <Text style={styles.completeButtonText}>
             Confirm & Complete Service
           </Text>
         )}
@@ -703,9 +538,7 @@ export default function SummaryStep() {
 
       {!signatureUploaded ? (
         <Text style={styles.completionHint}>
-          Client signature must be saved
-          before the service can be
-          completed.
+          Client signature must be saved before the service can be completed.
         </Text>
       ) : null}
     </View>
@@ -851,13 +684,9 @@ const styles = StyleSheet.create({
   },
 
   signatureContainer: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e2d4c0",
-    borderRadius: 12,
-    borderWidth: 1,
     height: 320,
     overflow: "hidden",
-    padding: 8,
+    borderRadius: 12,
   },
 
   signatureStatusCard: {
@@ -960,5 +789,50 @@ const styles = StyleSheet.create({
   errorText: {
     color: "#8a3324",
     fontSize: 14,
+  },
+
+  signatureCanvas: {
+    height: 320,
+    overflow: "hidden",
+    borderRadius: 12,
+  },
+
+  signatureActions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  signatureSecondaryButton: {
+    alignItems: "center",
+    backgroundColor: "#fffaf5",
+    borderColor: "#b99071",
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 48,
+    paddingHorizontal: 16,
+  },
+
+  signatureSecondaryButtonText: {
+    color: "#74401f",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  signatureSaveButton: {
+    alignItems: "center",
+    backgroundColor: "#b6692b",
+    borderRadius: 12,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 48,
+    paddingHorizontal: 16,
+  },
+
+  signatureSaveButtonText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
   },
 });
