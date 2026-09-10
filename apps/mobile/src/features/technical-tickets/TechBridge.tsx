@@ -14,7 +14,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 
@@ -191,17 +190,14 @@ export default function TechBridge() {
           style={styles.overlay}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          <TouchableWithoutFeedback
-            onPress={Keyboard.dismiss}
-            accessible={false}
-          >
-            <View style={styles.modalWrapper}>
-              <View style={styles.modal}>
-                <ScrollView
-                  contentContainerStyle={styles.modalContent}
-                  keyboardShouldPersistTaps="handled"
-                  showsVerticalScrollIndicator={false}
-                >
+          <View style={styles.modalWrapper}>
+            <View style={styles.modal}>
+              <ScrollView
+                contentContainerStyle={styles.modalContent}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+              >
                   <View style={styles.modalHeader}>
                     <View style={styles.headerContent}>
                       <Text style={styles.title}>
@@ -400,7 +396,6 @@ export default function TechBridge() {
                 </ScrollView>
               </View>
             </View>
-          </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
       </Modal>
 
