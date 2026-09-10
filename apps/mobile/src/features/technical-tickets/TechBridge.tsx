@@ -5,8 +5,12 @@ import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -51,17 +55,21 @@ export default function TechBridge() {
 
   async function handleOpenCamera(): Promise<void> {
     setMessage(null);
+    Keyboard.dismiss();
 
     if (!cameraPermission?.granted) {
       const result = await requestCameraPermission();
 
       if (!result.granted) {
-        setMessage("Camera permission is required to add a photo.");
+        setMessage(
+          "Camera permission is required to add a photo.",
+        );
 
         return;
       }
     }
 
+    setVisible(false);
     setCameraVisible(true);
   }
 
@@ -86,6 +94,7 @@ export default function TechBridge() {
 
       setPhotoUri(prepared.uri);
       setCameraVisible(false);
+      setVisible(true);
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Unable to capture the photo.",
@@ -172,165 +181,222 @@ export default function TechBridge() {
         animationType="slide"
         onRequestClose={() => {
           if (!submitting) {
+            Keyboard.dismiss();
             setVisible(false);
           }
         }}
       >
-        <View style={styles.overlay}>
-          <View style={styles.modal}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.title}>Report Technical Issue</Text>
-
-                <Text style={styles.context}>{visit.target.clientName}</Text>
-              </View>
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-                disabled={submitting}
-                onPress={() => {
-                  setVisible(false);
-                  setMessage(null);
-                }}
-                style={styles.closeButton}
+        <KeyboardAvoidingView
+          style={styles.overlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={styles.modalWrapper}>
+            <View style={styles.modal}>
+              <ScrollView
+                contentContainerStyle={styles.modalContent}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
               >
-                <Ionicons name="close" size={22} color="#3d2b1f" />
-              </Pressable>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>What's wrong?</Text>
-
-              <TextInput
-                value={description}
-                onChangeText={setDescription}
-                editable={!submitting}
-                multiline
-                maxLength={1000}
-                placeholder="Describe the machine issue..."
-                placeholderTextColor="#9a8c82"
-                textAlignVertical="top"
-                style={styles.input}
-              />
-            </View>
-
-            <View style={styles.field}>
-              <View style={styles.photoHeading}>
-                <Text style={styles.fieldLabel}>Photo</Text>
-
-                <Text style={styles.optionalText}>Optional</Text>
-              </View>
-
-              {photoUri ? (
-                <View style={styles.photoCard}>
-                  <Image
-                    source={{
-                      uri: photoUri,
-                    }}
-                    resizeMode="cover"
-                    style={styles.photoPreview}
-                  />
-
-                  <View style={styles.photoActions}>
-                    <Pressable
-                      disabled={submitting}
-                      onPress={() => {
-                        void handleOpenCamera();
-                      }}
-                      style={styles.photoAction}
-                    >
-                      <Ionicons
-                        name="camera-outline"
-                        size={17}
-                        color="#8b4d22"
-                      />
-
-                      <Text style={styles.photoActionText}>Retake</Text>
-                    </Pressable>
-
-                    <Pressable
-                      disabled={submitting}
-                      onPress={() => {
-                        setPhotoUri(null);
-                      }}
-                      style={styles.photoAction}
-                    >
-                      <Ionicons
-                        name="trash-outline"
-                        size={17}
-                        color="#8a3324"
-                      />
-
-                      <Text style={[styles.photoActionText, styles.removeText]}>
-                        Remove
+                  <View style={styles.modalHeader}>
+                    <View style={styles.headerContent}>
+                      <Text style={styles.title}>
+                        Report Technical Issue
                       </Text>
+
+                      <Text style={styles.context}>
+                        {visit.target.clientName}
+                      </Text>
+                    </View>
+
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Close"
+                      disabled={submitting}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setVisible(false);
+                        setMessage(null);
+                      }}
+                      style={styles.closeButton}
+                    >
+                      <Ionicons
+                        name="close"
+                        size={22}
+                        color="#3d2b1f"
+                      />
                     </Pressable>
                   </View>
-                </View>
-              ) : (
-                <Pressable
-                  disabled={submitting}
-                  onPress={() => {
-                    void handleOpenCamera();
-                  }}
-                  style={({ pressed }) => [
-                    styles.addPhotoButton,
-                    pressed && styles.addPhotoPressed,
-                  ]}
-                >
-                  <Ionicons name="camera-outline" size={21} color="#8b4d22" />
 
-                  <Text style={styles.addPhotoText}>Add issue photo</Text>
-                </Pressable>
-              )}
-            </View>
+                  <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>
+                      What's wrong?
+                    </Text>
 
-            {message ? (
-              <View style={styles.errorCard}>
-                <Text style={styles.error}>{message}</Text>
-              </View>
-            ) : null}
-
-            <View style={styles.actions}>
-              <Pressable
-                disabled={submitting}
-                onPress={() => {
-                  setVisible(false);
-                  setMessage(null);
-                }}
-                style={styles.cancelButton}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </Pressable>
-
-              <Pressable
-                disabled={submitting || !description.trim()}
-                onPress={() => {
-                  void handleSubmit();
-                }}
-                style={[
-                  styles.submitButton,
-                  (submitting || !description.trim()) && styles.disabled,
-                ]}
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <>
-                    <Ionicons
-                      name="paper-plane-outline"
-                      size={17}
-                      color="#ffffff"
+                    <TextInput
+                      value={description}
+                      onChangeText={setDescription}
+                      editable={!submitting}
+                      multiline
+                      maxLength={1000}
+                      placeholder="Describe the machine issue..."
+                      placeholderTextColor="#9a8c82"
+                      textAlignVertical="top"
+                      returnKeyType="done"
+                      blurOnSubmit
+                      style={styles.input}
                     />
+                  </View>
 
-                    <Text style={styles.submitText}>Submit Issue</Text>
-                  </>
-                )}
-              </Pressable>
+                  <View style={styles.field}>
+                    <View style={styles.photoHeading}>
+                      <Text style={styles.fieldLabel}>
+                        Photo
+                      </Text>
+
+                      <Text style={styles.optionalText}>
+                        Optional
+                      </Text>
+                    </View>
+
+                    {photoUri ? (
+                      <View style={styles.photoCard}>
+                        <Image
+                          source={{
+                            uri: photoUri,
+                          }}
+                          resizeMode="cover"
+                          style={styles.photoPreview}
+                        />
+
+                        <View style={styles.photoActions}>
+                          <Pressable
+                            disabled={submitting}
+                            onPress={() => {
+                              Keyboard.dismiss();
+                              void handleOpenCamera();
+                            }}
+                            style={styles.photoAction}
+                          >
+                            <Ionicons
+                              name="camera-outline"
+                              size={17}
+                              color="#8b4d22"
+                            />
+
+                            <Text style={styles.photoActionText}>
+                              Retake
+                            </Text>
+                          </Pressable>
+
+                          <Pressable
+                            disabled={submitting}
+                            onPress={() => {
+                              setPhotoUri(null);
+                            }}
+                            style={styles.photoAction}
+                          >
+                            <Ionicons
+                              name="trash-outline"
+                              size={17}
+                              color="#8a3324"
+                            />
+
+                            <Text
+                              style={[
+                                styles.photoActionText,
+                                styles.removeText,
+                              ]}
+                            >
+                              Remove
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ) : (
+                      <Pressable
+                        disabled={submitting}
+                        onPress={() => {
+                          Keyboard.dismiss();
+                          void handleOpenCamera();
+                        }}
+                        style={({ pressed }) => [
+                          styles.addPhotoButton,
+                          pressed && styles.addPhotoPressed,
+                        ]}
+                      >
+                        <Ionicons
+                          name="camera-outline"
+                          size={21}
+                          color="#8b4d22"
+                        />
+
+                        <Text style={styles.addPhotoText}>
+                          Add issue photo
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+
+                  {message ? (
+                    <View style={styles.errorCard}>
+                      <Text style={styles.error}>
+                        {message}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.actions}>
+                    <Pressable
+                      disabled={submitting}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setVisible(false);
+                        setMessage(null);
+                      }}
+                      style={styles.cancelButton}
+                    >
+                      <Text style={styles.cancelText}>
+                        Cancel
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      disabled={
+                        submitting || !description.trim()
+                      }
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        void handleSubmit();
+                      }}
+                      style={[
+                        styles.submitButton,
+                        (submitting ||
+                          !description.trim()) &&
+                          styles.disabled,
+                      ]}
+                    >
+                      {submitting ? (
+                        <ActivityIndicator color="#ffffff" />
+                      ) : (
+                        <>
+                          <Ionicons
+                            name="paper-plane-outline"
+                            size={17}
+                            color="#ffffff"
+                          />
+
+                          <Text style={styles.submitText}>
+                            Submit Issue
+                          </Text>
+                        </>
+                      )}
+                    </Pressable>
+                  </View>
+                </ScrollView>
+              </View>
             </View>
-          </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -339,6 +405,7 @@ export default function TechBridge() {
         onRequestClose={() => {
           if (!capturing) {
             setCameraVisible(false);
+            setVisible(true);
           }
         }}
       >
@@ -350,6 +417,7 @@ export default function TechBridge() {
               disabled={capturing}
               onPress={() => {
                 setCameraVisible(false);
+                setVisible(true);
               }}
               style={styles.cameraCancel}
             >
@@ -430,12 +498,12 @@ const styles = StyleSheet.create({
   },
 
   modal: {
+    maxHeight: "90%",
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     backgroundColor: "#fffdf8",
     padding: 22,
     paddingBottom: 30,
-    gap: 20,
   },
 
   modalHeader: {
@@ -656,5 +724,18 @@ const styles = StyleSheet.create({
 
   cameraControlSpacer: {
     width: 70,
+  },
+
+  modalWrapper: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+
+  modalContent: {
+    gap: 20,
+  },
+
+  headerContent: {
+    flex: 1,
   },
 });
