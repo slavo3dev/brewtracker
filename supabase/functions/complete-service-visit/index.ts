@@ -23,7 +23,39 @@ type CompletionPayload = {
 
   completedAt: string;
 
-  visitSummary: Record<string, unknown>;
+  visitSummary: VisitSummary;
+};
+
+type VisitSummaryInventoryItem = {
+  productId: string;
+  sku: string | null;
+  name: string;
+  actualQuantity: number;
+  normalizedUnit: string;
+};
+
+type VisitSummaryRestockDrop = {
+  items: VisitSummaryInventoryItem[];
+} | null;
+
+type VisitSummaryMachineRefill = {
+  items: VisitSummaryInventoryItem[];
+} | null;
+
+type VisitSummaryReserveAfterItem = {
+  productId: string;
+  reserveAfterQuantity: number;
+  normalizedUnit: string;
+};
+
+type VisitSummaryReserveAfter = {
+  items: VisitSummaryReserveAfterItem[];
+} | null;
+
+type VisitSummary = Record<string, unknown> & {
+  restockDrop?: VisitSummaryRestockDrop;
+  machineRefill?: VisitSummaryMachineRefill;
+  reserveAfter?: VisitSummaryReserveAfter;
 };
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -33,6 +65,166 @@ function jsonResponse(body: unknown, status = 200): Response {
       "Content-Type": "application/json",
     },
   });
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formatQuantity(
+  quantity: number,
+  unit: string,
+): string {
+  const safeUnit = escapeHtml(unit);
+
+  if (quantity === 1) {
+    return `1 ${safeUnit}`;
+  }
+
+  if (
+    unit.endsWith("s") ||
+    unit.endsWith("x") ||
+    unit.endsWith("ch") ||
+    unit.endsWith("sh")
+  ) {
+    return `${quantity} ${safeUnit}es`;
+  }
+
+  return `${quantity} ${safeUnit}s`;
+}
+
+function createInventorySummaryHtml(
+  visitSummary: VisitSummary,
+): string {
+  const deliveredItems =
+    visitSummary.restockDrop?.items ?? [];
+
+  const machineRefillItems =
+    visitSummary.machineRefill?.items ?? [];
+
+  const reserveAfterItems =
+    visitSummary.reserveAfter?.items ?? [];
+
+  const productIds = new Set<string>();
+
+  for (const item of deliveredItems) {
+    productIds.add(item.productId);
+  }
+
+  for (const item of machineRefillItems) {
+    productIds.add(item.productId);
+  }
+
+  for (const item of reserveAfterItems) {
+    productIds.add(item.productId);
+  }
+
+  if (productIds.size === 0) {
+    return "";
+  }
+
+  const productHtml = [...productIds]
+    .map((productId) => {
+      const delivered = deliveredItems.find(
+        (item) => item.productId === productId,
+      );
+
+      const machineRefill = machineRefillItems.find(
+        (item) => item.productId === productId,
+      );
+
+      const reserveAfter = reserveAfterItems.find(
+        (item) => item.productId === productId,
+      );
+
+      const product =
+        delivered ?? machineRefill;
+
+      if (!product) {
+        return "";
+      }
+
+      const deliveredQuantity =
+        delivered?.actualQuantity ?? 0;
+
+      const machineRefillQuantity =
+        machineRefill?.actualQuantity ?? 0;
+
+      const normalizedUnit =
+        delivered?.normalizedUnit ??
+        machineRefill?.normalizedUnit ??
+        reserveAfter?.normalizedUnit ??
+        "";
+
+      const sku = product.sku
+        ? ` · ${escapeHtml(product.sku)}`
+        : "";
+
+      return `
+        <div style="margin-bottom: 20px;">
+          <p style="margin-bottom: 8px;">
+            <strong>
+              ${escapeHtml(product.name)}${sku}
+            </strong>
+          </p>
+
+          <p style="margin: 4px 0;">
+            Delivered to client:
+            <strong>
+              ${formatQuantity(
+                deliveredQuantity,
+                normalizedUnit,
+              )}
+            </strong>
+          </p>
+
+          <p style="margin: 4px 0;">
+            Machine refill:
+            <strong>
+              ${formatQuantity(
+                machineRefillQuantity,
+                normalizedUnit,
+              )}
+            </strong>
+          </p>
+
+          ${
+            reserveAfter
+              ? `
+                <p style="margin: 4px 0;">
+                  Reserve remaining:
+                  <strong>
+                    ${formatQuantity(
+                      reserveAfter.reserveAfterQuantity,
+                      reserveAfter.normalizedUnit,
+                    )}
+                  </strong>
+                </p>
+              `
+              : ""
+          }
+        </div>
+      `;
+    })
+    .filter(Boolean)
+    .join("");
+
+  if (!productHtml) {
+    return "";
+  }
+
+  return `
+    <div style="margin-top: 24px;">
+      <h2>Inventory summary</h2>
+
+      ${productHtml}
+    </div>
+  `;
 }
 
 async function createPhotoSignedUrl(
@@ -506,6 +698,9 @@ Deno.serve(async (request: Request) => {
     });
   }
 
+  const inventorySummaryHtml =
+    createInventorySummaryHtml(payload.visitSummary);
+
   const photoHtml = [
     ...beforePhotos.map((photo: { kind?: string; url?: string | null }) =>
       photo.url
@@ -551,6 +746,8 @@ Deno.serve(async (request: Request) => {
             Completed:
             ${payload.completedAt}
           </p>
+
+          ${inventorySummaryHtml}
 
           ${photoHtml}
 
