@@ -1955,6 +1955,18 @@ export type Database = {
       is_driver: { Args: never; Returns: boolean }
       is_field_staff: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
+      record_warehouse_driver_transfer: {
+        Args: {
+          p_driver_id: string
+          p_issue_quantity: number
+          p_loose_quantity: number
+          p_movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          p_occurred_at?: string
+          p_product_id: string
+          p_warehouse_id: string
+        }
+        Returns: string
+      }
       save_client_delivery: {
         Args: {
           p_client_id: string
