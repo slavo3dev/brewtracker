@@ -61,6 +61,14 @@ export function InventoryManagement({
         </div>
 
         <div className="flex flex-wrap gap-2">
+          
+          <Link
+            href="/dashboard/inventory/transfers"
+            className="inline-flex items-center justify-center rounded-full bg-espresso-950 px-4 py-2.5 text-sm font-medium text-crema-50 transition hover:opacity-90"
+          >
+            Record transfer
+          </Link>
+          
           <Link
             href="/dashboard/inventory/warehouses"
             className="inline-flex items-center justify-center rounded-full border border-latte-200 bg-crema-0 px-4 py-2.5 text-sm font-medium text-espresso-800 transition hover:bg-latte-100"
