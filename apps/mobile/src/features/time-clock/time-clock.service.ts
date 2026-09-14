@@ -27,7 +27,7 @@ type WarehouseRow = Pick<
 
 type StopRow = Pick<
   Database["public"]["Tables"]["stops"]["Row"],
-  "id" | "client_id" | "sequence_number"
+  "id" | "client_id" | "sequence_number" | "status"
 >;
 
 type ClientRow = Pick<
@@ -68,21 +68,54 @@ async function requireAuthenticatedUserId(): Promise<string> {
 async function loadTodayRoute(userId: string): Promise<RouteRow | null> {
   const today = getLocalDateString();
 
-  const { data, error } = await supabase
+  const { data: routes, error: routesError } = await supabase
     .from("routes")
     .select("id, warehouse_id, route_date, status")
     .eq("driver_id", userId)
     .eq("route_date", today)
     .in("status", ["draft", "scheduled", "in_progress"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: false });
 
-  if (error) {
-    throw new Error(`Unable to load today's route: ${error.message}`);
+  if (routesError) {
+    throw new Error(`Unable to load today's routes: ${routesError.message}`);
   }
 
-  return data;
+  if (!routes || routes.length === 0) {
+    return null;
+  }
+
+  let nonEmptyFallback: RouteRow | null = null;
+
+  for (const route of routes) {
+    const { data: stops, error: stopsError } = await supabase
+      .from("stops")
+      .select("id, client_id, sequence_number, status")
+      .eq("route_id", route.id);
+
+    if (stopsError) {
+      throw new Error(`Unable to load route stops: ${stopsError.message}`);
+    }
+
+    if (!nonEmptyFallback && stops && stops.length > 0) {
+      nonEmptyFallback = route;
+    }
+
+    const hasRemainingWork = (stops ?? []).some(
+      (stop) => stop.status !== "completed" && stop.status !== "skipped",
+    );
+
+    if (hasRemainingWork) {
+      return route;
+    }
+  }
+
+  if (nonEmptyFallback) {
+    return nonEmptyFallback;
+  }
+
+  // All today's candidate routes are empty.
+  // Preserve newest-route behavior as the final fallback.
+  return routes[0];
 }
 
 async function loadWarehouseTarget(
@@ -217,9 +250,7 @@ async function loadOpenTimeEntryForUser(
     .maybeSingle();
 
   if (error) {
-    throw new Error(
-      `Unable to load your current shift: ${error.message}`,
-    );
+    throw new Error(`Unable to load your current shift: ${error.message}`);
   }
 
   return data;
@@ -252,10 +283,7 @@ export async function createClockIn({
       driver_id: userId,
       warehouse_id: target.warehouseId,
       route_id: target.routeId,
-      stop_id:
-        target.kind === "scheduled_stop"
-          ? target.stopId
-          : null,
+      stop_id: target.kind === "scheduled_stop" ? target.stopId : null,
       clock_in_at: new Date().toISOString(),
       clock_in_latitude: position.latitude,
       clock_in_longitude: position.longitude,
@@ -310,34 +338,24 @@ async function assertTimeEntryReadyForClockOut(
     .maybeSingle();
 
   if (error) {
-    throw new Error(
-      `Unable to verify the active shift: ${error.message}`,
-    );
+    throw new Error(`Unable to verify the active shift: ${error.message}`);
   }
 
   if (!data) {
     throw new Error("The active shift could not be found.");
   }
 
-  if (
-    data.selfie_status !== "uploaded" &&
-    data.selfie_status !== "waived"
-  ) {
+  if (data.selfie_status !== "uploaded" && data.selfie_status !== "waived") {
     throw new Error(
       "Complete the required clock-in selfie before clocking out.",
     );
   }
 }
 
-export async function clockOut(
-  timeEntryId: string,
-): Promise<ClockOutResult> {
+export async function clockOut(timeEntryId: string): Promise<ClockOutResult> {
   const userId = await requireAuthenticatedUserId();
 
-  await assertTimeEntryReadyForClockOut(
-    timeEntryId,
-    userId,
-  );
+  await assertTimeEntryReadyForClockOut(timeEntryId, userId);
 
   const position = await requestCurrentPosition();
 

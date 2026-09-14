@@ -93,25 +93,23 @@ async function requireAuthenticatedUserId(): Promise<string> {
   return user.id;
 }
 
-async function fetchTodayRouteRow(
+async function fetchTodayRouteRows(
   userId: string,
   routeDate: string,
-): Promise<RouteRow | null> {
+): Promise<RouteRow[]> {
   const { data, error } = await supabase
     .from("routes")
     .select("id, warehouse_id, route_date, status, notes, created_at")
     .eq("driver_id", userId)
     .eq("route_date", routeDate)
     .in("status", ["draft", "scheduled", "in_progress"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: false });
 
   if (error) {
-    throw new Error(`Unable to load today's route: ${error.message}`);
+    throw new Error(`Unable to load today's routes: ${error.message}`);
   }
 
-  return data;
+  return data ?? [];
 }
 
 async function fetchWarehouse(
@@ -161,6 +159,60 @@ async function fetchRouteStops(routeId: string): Promise<StopRow[]> {
   }
 
   return data;
+}
+
+function hasRemainingWork(stops: StopRow[]): boolean {
+  return stops.some(
+    (stop) => stop.status !== "completed" && stop.status !== "skipped",
+  );
+}
+
+async function selectTodayRoute(
+  userId: string,
+  routeDate: string,
+): Promise<{
+  routeRow: RouteRow;
+  stops: StopRow[];
+} | null> {
+  const routeRows = await fetchTodayRouteRows(userId, routeDate);
+
+  if (routeRows.length === 0) {
+    return null;
+  }
+
+  let fallback: {
+    routeRow: RouteRow;
+    stops: StopRow[];
+  } | null = null;
+
+  for (const routeRow of routeRows) {
+    const stops = await fetchRouteStops(routeRow.id);
+
+    if (!fallback && stops.length > 0) {
+      fallback = {
+        routeRow,
+        stops,
+      };
+    }
+
+    if (hasRemainingWork(stops)) {
+      return {
+        routeRow,
+        stops,
+      };
+    }
+  }
+
+  if (fallback) {
+    return fallback;
+  }
+
+  // All today's candidate routes are empty.
+  // Keep the existing newest-route behavior as the final fallback.
+  return {
+    routeRow: routeRows[0],
+    stops: [],
+  };
 }
 
 async function fetchClients(clientIds: string[]): Promise<ClientRow[]> {
@@ -286,9 +338,9 @@ async function fetchTodayRouteFromNetwork(
   userId: string,
   routeDate: string,
 ): Promise<TodayRouteSnapshot> {
-  const routeRow = await fetchTodayRouteRow(userId, routeDate);
+  const selectedRoute = await selectTodayRoute(userId, routeDate);
 
-  if (!routeRow) {
+  if (!selectedRoute) {
     const emptySnapshot: TodayRouteSnapshot = {
       userId,
       routeDate,
@@ -301,10 +353,9 @@ async function fetchTodayRouteFromNetwork(
     return emptySnapshot;
   }
 
-  const [warehouse, stops] = await Promise.all([
-    fetchWarehouse(routeRow.warehouse_id),
-    fetchRouteStops(routeRow.id),
-  ]);
+  const { routeRow, stops } = selectedRoute;
+
+  const warehouse = await fetchWarehouse(routeRow.warehouse_id);
 
   const clientIds = removeDuplicates(stops.map((stop) => stop.client_id));
 
