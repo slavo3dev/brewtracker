@@ -172,40 +172,67 @@ export async function loadTechnicalTickets(): Promise<
     users.map((user) => [user.id, user]),
   );
 
+  const visibleTickets = ticketRows.filter((ticket) => {
+    const client = clientsById.get(ticket.client_id);
+    const machine = machinesById.get(ticket.machine_id);
+    const reporter = usersById.get(ticket.reported_by);
+
+    if (!client) {
+      console.warn(
+        "Skipping technical ticket with inaccessible or missing client:",
+        {
+          ticketId: ticket.id,
+          clientId: ticket.client_id,
+        },
+      );
+
+      return false;
+    }
+
+    if (!machine) {
+      console.warn(
+        "Skipping technical ticket with inaccessible or missing machine:",
+        {
+          ticketId: ticket.id,
+          machineId: ticket.machine_id,
+        },
+      );
+
+      return false;
+    }
+
+    if (!reporter) {
+      console.warn(
+        "Skipping technical ticket with inaccessible or missing reporter:",
+        {
+          ticketId: ticket.id,
+          reporterId: ticket.reported_by,
+        },
+      );
+
+      return false;
+    }
+
+    return true;
+  });
+
   return Promise.all(
-    ticketRows.map(async (ticket): Promise<TechnicalTicketListItem> => {
-      const client = clientsById.get(ticket.client_id);
+    visibleTickets.map(async (ticket): Promise<TechnicalTicketListItem> => {
+      /*
+       * These relationships were validated above.
+       */
+      const client = clientsById.get(ticket.client_id)!;
+      const machine = machinesById.get(ticket.machine_id)!;
+      const reporter = usersById.get(ticket.reported_by)!;
 
-      const machine = machinesById.get(ticket.machine_id);
-
-      const reporter = usersById.get(ticket.reported_by);
-
+      /*
+       * Assignment is optional. If the assigned user is no longer
+       * accessible to the current viewer, render the ticket as
+       * unassigned rather than hiding the entire ticket.
+       */
       const assignedUser = ticket.assigned_to
         ? usersById.get(ticket.assigned_to)
         : undefined;
-
-      /*
-       * These relationships are required for displaying
-       * a usable ticket. Fail explicitly rather than
-       * silently rendering incomplete data.
-       */
-      if (!client) {
-        throw new Error(
-          `Client for technical ticket ${ticket.id} could not be loaded.`,
-        );
-      }
-
-      if (!machine) {
-        throw new Error(
-          `Machine for technical ticket ${ticket.id} could not be loaded.`,
-        );
-      }
-
-      if (!reporter) {
-        throw new Error(
-          `Reporter for technical ticket ${ticket.id} could not be loaded.`,
-        );
-      }
 
       /*
        * Ticket photos live in a private Storage bucket.
@@ -269,7 +296,6 @@ export async function loadTechnicalTickets(): Promise<
         assignedTo: assignedUser
           ? {
               id: assignedUser.id,
-
               fullName: assignedUser.full_name,
             }
           : null,
