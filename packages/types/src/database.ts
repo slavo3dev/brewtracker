@@ -1967,6 +1967,16 @@ export type Database = {
         }
         Returns: string
       }
+      record_warehouse_driver_transfer_batch: {
+        Args: {
+          p_driver_id: string
+          p_items: Json
+          p_movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          p_occurred_at?: string
+          p_warehouse_id: string
+        }
+        Returns: string[]
+      }
       save_client_delivery: {
         Args: {
           p_client_id: string
