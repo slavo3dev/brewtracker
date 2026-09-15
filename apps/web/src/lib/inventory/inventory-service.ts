@@ -106,13 +106,17 @@ export type WarehouseTransferData = {
   products: WarehouseTransferProduct[];
 };
 
+export type RecordWarehouseTransferItemInput = {
+  productId: string;
+  issueQuantity: number;
+  looseQuantity: number;
+};
+
 export type RecordWarehouseTransferInput = {
   movementType: WarehouseTransferType;
   warehouseId: string;
   driverId: string;
-  productId: string;
-  issueQuantity: number;
-  looseQuantity: number;
+  items: RecordWarehouseTransferItemInput[];
 };
 
 export type WarehouseMovementDashboardFilters = {
@@ -375,19 +379,23 @@ function escapePostgrestSearch(value: string) {
 
 export async function recordWarehouseTransfer(
   input: RecordWarehouseTransferInput,
-): Promise<string> {
+): Promise<string[]> {
   const supabase = await createClient();
 
+  const occurredAt = new Date().toISOString();
+
   const { data, error } = await supabase.rpc(
-    "record_warehouse_driver_transfer",
+    "record_warehouse_driver_transfer_batch",
     {
       p_movement_type: input.movementType,
       p_warehouse_id: input.warehouseId,
       p_driver_id: input.driverId,
-      p_product_id: input.productId,
-      p_issue_quantity: input.issueQuantity,
-      p_loose_quantity: input.looseQuantity,
-      p_occurred_at: new Date().toISOString(),
+      p_items: input.items.map((item) => ({
+        product_id: item.productId,
+        issue_quantity: item.issueQuantity,
+        loose_quantity: item.looseQuantity,
+      })),
+      p_occurred_at: occurredAt,
     },
   );
 
@@ -395,8 +403,8 @@ export async function recordWarehouseTransfer(
     throw new Error(`Unable to record inventory transfer: ${error.message}`);
   }
 
-  if (!data) {
-    throw new Error("The inventory transfer did not return a movement ID.");
+  if (!data || data.length === 0) {
+    throw new Error("The inventory transfer did not return any movement IDs.");
   }
 
   return data;

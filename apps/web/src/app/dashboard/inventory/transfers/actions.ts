@@ -9,7 +9,7 @@ import {
 } from "@/lib/inventory/inventory-service";
 
 export type WarehouseTransferActionResult = {
-  movementId: string;
+  movementIds: string[];
 };
 
 export async function recordWarehouseTransferAction(
@@ -21,56 +21,54 @@ export async function recordWarehouseTransferAction(
     input.movementType !== "warehouse_issue" &&
     input.movementType !== "warehouse_return"
   ) {
-    throw new Error(
-      "Invalid warehouse transfer type.",
-    );
+    throw new Error("Invalid warehouse transfer type.");
   }
 
   if (!input.warehouseId) {
-    throw new Error(
-      "Select a warehouse.",
-    );
+    throw new Error("Select a warehouse.");
   }
 
   if (!input.driverId) {
-    throw new Error(
-      "Select a driver.",
-    );
+    throw new Error("Select a driver.");
   }
 
-  if (!input.productId) {
-    throw new Error(
-      "Select a product.",
-    );
+  if (!Array.isArray(input.items) || input.items.length === 0) {
+    throw new Error("Add at least one product.");
   }
 
-  if (
-    !Number.isFinite(input.issueQuantity) ||
-    input.issueQuantity < 0
-  ) {
-    throw new Error(
-      "Issue quantity must be zero or greater.",
-    );
+  const productIds = new Set<string>();
+
+  for (const item of input.items) {
+    if (!item.productId) {
+      throw new Error("Select a product for every transfer item.");
+    }
+
+    if (productIds.has(item.productId)) {
+      throw new Error("The same product cannot be added more than once.");
+    }
+
+    productIds.add(item.productId);
+
+    if (!Number.isFinite(item.issueQuantity) || item.issueQuantity < 0) {
+      throw new Error("Issue quantity must be zero or greater.");
+    }
+
+    if (!Number.isInteger(item.issueQuantity)) {
+      throw new Error("Issue quantity must be a whole number.");
+    }
+
+    if (!Number.isFinite(item.looseQuantity) || item.looseQuantity < 0) {
+      throw new Error("Loose quantity must be zero or greater.");
+    }
   }
 
-  if (
-    !Number.isFinite(input.looseQuantity) ||
-    input.looseQuantity < 0
-  ) {
-    throw new Error(
-      "Loose quantity must be zero or greater.",
-    );
-  }
-
-  const movementId =
-    await recordWarehouseTransfer(input);
+  const movementIds = await recordWarehouseTransfer(input);
 
   revalidatePath("/dashboard/inventory");
-  revalidatePath(
-    "/dashboard/inventory/transfers",
-  );
+  revalidatePath("/dashboard/inventory/transfers");
+  revalidatePath("/dashboard/inventory/movements");
 
   return {
-    movementId,
+    movementIds,
   };
 }
