@@ -24,6 +24,7 @@ import {
   removeServiceVisit,
   saveServiceVisit,
 } from "./service-visit.storage";
+import { markServiceStopArrived } from "./service-visit-stop.service";
 
 import {
   createInitialStepStates,
@@ -516,6 +517,18 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       const updatedVisit = transitionToNextStep(
         visitWithArrival,
         "arrival",
+        now,
+      );
+
+      /*
+      * Persist the authoritative start of time spent
+      * servicing this client.
+      *
+      * Visit duration is derived later as:
+      * stops.completed_at - stops.arrived_at
+      */
+      await markServiceStopArrived(
+        activeVisit.stopId,
         now,
       );
 
