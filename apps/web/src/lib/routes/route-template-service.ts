@@ -2,51 +2,32 @@ import type { Database } from "@brewtracker/types";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 
-type UserRow =
-  Database["public"]["Tables"]["users"]["Row"];
+type UserRow = Database["public"]["Tables"]["users"]["Row"];
 
-type WarehouseRow =
-  Database["public"]["Tables"]["warehouses"]["Row"];
+type WarehouseRow = Database["public"]["Tables"]["warehouses"]["Row"];
 
-type ClientRow =
-  Database["public"]["Tables"]["clients"]["Row"];
+type ClientRow = Database["public"]["Tables"]["clients"]["Row"];
 
-type MachineRow =
-  Database["public"]["Tables"]["machines"]["Row"];
+type MachineRow = Database["public"]["Tables"]["machines"]["Row"];
 
-type RouteTemplateRow =
-  Database["public"]["Tables"]["route_templates"]["Row"];
+type RouteTemplateRow = Database["public"]["Tables"]["route_templates"]["Row"];
 
 type RouteTemplateStopRow =
   Database["public"]["Tables"]["route_template_stops"]["Row"];
 
-export type RouteTemplateStop =
-  RouteTemplateStopRow & {
-    client: Pick<
-      ClientRow,
-      "id" | "name" | "address" | "city"
-    > | null;
+export type RouteTemplateStop = RouteTemplateStopRow & {
+  client: Pick<ClientRow, "id" | "name" | "address" | "city"> | null;
 
-    machine: Pick<
-      MachineRow,
-      "id" | "name" | "serial_number"
-    > | null;
-  };
+  machine: Pick<MachineRow, "id" | "name" | "serial_number"> | null;
+};
 
-export type RouteTemplate =
-  RouteTemplateRow & {
-    driver: Pick<
-      UserRow,
-      "id" | "full_name" | "email" | "region"
-    > | null;
+export type RouteTemplate = RouteTemplateRow & {
+  driver: Pick<UserRow, "id" | "full_name" | "email" | "region"> | null;
 
-    warehouse: Pick<
-      WarehouseRow,
-      "id" | "name" | "city" | "region"
-    > | null;
+  warehouse: Pick<WarehouseRow, "id" | "name" | "city" | "region"> | null;
 
-    stops: RouteTemplateStop[];
-  };
+  stops: RouteTemplateStop[];
+};
 
 export type CreateRouteTemplateInput = {
   name: string;
@@ -100,10 +81,7 @@ export type AddRouteTemplateStopInput = {
   notes: string | null;
 };
 
-function normalizeRequiredText(
-  value: string,
-  fieldName: string,
-): string {
+function normalizeRequiredText(value: string, fieldName: string): string {
   const normalized = value.trim();
 
   if (!normalized) {
@@ -133,9 +111,7 @@ function hasSelectedServiceDay(input: {
   );
 }
 
-  export async function getRouteTemplates(): Promise<
-  RouteTemplate[]
-> {
+export async function getRouteTemplates(): Promise<RouteTemplate[]> {
   const supabase = createAdminClient();
 
   const { data, error } = await supabase
@@ -176,9 +152,7 @@ function hasSelectedServiceDay(input: {
     });
 
   if (error) {
-    throw new Error(
-      `Unable to load route templates: ${error.message}`,
-    );
+    throw new Error(`Unable to load route templates: ${error.message}`);
   }
 
   const templates = (data ?? []) as RouteTemplate[];
@@ -187,8 +161,7 @@ function hasSelectedServiceDay(input: {
     ...template,
 
     stops: [...template.stops].sort(
-      (a, b) =>
-        a.sequence_number - b.sequence_number,
+      (a, b) => a.sequence_number - b.sequence_number,
     ),
   }));
 }
@@ -198,20 +171,11 @@ export async function createRouteTemplate(
 ): Promise<string> {
   const supabase = createAdminClient();
 
-  const name = normalizeRequiredText(
-    input.name,
-    "Template name",
-  );
+  const name = normalizeRequiredText(input.name, "Template name");
 
-  normalizeRequiredText(
-    input.driverId,
-    "Driver",
-  );
+  normalizeRequiredText(input.driverId, "Driver");
 
-  normalizeRequiredText(
-    input.warehouseId,
-    "Warehouse",
-  );
+  normalizeRequiredText(input.warehouseId, "Warehouse");
 
   const { data, error } = await supabase
     .from("route_templates")
@@ -245,9 +209,7 @@ export async function createRouteTemplate(
     .single();
 
   if (error) {
-    throw new Error(
-      `Unable to create route template: ${error.message}`,
-    );
+    throw new Error(`Unable to create route template: ${error.message}`);
   }
 
   return data.id;
@@ -258,38 +220,23 @@ export async function updateRouteTemplate(
 ): Promise<void> {
   const supabase = createAdminClient();
 
-  const name = normalizeRequiredText(
-    input.name,
-    "Template name",
-  );
+  const name = normalizeRequiredText(input.name, "Template name");
 
-  normalizeRequiredText(
-    input.driverId,
-    "Driver",
-  );
+  normalizeRequiredText(input.driverId, "Driver");
 
-  normalizeRequiredText(
-    input.warehouseId,
-    "Warehouse",
-  );
+  normalizeRequiredText(input.warehouseId, "Warehouse");
 
-  const { data: existing, error: existingError } =
-    await supabase
-      .from("route_templates")
-      .select("id, is_active")
-      .eq("id", input.id)
-      .single();
+  const { data: existing, error: existingError } = await supabase
+    .from("route_templates")
+    .select("id, is_active")
+    .eq("id", input.id)
+    .single();
 
   if (existingError) {
-    throw new Error(
-      `Unable to load route template: ${existingError.message}`,
-    );
+    throw new Error(`Unable to load route template: ${existingError.message}`);
   }
 
-  if (
-    existing.is_active &&
-    !hasSelectedServiceDay(input)
-  ) {
+  if (existing.is_active && !hasSelectedServiceDay(input)) {
     throw new Error(
       "An active route template must have at least one service day.",
     );
@@ -318,9 +265,7 @@ export async function updateRouteTemplate(
     .eq("id", input.id);
 
   if (error) {
-    throw new Error(
-      `Unable to update route template: ${error.message}`,
-    );
+    throw new Error(`Unable to update route template: ${error.message}`);
   }
 }
 
@@ -329,29 +274,19 @@ export async function addRouteTemplateStop(
 ): Promise<void> {
   const supabase = createAdminClient();
 
-  normalizeRequiredText(
-    input.routeTemplateId,
-    "Route template",
-  );
+  normalizeRequiredText(input.routeTemplateId, "Route template");
 
-  normalizeRequiredText(
-    input.clientId,
-    "Client",
-  );
+  normalizeRequiredText(input.clientId, "Client");
 
-  const { data: latestStop, error: latestStopError } =
-    await supabase
-      .from("route_template_stops")
-      .select("sequence_number")
-      .eq(
-        "route_template_id",
-        input.routeTemplateId,
-      )
-      .order("sequence_number", {
-        ascending: false,
-      })
-      .limit(1)
-      .maybeSingle();
+  const { data: latestStop, error: latestStopError } = await supabase
+    .from("route_template_stops")
+    .select("sequence_number")
+    .eq("route_template_id", input.routeTemplateId)
+    .order("sequence_number", {
+      ascending: false,
+    })
+    .limit(1)
+    .maybeSingle();
 
   if (latestStopError) {
     throw new Error(
@@ -359,57 +294,85 @@ export async function addRouteTemplateStop(
     );
   }
 
-  const nextSequence =
-    (latestStop?.sequence_number ?? 0) + 1;
+  const nextSequence = (latestStop?.sequence_number ?? 0) + 1;
 
-  const { error } = await supabase
-    .from("route_template_stops")
-    .insert({
-      route_template_id:
-        input.routeTemplateId,
+  const { error } = await supabase.from("route_template_stops").insert({
+    route_template_id: input.routeTemplateId,
 
-      client_id: input.clientId,
-      machine_id: input.machineId,
+    client_id: input.clientId,
+    machine_id: input.machineId,
 
-      sequence_number: nextSequence,
+    sequence_number: nextSequence,
 
-      scheduled_start_time:
-        input.scheduledStartTime,
+    scheduled_start_time: input.scheduledStartTime,
 
-      scheduled_end_time:
-        input.scheduledEndTime,
+    scheduled_end_time: input.scheduledEndTime,
 
-      drink_count_required:
-        input.drinkCountRequired,
+    drink_count_required: input.drinkCountRequired,
 
-      notes: input.notes?.trim() || null,
-    });
+    notes: input.notes?.trim() || null,
+  });
 
   if (error) {
-    throw new Error(
-      `Unable to add route template stop: ${error.message}`,
-    );
+    throw new Error(`Unable to add route template stop: ${error.message}`);
   }
 }
 
-export async function deleteRouteTemplateStop(
-  stopId: string,
-): Promise<void> {
+export async function deleteRouteTemplateStop(stopId: string): Promise<void> {
   const supabase = createAdminClient();
 
-  const { data: stop, error: stopError } =
-    await supabase
-      .from("route_template_stops")
-      .select(
-        "id, route_template_id, sequence_number",
-      )
-      .eq("id", stopId)
-      .single();
+  const { data: stop, error: stopError } = await supabase
+    .from("route_template_stops")
+    .select(
+      `
+        id,
+        route_template_id,
+        sequence_number
+      `,
+    )
+    .eq("id", stopId)
+    .maybeSingle();
 
   if (stopError) {
-    throw new Error(
-      `Unable to load route template stop: ${stopError.message}`,
-    );
+    throw new Error(stopError.message);
+  }
+
+  if (!stop) {
+    throw new Error("Route template stop was not found.");
+  }
+
+  const { data: template, error: templateError } = await supabase
+    .from("route_templates")
+    .select("id, is_active")
+    .eq("id", stop.route_template_id)
+    .maybeSingle();
+
+  if (templateError) {
+    throw new Error(templateError.message);
+  }
+
+  if (!template) {
+    throw new Error("Route template was not found.");
+  }
+
+  if (template.is_active) {
+    const { count, error: countError } = await supabase
+      .from("route_template_stops")
+      .select("id", {
+        count: "exact",
+        head: true,
+      })
+      .eq("route_template_id", stop.route_template_id);
+
+    if (countError) {
+      throw new Error(countError.message);
+    }
+
+    if ((count ?? 0) <= 1) {
+      throw new Error(
+        "Deactivate the route template before removing its last stop.",
+      );
+    }
   }
 
   const { error: deleteError } = await supabase
@@ -418,56 +381,40 @@ export async function deleteRouteTemplateStop(
     .eq("id", stopId);
 
   if (deleteError) {
-    throw new Error(
-      `Unable to remove route template stop: ${deleteError.message}`,
-    );
+    throw new Error(deleteError.message);
   }
 
-  const { data: remainingStops, error: remainingError } =
-    await supabase
-      .from("route_template_stops")
-      .select("id, sequence_number")
-      .eq(
-        "route_template_id",
-        stop.route_template_id,
-      )
-      .order("sequence_number", {
-        ascending: true,
-      });
+  const { data: remainingStops, error: remainingStopsError } = await supabase
+    .from("route_template_stops")
+    .select("id, sequence_number")
+    .eq("route_template_id", stop.route_template_id)
+    .order("sequence_number", {
+      ascending: true,
+    });
 
-  if (remainingError) {
-    throw new Error(
-      `Unable to normalize template stops: ${remainingError.message}`,
-    );
+  if (remainingStopsError) {
+    throw new Error(remainingStopsError.message);
   }
 
-  for (
-    let index = 0;
-    index < (remainingStops ?? []).length;
-    index += 1
-  ) {
-    const currentStop = remainingStops![index];
-    const expectedSequence = index + 1;
+  for (let index = 0; index < remainingStops.length; index += 1) {
+    const currentStop = remainingStops[index];
 
-    if (
-      currentStop.sequence_number ===
-      expectedSequence
-    ) {
+    const nextSequence = index + 1;
+
+    if (currentStop.sequence_number === nextSequence) {
       continue;
     }
 
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from("route_template_stops")
       .update({
-        sequence_number: expectedSequence,
+        sequence_number: nextSequence,
         updated_at: new Date().toISOString(),
       })
       .eq("id", currentStop.id);
 
-    if (error) {
-      throw new Error(
-        `Unable to normalize template stop order: ${error.message}`,
-      );
+    if (updateError) {
+      throw new Error(updateError.message);
     }
   }
 }
@@ -479,11 +426,10 @@ export async function setRouteTemplateActive(
   const supabase = createAdminClient();
 
   if (isActive) {
-    const { data: template, error: templateError } =
-      await supabase
-        .from("route_templates")
-        .select(
-          `
+    const { data: template, error: templateError } = await supabase
+      .from("route_templates")
+      .select(
+        `
             id,
             monday,
             tuesday,
@@ -493,9 +439,9 @@ export async function setRouteTemplateActive(
             saturday,
             sunday
           `,
-        )
-        .eq("id", templateId)
-        .single();
+      )
+      .eq("id", templateId)
+      .single();
 
     if (templateError) {
       throw new Error(
@@ -509,17 +455,13 @@ export async function setRouteTemplateActive(
       );
     }
 
-    const { count, error: countError } =
-      await supabase
-        .from("route_template_stops")
-        .select("id", {
-          count: "exact",
-          head: true,
-        })
-        .eq(
-          "route_template_id",
-          templateId,
-        );
+    const { count, error: countError } = await supabase
+      .from("route_template_stops")
+      .select("id", {
+        count: "exact",
+        head: true,
+      })
+      .eq("route_template_id", templateId);
 
     if (countError) {
       throw new Error(
@@ -528,9 +470,7 @@ export async function setRouteTemplateActive(
     }
 
     if (!count) {
-      throw new Error(
-        "Add at least one stop before activating the template.",
-      );
+      throw new Error("Add at least one stop before activating the template.");
     }
   }
 
