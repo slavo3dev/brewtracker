@@ -1192,6 +1192,149 @@ export type Database = {
           },
         ]
       }
+      route_template_stops: {
+        Row: {
+          client_id: string
+          created_at: string
+          drink_count_required: boolean
+          id: string
+          machine_id: string | null
+          notes: string | null
+          route_template_id: string
+          scheduled_end_time: string | null
+          scheduled_start_time: string | null
+          sequence_number: number
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          drink_count_required?: boolean
+          id?: string
+          machine_id?: string | null
+          notes?: string | null
+          route_template_id: string
+          scheduled_end_time?: string | null
+          scheduled_start_time?: string | null
+          sequence_number: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          drink_count_required?: boolean
+          id?: string
+          machine_id?: string | null
+          notes?: string | null
+          route_template_id?: string
+          scheduled_end_time?: string | null
+          scheduled_start_time?: string | null
+          sequence_number?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_template_stops_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_stops_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_stops_route_template_id_fkey"
+            columns: ["route_template_id"]
+            isOneToOne: false
+            referencedRelation: "route_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          driver_id: string
+          friday: boolean
+          id: string
+          is_active: boolean
+          monday: boolean
+          name: string
+          notes: string | null
+          saturday: boolean
+          sunday: boolean
+          thursday: boolean
+          tuesday: boolean
+          updated_at: string
+          warehouse_id: string
+          wednesday: boolean
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          driver_id: string
+          friday?: boolean
+          id?: string
+          is_active?: boolean
+          monday?: boolean
+          name: string
+          notes?: string | null
+          saturday?: boolean
+          sunday?: boolean
+          thursday?: boolean
+          tuesday?: boolean
+          updated_at?: string
+          warehouse_id: string
+          wednesday?: boolean
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string
+          friday?: boolean
+          id?: string
+          is_active?: boolean
+          monday?: boolean
+          name?: string
+          notes?: string | null
+          saturday?: boolean
+          sunday?: boolean
+          thursday?: boolean
+          tuesday?: boolean
+          updated_at?: string
+          warehouse_id?: string
+          wednesday?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_templates_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_templates_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       routes: {
         Row: {
           created_at: string
