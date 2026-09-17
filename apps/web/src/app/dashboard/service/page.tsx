@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth/require-admin";
 
+import { ServiceNavigation } from "./service-navigation";
 import { TechnicalTicketCard } from "./technical-ticket-card";
 import {
   loadTechnicalTickets,
@@ -37,6 +38,8 @@ export default async function ServicePage() {
           Review technical problems reported by drivers during service visits.
         </p>
       </div>
+
+      <ServiceNavigation />
 
       <div className="mt-7 grid gap-3 sm:grid-cols-3">
         <StatusCard label="Open" value={openCount} />

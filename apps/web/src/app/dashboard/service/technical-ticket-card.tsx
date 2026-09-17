@@ -55,7 +55,11 @@ export function TechnicalTicketCard({ ticket, technicians }: Props) {
 
   return (
     <article className="overflow-hidden rounded-2xl border border-latte-200 bg-crema-0 shadow-sm">
-      <div className="grid md:grid-cols-[1fr_220px]">
+      <div
+        className={
+          ticket.photoUrl ? "grid md:grid-cols-[minmax(0,1fr)_260px]" : "grid"
+        }
+      >
         <div className="p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
