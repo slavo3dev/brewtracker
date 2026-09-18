@@ -1343,6 +1343,7 @@ export type Database = {
           id: string
           notes: string | null
           route_date: string
+          source_route_template_id: string | null
           status: Database["public"]["Enums"]["route_status"]
           updated_at: string
           warehouse_id: string | null
@@ -1354,6 +1355,7 @@ export type Database = {
           id?: string
           notes?: string | null
           route_date: string
+          source_route_template_id?: string | null
           status?: Database["public"]["Enums"]["route_status"]
           updated_at?: string
           warehouse_id?: string | null
@@ -1365,6 +1367,7 @@ export type Database = {
           id?: string
           notes?: string | null
           route_date?: string
+          source_route_template_id?: string | null
           status?: Database["public"]["Enums"]["route_status"]
           updated_at?: string
           warehouse_id?: string | null
@@ -1382,6 +1385,13 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routes_source_route_template_id_fkey"
+            columns: ["source_route_template_id"]
+            isOneToOne: false
+            referencedRelation: "route_templates"
             referencedColumns: ["id"]
           },
           {
@@ -2082,6 +2092,16 @@ export type Database = {
       driver_has_route_at_warehouse: {
         Args: { target_warehouse_id: string }
         Returns: boolean
+      }
+      generate_routes_from_templates: {
+        Args: { p_route_date: string }
+        Returns: {
+          driver_id: string
+          route_date: string
+          route_id: string
+          route_template_id: string
+          stops_created: number
+        }[]
       }
       get_inventory_location_id: {
         Args: {
