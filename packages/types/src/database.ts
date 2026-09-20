@@ -1192,6 +1192,64 @@ export type Database = {
           },
         ]
       }
+      route_template_exceptions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          exception_date: string
+          id: string
+          is_skipped: boolean
+          notes: string | null
+          override_driver_id: string | null
+          route_template_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          exception_date: string
+          id?: string
+          is_skipped?: boolean
+          notes?: string | null
+          override_driver_id?: string | null
+          route_template_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          exception_date?: string
+          id?: string
+          is_skipped?: boolean
+          notes?: string | null
+          override_driver_id?: string | null
+          route_template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_template_exceptions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_exceptions_override_driver_id_fkey"
+            columns: ["override_driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_exceptions_route_template_id_fkey"
+            columns: ["route_template_id"]
+            isOneToOne: false
+            referencedRelation: "route_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       route_template_stops: {
         Row: {
           client_id: string
@@ -2057,6 +2115,17 @@ export type Database = {
       }
     }
     Functions: {
+      apply_route_template_exception: {
+        Args: {
+          p_created_by?: string
+          p_exception_date: string
+          p_is_skipped: boolean
+          p_notes?: string
+          p_override_driver_id?: string
+          p_route_template_id: string
+        }
+        Returns: string
+      }
       calculate_client_reserve_decrease: {
         Args: {
           p_current_reserve_before: number

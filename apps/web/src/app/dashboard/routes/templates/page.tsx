@@ -1,5 +1,6 @@
 import { getRouteBuilderData } from "@/lib/routes/route-service";
 import { getRouteTemplates } from "@/lib/routes/route-template-service";
+import { getRouteTemplateExceptions } from "@/lib/routes/route-template-exception-service";
 
 import { CreateTemplateForm } from "./create-template-form";
 import { RouteTemplateCard } from "./route-template-card";
@@ -15,6 +16,15 @@ export default async function RouteTemplatesPage() {
   const activeCount = templates.filter((template) => template.is_active).length;
 
   const inactiveCount = templates.length - activeCount;
+
+  const exceptionsByTemplate = new Map(
+    await Promise.all(
+      templates.map(
+        async (template) =>
+          [template.id, await getRouteTemplateExceptions(template.id)] as const,
+      ),
+    ),
+  );
 
   return (
     <>
@@ -72,6 +82,7 @@ export default async function RouteTemplatesPage() {
               <RouteTemplateCard
                 key={template.id}
                 template={template}
+                exceptions={exceptionsByTemplate.get(template.id) ?? []}
                 drivers={drivers}
                 warehouses={warehouses}
                 clients={clients}
