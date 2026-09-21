@@ -1,5 +1,9 @@
 import { getRouteBuilderData } from "@/lib/routes/route-service";
 import { getRouteTemplates } from "@/lib/routes/route-template-service";
+import {
+  getRouteTemplateExceptions,
+  getRouteTemplateStopExceptions,
+} from "@/lib/routes/route-template-exception-service";
 
 import { CreateTemplateForm } from "./create-template-form";
 import { RouteTemplateCard } from "./route-template-card";
@@ -15,6 +19,25 @@ export default async function RouteTemplatesPage() {
   const activeCount = templates.filter((template) => template.is_active).length;
 
   const inactiveCount = templates.length - activeCount;
+
+  const [exceptionsByTemplate, stopExceptionsByTemplate] = await Promise.all([
+    Promise.all(
+      templates.map(
+        async (template) =>
+          [template.id, await getRouteTemplateExceptions(template.id)] as const,
+      ),
+    ).then((entries) => new Map(entries)),
+
+    Promise.all(
+      templates.map(
+        async (template) =>
+          [
+            template.id,
+            await getRouteTemplateStopExceptions(template.id),
+          ] as const,
+      ),
+    ).then((entries) => new Map(entries)),
+  ]);
 
   return (
     <>
@@ -72,6 +95,8 @@ export default async function RouteTemplatesPage() {
               <RouteTemplateCard
                 key={template.id}
                 template={template}
+                exceptions={exceptionsByTemplate.get(template.id) ?? []}
+                stopExceptions={stopExceptionsByTemplate.get(template.id) ?? []}
                 drivers={drivers}
                 warehouses={warehouses}
                 clients={clients}
