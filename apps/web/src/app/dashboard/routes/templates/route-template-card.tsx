@@ -6,7 +6,10 @@ import type { Database } from "@brewtracker/types";
 
 import type { RouteTemplate } from "@/lib/routes/route-template-service";
 
-import type { RouteTemplateException } from "@/lib/routes/route-template-exception-service";
+import type {
+  RouteTemplateException,
+  RouteTemplateStopException,
+} from "@/lib/routes/route-template-exception-service";
 
 import {
   deleteRouteTemplateStopAction,
@@ -18,6 +21,7 @@ import { EditTemplateForm } from "./edit-template-form";
 
 import { deleteRouteTemplateExceptionAction } from "./exception-actions";
 import { RouteExceptionForm } from "./route-exception-form";
+import { RouteStopExceptionForm } from "./route-stop-exception-form";
 
 type UserRow = Database["public"]["Tables"]["users"]["Row"];
 
@@ -37,7 +41,9 @@ type Machine = Pick<MachineRow, "id" | "client_id" | "name" | "serial_number">;
 
 type Props = {
   template: RouteTemplate;
+
   exceptions: RouteTemplateException[];
+  stopExceptions: RouteTemplateStopException[];
 
   drivers: Driver[];
   warehouses: Warehouse[];
@@ -72,6 +78,7 @@ function formatTime(value: string | null): string | null {
 export function RouteTemplateCard({
   template,
   exceptions,
+  stopExceptions,
   drivers,
   warehouses,
   clients,
@@ -82,6 +89,8 @@ export function RouteTemplateCard({
   const [addingStop, setAddingStop] = useState(false);
 
   const [addingException, setAddingException] = useState(false);
+
+  const [addingStopException, setAddingStopException] = useState(false);
 
   const [statusState, statusAction, statusPending] = useActionState(
     setRouteTemplateActiveAction,
@@ -310,6 +319,62 @@ export function RouteTemplateCard({
             </p>
           </div>
         )}
+        <div className="mt-6 border-t border-latte-200 pt-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h5 className="font-medium text-espresso-950">
+                Stop exceptions
+              </h5>
+
+              <p className="mt-1 text-sm leading-6 text-steam-400">
+                Add a one-off stop or remove a recurring stop for one specific
+                service date without changing this template.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setAddingStopException((current) => !current)
+              }
+              className="rounded-xl border border-latte-200 bg-white px-3 py-2 text-sm font-medium text-espresso-800 transition hover:bg-latte-50"
+            >
+              {addingStopException ? "Cancel" : "+ Stop Exception"}
+            </button>
+          </div>
+
+          {addingStopException ? (
+            <div className="mt-5 rounded-xl border border-latte-200 bg-latte-50/40 p-4">
+              <RouteStopExceptionForm
+                routeTemplateId={template.id}
+                templateStops={template.stops}
+                clients={clients}
+                machines={machines}
+              />
+            </div>
+          ) : null}
+
+          {stopExceptions.length > 0 ? (
+            <div className="mt-5 divide-y divide-latte-200 rounded-xl border border-latte-200">
+              {stopExceptions.map((exception) => (
+                <RouteStopExceptionRow
+                  key={exception.id}
+                  exception={exception}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-xl border border-dashed border-latte-200 px-5 py-8 text-center">
+              <p className="text-sm font-medium text-espresso-950">
+                No stop exceptions
+              </p>
+
+              <p className="mt-1 text-sm text-steam-400">
+                All recurring stops will follow the normal template schedule.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </article>
   );
@@ -468,6 +533,90 @@ function RouteExceptionRow({
             Remove
           </button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function RouteStopExceptionRow({
+  exception,
+}: {
+  exception: RouteTemplateStopException;
+}) {
+  const isAdd = exception.exception_type === "add";
+
+  const date = new Intl.DateTimeFormat("en", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${exception.exception_date}T00:00:00Z`));
+
+  const startTime = formatTime(exception.scheduled_start_time);
+
+  const endTime = formatTime(exception.scheduled_end_time);
+
+  return (
+    <div className="p-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium text-espresso-950">
+              {date}
+            </p>
+
+            <span
+              className={[
+                "rounded-full px-2.5 py-1 text-xs font-medium",
+                isAdd
+                  ? "bg-green-50 text-green-700"
+                  : "bg-red-50 text-red-700",
+              ].join(" ")}
+            >
+              {isAdd ? "One-off stop" : "Recurring stop removed"}
+            </span>
+          </div>
+
+          {isAdd ? (
+            <>
+              <p className="mt-2 text-sm text-steam-400">
+                <span className="font-medium text-espresso-800">
+                  {exception.client?.name ?? "Unknown client"}
+                </span>
+
+                {exception.machine?.serial_number
+                  ? ` · ${exception.machine.serial_number}`
+                  : ""}
+              </p>
+
+              {startTime || endTime ? (
+                <p className="mt-1 text-xs text-steam-400">
+                  Planned: {startTime ?? "—"}
+                  {" – "}
+                  {endTime ?? "—"}
+                </p>
+              ) : null}
+
+              {exception.drink_count_required ? (
+                <p className="mt-1 text-xs font-medium text-copper-700">
+                  Drink Count required
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-steam-400">
+              Template stop #
+              {exception.routeTemplateStop?.sequence_number ?? "—"} will
+              not be included for this date.
+            </p>
+          )}
+
+          {exception.notes ? (
+            <p className="mt-2 text-sm leading-6 text-steam-400">
+              {exception.notes}
+            </p>
+          ) : null}
+        </div>
       </div>
     </div>
   );

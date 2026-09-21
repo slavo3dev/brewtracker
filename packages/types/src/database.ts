@@ -1250,6 +1250,93 @@ export type Database = {
           },
         ]
       }
+      route_template_stop_exceptions: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          drink_count_required: boolean
+          exception_date: string
+          exception_type: Database["public"]["Enums"]["route_stop_exception_type"]
+          id: string
+          machine_id: string | null
+          notes: string | null
+          route_template_id: string
+          route_template_stop_id: string | null
+          scheduled_end_time: string | null
+          scheduled_start_time: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          drink_count_required?: boolean
+          exception_date: string
+          exception_type: Database["public"]["Enums"]["route_stop_exception_type"]
+          id?: string
+          machine_id?: string | null
+          notes?: string | null
+          route_template_id: string
+          route_template_stop_id?: string | null
+          scheduled_end_time?: string | null
+          scheduled_start_time?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          drink_count_required?: boolean
+          exception_date?: string
+          exception_type?: Database["public"]["Enums"]["route_stop_exception_type"]
+          id?: string
+          machine_id?: string | null
+          notes?: string | null
+          route_template_id?: string
+          route_template_stop_id?: string | null
+          scheduled_end_time?: string | null
+          scheduled_start_time?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_template_stop_exceptions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_stop_exceptions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_stop_exceptions_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_stop_exceptions_route_template_id_fkey"
+            columns: ["route_template_id"]
+            isOneToOne: false
+            referencedRelation: "route_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_stop_exceptions_route_template_stop_id_fkey"
+            columns: ["route_template_stop_id"]
+            isOneToOne: false
+            referencedRelation: "route_template_stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       route_template_stops: {
         Row: {
           client_id: string
@@ -2115,6 +2202,20 @@ export type Database = {
       }
     }
     Functions: {
+      add_route_stop_exception: {
+        Args: {
+          p_client_id: string
+          p_created_by?: string
+          p_drink_count_required?: boolean
+          p_exception_date: string
+          p_machine_id?: string
+          p_notes?: string
+          p_route_template_id: string
+          p_scheduled_end_time?: string
+          p_scheduled_start_time?: string
+        }
+        Returns: string
+      }
       apply_route_template_exception: {
         Args: {
           p_created_by?: string
@@ -2208,6 +2309,16 @@ export type Database = {
           p_warehouse_id: string
         }
         Returns: string[]
+      }
+      remove_route_stop_exception: {
+        Args: {
+          p_created_by?: string
+          p_exception_date: string
+          p_notes?: string
+          p_route_template_id: string
+          p_route_template_stop_id: string
+        }
+        Returns: string
       }
       save_client_delivery: {
         Args: {
@@ -2312,6 +2423,7 @@ export type Database = {
         | "in_progress"
         | "completed"
         | "cancelled"
+      route_stop_exception_type: "add" | "remove"
       selfie_verification_status: "required" | "uploaded" | "missing" | "waived"
       service_photo_kind: "exterior" | "interior_hopper" | "completed_machine"
       service_photo_stage: "before" | "after" | "signature"
@@ -2477,6 +2589,7 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
+      route_stop_exception_type: ["add", "remove"],
       selfie_verification_status: ["required", "uploaded", "missing", "waived"],
       service_photo_kind: ["exterior", "interior_hopper", "completed_machine"],
       service_photo_stage: ["before", "after", "signature"],
