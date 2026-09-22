@@ -2234,6 +2234,10 @@ export type Database = {
         }
         Returns: number
       }
+      cancel_operational_route: {
+        Args: { p_route_id: string }
+        Returns: undefined
+      }
       client_is_in_current_user_region: {
         Args: { target_client_id: string }
         Returns: boolean
@@ -2258,6 +2262,10 @@ export type Database = {
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
+      }
+      delete_route_template: {
+        Args: { p_route_template_id: string }
+        Returns: undefined
       }
       driver_has_route_at_warehouse: {
         Args: { target_warehouse_id: string }

@@ -490,3 +490,27 @@ export async function setRouteTemplateActive(
     );
   }
 }
+
+export async function deleteRouteTemplate(
+  templateId: string,
+): Promise<void> {
+  const supabase = createAdminClient();
+
+  normalizeRequiredText(
+    templateId,
+    "Route template",
+  );
+
+  const { error } = await supabase.rpc(
+    "delete_route_template",
+    {
+      p_route_template_id: templateId,
+    },
+  );
+
+  if (error) {
+    throw new Error(
+      `Unable to delete route template: ${error.message}`,
+    );
+  }
+}

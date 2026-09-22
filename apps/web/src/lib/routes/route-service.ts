@@ -182,3 +182,31 @@ export async function deleteRouteStop(stopId: string) {
 
   if (error) throw new Error(error.message);
 }
+
+export async function cancelRoute(
+  routeId: string,
+): Promise<void> {
+  const supabase = createAdminClient();
+
+  const normalizedRouteId =
+    routeId.trim();
+
+  if (!normalizedRouteId) {
+    throw new Error(
+      "Route is required.",
+    );
+  }
+
+  const { error } = await supabase.rpc(
+    "cancel_operational_route",
+    {
+      p_route_id: normalizedRouteId,
+    },
+  );
+
+  if (error) {
+    throw new Error(
+      `Unable to cancel route: ${error.message}`,
+    );
+  }
+}
