@@ -12,6 +12,7 @@ import type {
 } from "@/lib/routes/route-template-exception-service";
 
 import {
+  deleteRouteTemplateAction,
   deleteRouteTemplateStopAction,
   setRouteTemplateActiveAction,
 } from "../template-actions";
@@ -97,6 +98,11 @@ export function RouteTemplateCard({
     initialState,
   );
 
+  const [deleteState, deleteAction, deletePending] = useActionState(
+    deleteRouteTemplateAction,
+    initialState,
+  );
+
   const activeDays = weekdayLabels.filter(([name]) => template[name]);
 
   const existingMachineIds = template.stops.flatMap((stop) =>
@@ -167,6 +173,36 @@ export function RouteTemplateCard({
                     : "Activate"}
               </button>
             </form>
+            {!template.is_active ? (
+              <form
+                action={deleteAction}
+                onSubmit={(event) => {
+                  const confirmed = window.confirm(
+                    "Delete this recurring route template? Previously generated operational routes will remain in route history.",
+                  );
+
+                  if (!confirmed) {
+                    event.preventDefault();
+                  }
+                }}
+              >
+                <input
+                  type="hidden"
+                  name="templateId"
+                  value={template.id}
+                />
+
+                <button
+                  type="submit"
+                  disabled={deletePending}
+                  className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deletePending
+                    ? "Deleting..."
+                    : "Delete"}
+                </button>
+              </form>
+            ) : null}
           </div>
         </div>
 
@@ -202,6 +238,24 @@ export function RouteTemplateCard({
         {statusState.success ? (
           <p role="status" className="mt-4 text-sm text-green-700">
             {statusState.success}
+          </p>
+        ) : null}
+
+        {deleteState.error ? (
+          <p
+            role="alert"
+            className="mt-4 text-sm text-red-700"
+          >
+            {deleteState.error}
+          </p>
+        ) : null}
+
+        {deleteState.success ? (
+          <p
+            role="status"
+            className="mt-4 text-sm text-green-700"
+          >
+            {deleteState.success}
           </p>
         ) : null}
 

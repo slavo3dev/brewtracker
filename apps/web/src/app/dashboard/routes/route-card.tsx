@@ -6,7 +6,11 @@ import type {
   RouteBuilderRoute,
   RouteBuilderStop,
 } from "@/lib/routes/route-service";
-import { deleteStopAction, updateStopSequenceAction } from "./actions";
+import {
+  cancelRouteAction,
+  deleteStopAction,
+  updateStopSequenceAction,
+} from "./actions";
 import { AddStopForm } from "./add-stop-form";
 import { initialRouteActionState } from "./action-state";
 import {
@@ -33,6 +37,14 @@ const orderInputClass =
 export function RouteCard({ route, clients, machines }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showAddStop, setShowAddStop] = useState(false);
+  const [cancelState, cancelAction] = useActionState(
+    cancelRouteAction,
+    initialRouteActionState,
+  );
+
+  const canCancel = route.status === "scheduled";
+  const canManageStops = route.status === "scheduled";
+  
   const sortedStops = [...route.stops].sort(
     (a, b) => a.sequence_number - b.sequence_number,
   );
@@ -102,6 +114,69 @@ export function RouteCard({ route, clients, machines }: Props) {
       {isExpanded && (
         <div className="border-t border-latte-200 bg-latte-100/40 p-5">
           <RouteMapPreview stops={sortedStops} />
+          <div className="mt-5 rounded-xl border border-latte-200 bg-crema-0 p-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <h3 className="font-semibold text-espresso-950">
+                  Route management
+                </h3>
+
+                <p className="mt-1 text-sm leading-6 text-steam-400">
+                  {canCancel
+                    ? "Cancel this route if it should no longer be serviced. The route will remain in history."
+                    : route.status === "cancelled"
+                      ? "This route has been cancelled and remains available for historical reference."
+                      : "This route can no longer be cancelled because service has started or the route has been completed."}
+                </p>
+              </div>
+
+              {canCancel ? (
+                <form
+                  action={cancelAction}
+                  onSubmit={(event) => {
+                    const confirmed = window.confirm(
+                      "Cancel this route? It will remain in route history, but the driver will no longer be able to service it.",
+                    );
+
+                    if (!confirmed) {
+                      event.preventDefault();
+                    }
+                  }}
+                >
+                  <input
+                    type="hidden"
+                    name="routeId"
+                    value={route.id}
+                  />
+
+                  <SubmitButton
+                    pendingLabel="Cancelling…"
+                    className="shrink-0 rounded-full border border-red-200 bg-crema-0 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Cancel route
+                  </SubmitButton>
+                </form>
+              ) : null}
+            </div>
+
+            {cancelState.error ? (
+              <p
+                role="alert"
+                className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+              >
+                {cancelState.error}
+              </p>
+            ) : null}
+
+            {cancelState.success ? (
+              <p
+                role="status"
+                className="mt-3 rounded-lg bg-latte-100 px-3 py-2 text-sm text-espresso-800"
+              >
+                {cancelState.success}
+              </p>
+            ) : null}
+          </div>
           <div className="mb-3 mt-5 flex items-center justify-between gap-3">
             <div>
               <h3 className="font-semibold text-espresso-950">Stops</h3>
@@ -111,14 +186,15 @@ export function RouteCard({ route, clients, machines }: Props) {
             </div>
             <button
               type="button"
+              disabled={!canManageStops}
               onClick={() => setShowAddStop((value) => !value)}
-              className="inline-flex shrink-0 items-center gap-2 rounded-full bg-espresso-950 px-4 py-2 text-sm font-medium text-crema-50 hover:bg-copper-600"
+              className="inline-flex shrink-0 items-center gap-2 rounded-full bg-espresso-950 px-4 py-2 text-sm font-medium text-crema-50 hover:bg-copper-600 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <PlusIcon className="size-4" />
               {showAddStop ? "Close form" : "Add stop"}
             </button>
           </div>
-          {showAddStop && (
+          {showAddStop && canManageStops && (
             <AddStopForm
               routeId={route.id}
               clients={clients}
@@ -131,7 +207,13 @@ export function RouteCard({ route, clients, machines }: Props) {
                 No stops yet. Add the first stop to this route.
               </div>
             ) : (
-              sortedStops.map((stop) => <StopRow key={stop.id} stop={stop} />)
+              sortedStops.map((stop) => (
+                <StopRow
+                  key={stop.id}
+                  stop={stop}
+                  canManage={canManageStops}
+                />
+              ))
             )}
           </div>
         </div>
@@ -140,7 +222,13 @@ export function RouteCard({ route, clients, machines }: Props) {
   );
 }
 
-function StopRow({ stop }: { stop: RouteBuilderStop }) {
+function StopRow({
+  stop,
+  canManage,
+}: {
+  stop: RouteBuilderStop;
+  canManage: boolean;
+}) {
   const [sequenceState, sequenceAction] = useActionState(
     updateStopSequenceAction,
     initialRouteActionState,
@@ -192,9 +280,11 @@ function StopRow({ stop }: { stop: RouteBuilderStop }) {
               type="number"
               min="1"
               defaultValue={stop.sequence_number}
+              disabled={!canManage}
               className={orderInputClass}
             />
             <SubmitButton
+              disabled={!canManage}
               pendingLabel="Saving…"
               className="rounded-full border border-latte-200 px-3 py-2 text-sm font-medium text-espresso-800 hover:bg-latte-100 disabled:opacity-50"
             >
@@ -214,6 +304,7 @@ function StopRow({ stop }: { stop: RouteBuilderStop }) {
           >
             <input type="hidden" name="stopId" value={stop.id} />
             <SubmitButton
+              disabled={!canManage}
               pendingLabel="Removing…"
               aria-label={`Remove ${stop.client?.name ?? "stop"}`}
               className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-copper-600 hover:bg-copper-100 disabled:opacity-50"

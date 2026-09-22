@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRouteManager } from "@/lib/auth/require-route-manager";
 import {
   addRouteStop,
+  cancelRoute,
   createRoute,
   deleteRouteStop,
   updateStopSequence,
@@ -166,6 +167,46 @@ export async function deleteStopAction(
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Unable to remove stop.",
+      success: null,
+    };
+  }
+}
+
+export async function cancelRouteAction(
+  _prevState: RouteActionResult,
+  formData: FormData,
+): Promise<RouteActionResult> {
+  await requireRouteManager();
+
+  const routeId = String(
+    formData.get("routeId") ?? "",
+  ).trim();
+
+  if (!routeId) {
+    return {
+      error: "Route is required.",
+      success: null,
+    };
+  }
+
+  try {
+    await cancelRoute(routeId);
+
+    revalidatePath(
+      "/dashboard/routes",
+    );
+
+    return {
+      error: null,
+      success: "Route cancelled.",
+    };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to cancel route.",
+
       success: null,
     };
   }

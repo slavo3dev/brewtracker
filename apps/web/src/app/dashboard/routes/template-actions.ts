@@ -6,6 +6,7 @@ import { requireRouteManager } from "@/lib/auth/require-route-manager";
 import {
   addRouteTemplateStop,
   createRouteTemplate,
+  deleteRouteTemplate,
   deleteRouteTemplateStop,
   setRouteTemplateActive,
   updateRouteTemplate,
@@ -443,6 +444,47 @@ export async function setRouteTemplateActiveAction(
         error instanceof Error
           ? error.message
           : "Unable to update route template status.",
+
+      success: null,
+    };
+  }
+}
+
+export async function deleteRouteTemplateAction(
+  _previousState: RouteActionResult,
+  formData: FormData,
+): Promise<RouteActionResult> {
+  await requireRouteManager();
+
+  const templateId = getRequiredText(
+    formData,
+    "templateId",
+  );
+
+  if (!templateId) {
+    return {
+      error: "Route template is required.",
+      success: null,
+    };
+  }
+
+  try {
+    await deleteRouteTemplate(
+      templateId,
+    );
+
+    revalidateRoutePages();
+
+    return {
+      error: null,
+      success: "Route template deleted.",
+    };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to delete route template.",
 
       success: null,
     };
