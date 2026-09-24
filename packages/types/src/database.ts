@@ -748,6 +748,140 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_reconciliation_items: {
+        Row: {
+          base_unit_snapshot: string
+          created_at: string
+          expected_quantity: number | null
+          id: string
+          issue_unit_snapshot: string
+          normalized_unit: string
+          package_description_snapshot: string | null
+          physical_quantity: number
+          product_id: string
+          reason: string | null
+          reconciliation_id: string
+          units_per_issue_unit_snapshot: number
+          variance_quantity: number | null
+        }
+        Insert: {
+          base_unit_snapshot: string
+          created_at?: string
+          expected_quantity?: number | null
+          id?: string
+          issue_unit_snapshot: string
+          normalized_unit: string
+          package_description_snapshot?: string | null
+          physical_quantity: number
+          product_id: string
+          reason?: string | null
+          reconciliation_id: string
+          units_per_issue_unit_snapshot: number
+          variance_quantity?: number | null
+        }
+        Update: {
+          base_unit_snapshot?: string
+          created_at?: string
+          expected_quantity?: number | null
+          id?: string
+          issue_unit_snapshot?: string
+          normalized_unit?: string
+          package_description_snapshot?: string | null
+          physical_quantity?: number
+          product_id?: string
+          reason?: string | null
+          reconciliation_id?: string
+          units_per_issue_unit_snapshot?: number
+          variance_quantity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_reconciliation_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reconciliation_items_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_reconciliations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_reconciliations: {
+        Row: {
+          confirmed_at: string | null
+          confirmed_by: string | null
+          counted_at: string
+          counted_by: string
+          created_at: string
+          driver_id: string
+          id: string
+          inventory_location_id: string
+          notes: string | null
+          status: Database["public"]["Enums"]["inventory_reconciliation_status"]
+          updated_at: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          counted_at?: string
+          counted_by: string
+          created_at?: string
+          driver_id: string
+          id?: string
+          inventory_location_id: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["inventory_reconciliation_status"]
+          updated_at?: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          counted_at?: string
+          counted_by?: string
+          created_at?: string
+          driver_id?: string
+          id?: string
+          inventory_location_id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["inventory_reconciliation_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_reconciliations_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reconciliations_counted_by_fkey"
+            columns: ["counted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reconciliations_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reconciliations_inventory_location_id_fkey"
+            columns: ["inventory_location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_restock_drop_items: {
         Row: {
           actual_quantity: number
@@ -2258,6 +2392,14 @@ export type Database = {
         Args: { target_client_id: string }
         Returns: boolean
       }
+      confirm_driver_inventory_reconciliation: {
+        Args: { p_reconciliation_id: string }
+        Returns: undefined
+      }
+      create_driver_inventory_reconciliation: {
+        Args: { p_driver_id: string; p_items: Json; p_notes?: string }
+        Returns: string
+      }
       current_user_has_client_stop: {
         Args: { target_client_id: string }
         Returns: boolean
@@ -2295,6 +2437,19 @@ export type Database = {
           route_id: string
           route_template_id: string
           stops_created: number
+        }[]
+      }
+      get_driver_inventory_expected_balance: {
+        Args: { p_as_of?: string; p_driver_id: string; p_product_id: string }
+        Returns: {
+          baseline_at: string
+          baseline_quantity: number
+          expected_quantity: number
+          has_baseline: boolean
+          inventory_location_id: string
+          movement_delta: number
+          normalized_unit: string
+          product_id: string
         }[]
       }
       get_inventory_location_id: {
@@ -2461,6 +2616,7 @@ export type Database = {
         | "cups_lids"
         | "creamers"
         | "cleaning"
+      inventory_reconciliation_status: "draft" | "confirmed"
       machine_status: "active" | "inactive" | "maintenance" | "retired"
       route_status:
         | "draft"
@@ -2626,6 +2782,7 @@ export const Constants = {
         "creamers",
         "cleaning",
       ],
+      inventory_reconciliation_status: ["draft", "confirmed"],
       machine_status: ["active", "inactive", "maintenance", "retired"],
       route_status: [
         "draft",
