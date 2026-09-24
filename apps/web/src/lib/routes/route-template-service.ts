@@ -220,52 +220,48 @@ export async function updateRouteTemplate(
 ): Promise<void> {
   const supabase = createAdminClient();
 
-  const name = normalizeRequiredText(input.name, "Template name");
+  const name = normalizeRequiredText(
+    input.name,
+    "Template name",
+  );
 
-  normalizeRequiredText(input.driverId, "Driver");
+  normalizeRequiredText(
+    input.driverId,
+    "Driver",
+  );
 
-  normalizeRequiredText(input.warehouseId, "Warehouse");
+  normalizeRequiredText(
+    input.warehouseId,
+    "Warehouse",
+  );
 
-  const { data: existing, error: existingError } = await supabase
-    .from("route_templates")
-    .select("id, is_active")
-    .eq("id", input.id)
-    .single();
+  const { error } = await supabase.rpc(
+    "update_route_template_checked",
+    {
+      p_route_template_id: input.id,
 
-  if (existingError) {
-    throw new Error(`Unable to load route template: ${existingError.message}`);
-  }
+      p_name: name,
 
-  if (existing.is_active && !hasSelectedServiceDay(input)) {
-    throw new Error(
-      "An active route template must have at least one service day.",
-    );
-  }
+      p_driver_id: input.driverId,
+      p_warehouse_id: input.warehouseId,
 
-  const { error } = await supabase
-    .from("route_templates")
-    .update({
-      name,
+      p_monday: input.monday,
+      p_tuesday: input.tuesday,
+      p_wednesday: input.wednesday,
+      p_thursday: input.thursday,
+      p_friday: input.friday,
+      p_saturday: input.saturday,
+      p_sunday: input.sunday,
 
-      driver_id: input.driverId,
-      warehouse_id: input.warehouseId,
-
-      monday: input.monday,
-      tuesday: input.tuesday,
-      wednesday: input.wednesday,
-      thursday: input.thursday,
-      friday: input.friday,
-      saturday: input.saturday,
-      sunday: input.sunday,
-
-      notes: input.notes?.trim() || null,
-
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", input.id);
+      p_notes:
+        input.notes?.trim() || undefined,
+    },
+  );
 
   if (error) {
-    throw new Error(`Unable to update route template: ${error.message}`);
+    throw new Error(
+      `Unable to update route template: ${error.message}`,
+    );
   }
 }
 
@@ -274,47 +270,46 @@ export async function addRouteTemplateStop(
 ): Promise<void> {
   const supabase = createAdminClient();
 
-  normalizeRequiredText(input.routeTemplateId, "Route template");
+  normalizeRequiredText(
+    input.routeTemplateId,
+    "Route template",
+  );
 
-  normalizeRequiredText(input.clientId, "Client");
+  normalizeRequiredText(
+    input.clientId,
+    "Client",
+  );
 
-  const { data: latestStop, error: latestStopError } = await supabase
-    .from("route_template_stops")
-    .select("sequence_number")
-    .eq("route_template_id", input.routeTemplateId)
-    .order("sequence_number", {
-      ascending: false,
-    })
-    .limit(1)
-    .maybeSingle();
+  const { error } = await supabase.rpc(
+    "add_route_template_stop_checked",
+    {
+      p_route_template_id:
+        input.routeTemplateId,
 
-  if (latestStopError) {
-    throw new Error(
-      `Unable to inspect route template stops: ${latestStopError.message}`,
-    );
-  }
+      p_client_id:
+        input.clientId,
 
-  const nextSequence = (latestStop?.sequence_number ?? 0) + 1;
+      p_machine_id:
+        input.machineId ?? undefined,
 
-  const { error } = await supabase.from("route_template_stops").insert({
-    route_template_id: input.routeTemplateId,
+      p_scheduled_start_time:
+        input.scheduledStartTime ?? undefined,
 
-    client_id: input.clientId,
-    machine_id: input.machineId,
+      p_scheduled_end_time:
+        input.scheduledEndTime ?? undefined,
 
-    sequence_number: nextSequence,
+      p_drink_count_required:
+        input.drinkCountRequired,
 
-    scheduled_start_time: input.scheduledStartTime,
-
-    scheduled_end_time: input.scheduledEndTime,
-
-    drink_count_required: input.drinkCountRequired,
-
-    notes: input.notes?.trim() || null,
-  });
+      p_notes:
+        input.notes?.trim() || undefined,
+    },
+  );
 
   if (error) {
-    throw new Error(`Unable to add route template stop: ${error.message}`);
+    throw new Error(
+      `Unable to add route template stop: ${error.message}`,
+    );
   }
 }
 
@@ -425,62 +420,18 @@ export async function setRouteTemplateActive(
 ): Promise<void> {
   const supabase = createAdminClient();
 
-  if (isActive) {
-    const { data: template, error: templateError } = await supabase
-      .from("route_templates")
-      .select(
-        `
-            id,
-            monday,
-            tuesday,
-            wednesday,
-            thursday,
-            friday,
-            saturday,
-            sunday
-          `,
-      )
-      .eq("id", templateId)
-      .single();
+  normalizeRequiredText(
+    templateId,
+    "Route template",
+  );
 
-    if (templateError) {
-      throw new Error(
-        `Unable to load route template: ${templateError.message}`,
-      );
-    }
-
-    if (!hasSelectedServiceDay(template)) {
-      throw new Error(
-        "Select at least one service day before activating the template.",
-      );
-    }
-
-    const { count, error: countError } = await supabase
-      .from("route_template_stops")
-      .select("id", {
-        count: "exact",
-        head: true,
-      })
-      .eq("route_template_id", templateId);
-
-    if (countError) {
-      throw new Error(
-        `Unable to validate route template stops: ${countError.message}`,
-      );
-    }
-
-    if (!count) {
-      throw new Error("Add at least one stop before activating the template.");
-    }
-  }
-
-  const { error } = await supabase
-    .from("route_templates")
-    .update({
-      is_active: isActive,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", templateId);
+  const { error } = await supabase.rpc(
+    "set_route_template_active",
+    {
+      p_route_template_id: templateId,
+      p_is_active: isActive,
+    },
+  );
 
   if (error) {
     throw new Error(

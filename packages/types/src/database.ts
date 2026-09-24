@@ -2216,6 +2216,18 @@ export type Database = {
         }
         Returns: string
       }
+      add_route_template_stop_checked: {
+        Args: {
+          p_client_id: string
+          p_drink_count_required: boolean
+          p_machine_id?: string
+          p_notes?: string
+          p_route_template_id: string
+          p_scheduled_end_time?: string
+          p_scheduled_start_time?: string
+        }
+        Returns: undefined
+      }
       apply_route_template_exception: {
         Args: {
           p_created_by?: string
@@ -2226,6 +2238,10 @@ export type Database = {
           p_route_template_id: string
         }
         Returns: string
+      }
+      assert_route_template_has_no_conflicts: {
+        Args: { p_route_template_id: string }
+        Returns: undefined
       }
       calculate_client_reserve_decrease: {
         Args: {
@@ -2393,6 +2409,27 @@ export type Database = {
           p_stop_id: string
         }
         Returns: string
+      }
+      set_route_template_active: {
+        Args: { p_is_active: boolean; p_route_template_id: string }
+        Returns: undefined
+      }
+      update_route_template_checked: {
+        Args: {
+          p_driver_id: string
+          p_friday: boolean
+          p_monday: boolean
+          p_name: string
+          p_notes?: string
+          p_route_template_id: string
+          p_saturday: boolean
+          p_sunday: boolean
+          p_thursday: boolean
+          p_tuesday: boolean
+          p_warehouse_id: string
+          p_wednesday: boolean
+        }
+        Returns: undefined
       }
       warehouse_is_in_current_user_region: {
         Args: { target_warehouse_id: string }
