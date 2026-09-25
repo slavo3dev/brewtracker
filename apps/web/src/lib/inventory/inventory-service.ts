@@ -152,6 +152,74 @@ export type WarehouseMovementDashboardData = {
   };
 };
 
+export type InventoryReconciliationDriver = Pick<
+  UserRow,
+  "id" | "full_name" | "email" | "region"
+>;
+
+export type InventoryReconciliationProduct = Pick<
+  ProductRow,
+  | "id"
+  | "sku"
+  | "name"
+  | "category"
+  | "base_unit"
+  | "issue_unit"
+  | "units_per_issue_unit"
+  | "package_description"
+  | "allows_loose_units"
+  | "allows_partial_base_unit"
+>;
+
+export type InventoryExpectedBalance = {
+  productId: string;
+  baselineQuantity: number | null;
+  baselineAt: string | null;
+  movementDelta: number;
+  expectedQuantity: number | null;
+  normalizedUnit: string;
+  hasBaseline: boolean;
+};
+
+export type InventoryReconciliationData = {
+  drivers: InventoryReconciliationDriver[];
+  products: InventoryReconciliationProduct[];
+};
+
+export type CreateInventoryReconciliationItemInput = {
+  productId: string;
+  physicalQuantity: number;
+  reason?: string;
+};
+
+export type CreateInventoryReconciliationInput = {
+  driverId: string;
+  notes?: string;
+  items: CreateInventoryReconciliationItemInput[];
+};
+
+export type InventoryReconciliationItem = {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string | null;
+  expectedQuantity: number | null;
+  physicalQuantity: number;
+  varianceQuantity: number | null;
+  normalizedUnit: string;
+  reason: string | null;
+};
+
+export type InventoryReconciliationDetail = {
+  id: string;
+  driverId: string;
+  status: "draft" | "confirmed";
+  notes: string | null;
+  countedAt: string;
+  confirmedAt: string | null;
+  items: InventoryReconciliationItem[];
+};
+
 const locationSelect = `
   id,
   location_type,
@@ -710,4 +778,243 @@ export async function getWarehouseMovementDashboard(
       driverCount: includedDriverIds.size,
     },
   };
+}
+
+export async function getInventoryReconciliationData(): Promise<InventoryReconciliationData> {
+  const supabase = createAdminClient();
+
+  const [driversResult, productsResult] = await Promise.all([
+    supabase
+      .from("users")
+      .select("id, full_name, email, region")
+      .eq("role", "driver")
+      .eq("is_active", true)
+      .order("full_name"),
+
+    supabase
+      .from("inventory_products")
+      .select(
+        `
+          id,
+          sku,
+          name,
+          category,
+          base_unit,
+          issue_unit,
+          units_per_issue_unit,
+          package_description,
+          allows_loose_units,
+          allows_partial_base_unit
+        `,
+      )
+      .eq("is_active", true)
+      .order("sort_order")
+      .order("name"),
+  ]);
+
+  if (driversResult.error) {
+    throw new Error(
+      `Unable to load drivers: ${driversResult.error.message}`,
+    );
+  }
+
+  if (productsResult.error) {
+    throw new Error(
+      `Unable to load inventory products: ${productsResult.error.message}`,
+    );
+  }
+
+  return {
+    drivers:
+      (driversResult.data ?? []) as InventoryReconciliationDriver[],
+
+    products:
+      (productsResult.data ?? []) as InventoryReconciliationProduct[],
+  };
+}
+
+export async function getDriverExpectedInventory(
+  driverId: string,
+): Promise<InventoryExpectedBalance[]> {
+  const supabase = await createClient();
+
+  const { products } = await getInventoryReconciliationData();
+
+  const results = await Promise.all(
+    products.map(async (product) => {
+      const { data, error } = await supabase.rpc(
+        "get_driver_inventory_expected_balance",
+        {
+          p_driver_id: driverId,
+          p_product_id: product.id,
+          p_as_of: new Date().toISOString(),
+        },
+      );
+
+      if (error) {
+        throw new Error(
+          `Unable to calculate expected inventory for ${product.name}: ${error.message}`,
+        );
+      }
+
+      const row = data?.[0];
+
+      if (!row) {
+        throw new Error(
+          `Expected inventory was not returned for ${product.name}.`,
+        );
+      }
+
+      return {
+        productId: product.id,
+
+        baselineQuantity:
+          row.baseline_quantity === null
+            ? null
+            : Number(row.baseline_quantity),
+
+        baselineAt: row.baseline_at,
+
+        movementDelta: Number(row.movement_delta),
+
+        expectedQuantity:
+          row.expected_quantity === null
+            ? null
+            : Number(row.expected_quantity),
+
+        normalizedUnit: row.normalized_unit,
+
+        hasBaseline: row.has_baseline,
+      };
+    }),
+  );
+
+  return results;
+}
+
+export async function createInventoryReconciliation(
+  input: CreateInventoryReconciliationInput,
+): Promise<string> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc(
+    "create_driver_inventory_reconciliation",
+    {
+      p_driver_id: input.driverId,
+
+      p_items: input.items.map((item) => ({
+        product_id: item.productId,
+        physical_quantity: item.physicalQuantity,
+        reason: item.reason?.trim() || null,
+      })),
+
+      p_notes: input.notes?.trim() || undefined,
+    },
+  );
+
+  if (error) {
+    throw new Error(
+      `Unable to create inventory reconciliation: ${error.message}`,
+    );
+  }
+
+  if (!data) {
+    throw new Error(
+      "Inventory reconciliation did not return an ID.",
+    );
+  }
+
+  return data;
+}
+
+export async function getInventoryReconciliation(
+  reconciliationId: string,
+): Promise<InventoryReconciliationDetail> {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from("inventory_reconciliations")
+    .select(
+      `
+        id,
+        driver_id,
+        status,
+        notes,
+        counted_at,
+        confirmed_at,
+        items:inventory_reconciliation_items (
+          id,
+          product_id,
+          expected_quantity,
+          physical_quantity,
+          variance_quantity,
+          normalized_unit,
+          reason,
+          product:inventory_products (
+            id,
+            sku,
+            name
+          )
+        )
+      `,
+    )
+    .eq("id", reconciliationId)
+    .single();
+
+  if (error) {
+    throw new Error(
+      `Unable to load inventory reconciliation: ${error.message}`,
+    );
+  }
+
+  return {
+    id: data.id,
+    driverId: data.driver_id,
+    status: data.status,
+    notes: data.notes,
+    countedAt: data.counted_at,
+    confirmedAt: data.confirmed_at,
+
+    items: data.items.map((item) => ({
+      id: item.id,
+      productId: item.product_id,
+      productName:
+        item.product?.name ?? "Unknown product",
+      sku: item.product?.sku ?? null,
+
+      expectedQuantity:
+        item.expected_quantity === null
+          ? null
+          : Number(item.expected_quantity),
+
+      physicalQuantity: Number(item.physical_quantity),
+
+      varianceQuantity:
+        item.variance_quantity === null
+          ? null
+          : Number(item.variance_quantity),
+
+      normalizedUnit: item.normalized_unit,
+      reason: item.reason,
+    })),
+  };
+}
+
+export async function confirmInventoryReconciliation(
+  reconciliationId: string,
+): Promise<void> {
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc(
+    "confirm_driver_inventory_reconciliation",
+    {
+      p_reconciliation_id: reconciliationId,
+    },
+  );
+
+  if (error) {
+    throw new Error(
+      `Unable to confirm inventory reconciliation: ${error.message}`,
+    );
+  }
 }
