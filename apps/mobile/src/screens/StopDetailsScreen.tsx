@@ -85,6 +85,11 @@ export default function StopDetailsScreen({
   const hasDifferentActiveVisit =
     activeVisit?.status === "in_progress" && activeVisit.stopId !== stop.id;
 
+  const isCompletedStop = stop.status === "completed";
+  const isSkippedStop = stop.status === "skipped";
+
+  const cannotStartService = isCompletedStop || isSkippedStop;
+
   const [openingNavigation, setOpeningNavigation] = useState(false);
   const [navigationError, setNavigationError] = useState<string | null>(null);
 
@@ -136,6 +141,16 @@ export default function StopDetailsScreen({
 
   async function handleStartService(): Promise<void> {
     if (startingService) {
+      return;
+    }
+
+    if (isCompletedStop) {
+      setServiceError("This service stop has already been completed.");
+      return;
+    }
+
+    if (isSkippedStop) {
+      setServiceError("This service stop has been skipped.");
       return;
     }
 
@@ -363,14 +378,19 @@ export default function StopDetailsScreen({
           <Pressable
             style={({ pressed }) => [
               styles.serviceButton,
-              hasDifferentActiveVisit && styles.buttonDisabled,
-              startingService && styles.buttonDisabled,
+              (cannotStartService ||
+                hasDifferentActiveVisit ||
+                startingService) &&
+                styles.buttonDisabled,
               pressed &&
+                !cannotStartService &&
                 !hasDifferentActiveVisit &&
                 !startingService &&
                 styles.buttonPressed,
             ]}
-            disabled={hasDifferentActiveVisit || startingService}
+            disabled={
+              cannotStartService || hasDifferentActiveVisit || startingService
+            }
             onPress={() => {
               void handleStartService();
             }}
@@ -379,7 +399,13 @@ export default function StopDetailsScreen({
               <ActivityIndicator color="#ffffff" />
             ) : (
               <Text style={styles.serviceButtonText}>
-                {hasVisitForThisStop ? "Resume Service" : "Start Service"}
+                {isCompletedStop
+                  ? "Service Completed"
+                  : isSkippedStop
+                    ? "Stop Skipped"
+                    : hasVisitForThisStop
+                      ? "Resume Service"
+                      : "Start Service"}
               </Text>
             )}
           </Pressable>
