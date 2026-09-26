@@ -322,8 +322,6 @@ export default function InventoryAuditStep() {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.eyebrow}>Step 5</Text>
-
       <Text style={styles.title}>Count client reserve</Text>
 
       <Text style={styles.description}>
