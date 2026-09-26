@@ -1,7 +1,4 @@
-import {
-  distanceMeters,
-  type GeoPoint,
-} from "@brewtracker/types";
+import { distanceMeters, type GeoPoint } from "@brewtracker/types";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -35,8 +32,7 @@ export default function ArrivalStep() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [showOverride, setShowOverride] = useState(false);
 
@@ -54,10 +50,7 @@ export default function ArrivalStep() {
       latitude: activeVisit.target.latitude,
       longitude: activeVisit.target.longitude,
     };
-  }, [
-    activeVisit?.target.latitude,
-    activeVisit?.target.longitude,
-  ]);
+  }, [activeVisit?.target.latitude, activeVisit?.target.longitude]);
 
   const currentDistance = useMemo(() => {
     if (!position || !targetPosition) {
@@ -75,8 +68,7 @@ export default function ArrivalStep() {
 
   const radius = visit.target.geofenceRadiusMeters;
 
-  const isInsideGeofence =
-    currentDistance != null && currentDistance <= radius;
+  const isInsideGeofence = currentDistance != null && currentDistance <= radius;
 
   const canConfirmNormally =
     locationStatus === "ready" &&
@@ -88,9 +80,7 @@ export default function ArrivalStep() {
   const normalizedOverrideReason = overrideReason.trim();
 
   const canSubmitOverride =
-    showOverride &&
-    normalizedOverrideReason.length >= 10 &&
-    !submitting;
+    showOverride && normalizedOverrideReason.length >= 10 && !submitting;
 
   function getLocationMessage(): string {
     if (!targetPosition) {
@@ -106,8 +96,7 @@ export default function ArrivalStep() {
 
       case "error":
         return (
-          locationError ??
-          "Your current location could not be determined."
+          locationError ?? "Your current location could not be determined."
         );
 
       case "ready":
@@ -192,8 +181,6 @@ export default function ArrivalStep() {
       <View style={styles.locationCard}>
         <View style={styles.locationHeader}>
           <View>
-            <Text style={styles.eyebrow}>Step 1 of 8</Text>
-
             <Text style={styles.title}>Verify arrival</Text>
           </View>
 
@@ -206,8 +193,7 @@ export default function ArrivalStep() {
             <Text
               style={[
                 styles.statusBadgeText,
-                isInsideGeofence &&
-                  styles.statusBadgeTextSuccess,
+                isInsideGeofence && styles.statusBadgeTextSuccess,
               ]}
             >
               {isInsideGeofence ? "In range" : "Not verified"}
@@ -215,22 +201,16 @@ export default function ArrivalStep() {
           </View>
         </View>
 
-        <Text style={styles.clientName}>
-          {visit.target.clientName}
-        </Text>
+        <Text style={styles.clientName}>{visit.target.clientName}</Text>
 
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>
-            Allowed radius
-          </Text>
+          <Text style={styles.detailLabel}>Allowed radius</Text>
 
           <Text style={styles.detailValue}>{radius} m</Text>
         </View>
 
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>
-            Current distance
-          </Text>
+          <Text style={styles.detailLabel}>Current distance</Text>
 
           <Text style={styles.detailValue}>
             {currentDistance == null
@@ -246,17 +226,13 @@ export default function ArrivalStep() {
           ]}
         >
           {locationStatus === "loading" ? (
-            <ActivityIndicator
-              color="#9c5621"
-              style={styles.messageSpinner}
-            />
+            <ActivityIndicator color="#9c5621" style={styles.messageSpinner} />
           ) : null}
 
           <Text
             style={[
               styles.messageText,
-              isInsideGeofence &&
-                styles.messageTextSuccess,
+              isInsideGeofence && styles.messageTextSuccess,
             ]}
           >
             {getLocationMessage()}
@@ -275,9 +251,7 @@ export default function ArrivalStep() {
               void retry();
             }}
           >
-            <Text style={styles.retryButtonText}>
-              Try Location Again
-            </Text>
+            <Text style={styles.retryButtonText}>Try Location Again</Text>
           </Pressable>
         ) : null}
       </View>
@@ -293,9 +267,7 @@ export default function ArrivalStep() {
         style={({ pressed }) => [
           styles.primaryButton,
           !canConfirmNormally && styles.buttonDisabled,
-          pressed &&
-            canConfirmNormally &&
-            styles.buttonPressed,
+          pressed && canConfirmNormally && styles.buttonPressed,
         ]}
         disabled={!canConfirmNormally}
         onPress={() => {
@@ -305,9 +277,7 @@ export default function ArrivalStep() {
         {submitting && !showOverride ? (
           <ActivityIndicator color="#ffffff" />
         ) : (
-          <Text style={styles.primaryButtonText}>
-            Confirm Arrival
-          </Text>
+          <Text style={styles.primaryButtonText}>Confirm Arrival</Text>
         )}
       </Pressable>
 
@@ -329,14 +299,11 @@ export default function ArrivalStep() {
         </Pressable>
       ) : (
         <View style={styles.overrideCard}>
-          <Text style={styles.overrideTitle}>
-            Manual arrival override
-          </Text>
+          <Text style={styles.overrideTitle}>Manual arrival override</Text>
 
           <Text style={styles.overrideDescription}>
-            Explain why GPS verification cannot be completed. This
-            reason will be saved with the service visit for manager
-            review.
+            Explain why GPS verification cannot be completed. This reason will
+            be saved with the service visit for manager review.
           </Text>
 
           <TextInput
@@ -370,9 +337,7 @@ export default function ArrivalStep() {
                 setErrorMessage(null);
               }}
             >
-              <Text style={styles.cancelOverrideText}>
-                Cancel
-              </Text>
+              <Text style={styles.cancelOverrideText}>Cancel</Text>
             </Pressable>
 
             <Pressable
@@ -380,9 +345,7 @@ export default function ArrivalStep() {
               style={({ pressed }) => [
                 styles.submitOverrideButton,
                 !canSubmitOverride && styles.buttonDisabled,
-                pressed &&
-                  canSubmitOverride &&
-                  styles.buttonPressed,
+                pressed && canSubmitOverride && styles.buttonPressed,
               ]}
               disabled={!canSubmitOverride}
               onPress={() => {
@@ -392,9 +355,7 @@ export default function ArrivalStep() {
               {submitting ? (
                 <ActivityIndicator color="#ffffff" />
               ) : (
-                <Text style={styles.submitOverrideText}>
-                  Submit Override
-                </Text>
+                <Text style={styles.submitOverrideText}>Submit Override</Text>
               )}
             </Pressable>
           </View>

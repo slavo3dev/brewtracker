@@ -367,8 +367,6 @@ export default function RestockDropStep() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.eyebrow}>Step 6</Text>
-
         <Text style={styles.title}>Client delivery</Text>
 
         <Text style={styles.description}>
