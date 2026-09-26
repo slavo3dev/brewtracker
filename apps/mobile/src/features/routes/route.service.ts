@@ -437,3 +437,25 @@ export async function refreshTodayRoute(): Promise<LoadTodayRouteResult> {
 
   return loadRouteWithCacheFallback(userId, routeDate);
 }
+
+export async function assertStopCanStartService(stopId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("stops")
+    .select("status")
+    .eq("id", stopId)
+    .single();
+
+  if (error) {
+    throw new Error(`Unable to verify service stop status: ${error.message}`);
+  }
+
+  if (data.status === "completed") {
+    throw new Error("This service stop has already been completed.");
+  }
+
+  if (data.status === "skipped") {
+    throw new Error(
+      "This service stop has been skipped and cannot be started.",
+    );
+  }
+}
