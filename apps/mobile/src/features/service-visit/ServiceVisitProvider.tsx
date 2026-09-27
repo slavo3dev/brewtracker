@@ -25,6 +25,7 @@ import {
   saveServiceVisit,
 } from "./service-visit.storage";
 import { markServiceStopArrived } from "./service-visit-stop.service";
+import { assertStopCanStartService } from "../routes/route.service";
 
 import {
   createInitialStepStates,
@@ -95,9 +96,7 @@ type ServiceVisitContextValue = {
     input: UpdateMediaUploadInput,
   ) => Promise<ServiceVisit>;
 
-  saveSignature: (
-    input: SaveSignatureInput,
-  ) => Promise<ServiceVisit>;
+  saveSignature: (input: SaveSignatureInput) => Promise<ServiceVisit>;
 
   updateSignatureUpload: (
     localUri: string,
@@ -162,14 +161,11 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     setActiveVisit,
   });
 
-  const {
-    saveSignature,
-    updateSignatureUpload,
-    removeSignature,
-  } = useClientConfirmation({
-    commitVisitMutation,
-    setErrorMessage,
-  });
+  const { saveSignature, updateSignatureUpload, removeSignature } =
+    useClientConfirmation({
+      commitVisitMutation,
+      setErrorMessage,
+    });
 
   const { completeSummary, retrySummarySync } = useSummaryStep({
     commitVisitMutation,
@@ -220,8 +216,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     setErrorMessage,
   });
 
-  const { completeMachineRefill } =
-  useMachineRefillStep({
+  const { completeMachineRefill } = useMachineRefillStep({
     activeVisit,
     setActiveVisit,
     setErrorMessage,
@@ -338,6 +333,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
           "Complete or cancel the active service visit before starting another stop.",
         );
       }
+
+      await assertStopCanStartService(input.stopId);
 
       if (input.target.latitude == null || input.target.longitude == null) {
         throw new Error(
@@ -521,16 +518,13 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       );
 
       /*
-      * Persist the authoritative start of time spent
-      * servicing this client.
-      *
-      * Visit duration is derived later as:
-      * stops.completed_at - stops.arrived_at
-      */
-      await markServiceStopArrived(
-        activeVisit.stopId,
-        now,
-      );
+       * Persist the authoritative start of time spent
+       * servicing this client.
+       *
+       * Visit duration is derived later as:
+       * stops.completed_at - stops.arrived_at
+       */
+      await markServiceStopArrived(activeVisit.stopId, now);
 
       await saveServiceVisit(updatedVisit);
 
@@ -699,7 +693,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       saveSignature,
       updateSignatureUpload,
       removeSignature,
-      
+
       completeAfterService,
 
       completeSummary,
