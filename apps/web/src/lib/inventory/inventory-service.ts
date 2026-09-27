@@ -220,6 +220,51 @@ export type InventoryReconciliationDetail = {
   items: InventoryReconciliationItem[];
 };
 
+export type InventoryReconciliationHistoryFilters = {
+  driverId?: string;
+  from?: string;
+  to?: string;
+};
+
+export type InventoryReconciliationHistoryItem = {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string | null;
+  expectedQuantity: number | null;
+  physicalQuantity: number;
+  varianceQuantity: number | null;
+  normalizedUnit: string;
+  reason: string | null;
+};
+
+export type InventoryReconciliationHistoryRow = {
+  id: string;
+  driverId: string;
+  driverName: string;
+  driverEmail: string | null;
+
+  status: "draft" | "confirmed";
+
+  countedAt: string;
+  confirmedAt: string | null;
+
+  countedByName: string;
+  confirmedByName: string | null;
+
+  notes: string | null;
+
+  productCount: number;
+  discrepancyCount: number;
+
+  items: InventoryReconciliationHistoryItem[];
+};
+
+export type InventoryReconciliationHistoryData = {
+  drivers: InventoryReconciliationDriver[];
+  reconciliations: InventoryReconciliationHistoryRow[];
+};
+
 const locationSelect = `
   id,
   location_type,
@@ -1017,4 +1062,201 @@ export async function confirmInventoryReconciliation(
       `Unable to confirm inventory reconciliation: ${error.message}`,
     );
   }
+}
+
+export async function getInventoryReconciliationHistory(
+  filters: InventoryReconciliationHistoryFilters = {},
+): Promise<InventoryReconciliationHistoryData> {
+  const supabase = createAdminClient();
+
+  const { data: drivers, error: driversError } =
+    await supabase
+      .from("users")
+      .select("id, full_name, email, region")
+      .eq("role", "driver")
+      .eq("is_active", true)
+      .order("full_name");
+
+  if (driversError) {
+    throw new Error(
+      `Unable to load drivers: ${driversError.message}`,
+    );
+  }
+
+  let query = supabase
+    .from("inventory_reconciliations")
+    .select(`
+      id,
+      driver_id,
+      status,
+      notes,
+      counted_at,
+      confirmed_at,
+
+      driver:users!inventory_reconciliations_driver_id_fkey (
+        id,
+        full_name,
+        email
+      ),
+
+      counted_by_user:users!inventory_reconciliations_counted_by_fkey (
+        id,
+        full_name
+      ),
+
+      confirmed_by_user:users!inventory_reconciliations_confirmed_by_fkey (
+        id,
+        full_name
+      ),
+
+      items:inventory_reconciliation_items (
+        id,
+        product_id,
+        expected_quantity,
+        physical_quantity,
+        variance_quantity,
+        normalized_unit,
+        reason,
+
+        product:inventory_products (
+          id,
+          sku,
+          name
+        )
+      )
+    `)
+    .eq("status", "confirmed")
+    .order("counted_at", {
+      ascending: false,
+    });
+
+  if (filters.driverId) {
+    query = query.eq(
+      "driver_id",
+      filters.driverId,
+    );
+  }
+
+  if (filters.from) {
+    query = query.gte(
+      "counted_at",
+      `${filters.from}T00:00:00.000Z`,
+    );
+  }
+
+  if (filters.to) {
+    query = query.lte(
+      "counted_at",
+      `${filters.to}T23:59:59.999Z`,
+    );
+  }
+
+  const {
+    data: reconciliations,
+    error: reconciliationsError,
+  } = await query;
+
+  if (reconciliationsError) {
+    throw new Error(
+      `Unable to load inventory reconciliation history: ${reconciliationsError.message}`,
+    );
+  }
+
+  const rows: InventoryReconciliationHistoryRow[] =
+    (reconciliations ?? []).map(
+      (reconciliation) => {
+        const items: InventoryReconciliationHistoryItem[] =
+          reconciliation.items.map((item) => ({
+            id: item.id,
+
+            productId: item.product_id,
+
+            productName:
+              item.product?.name ??
+              "Unknown product",
+
+            sku:
+              item.product?.sku ?? null,
+
+            expectedQuantity:
+              item.expected_quantity === null
+                ? null
+                : Number(
+                    item.expected_quantity,
+                  ),
+
+            physicalQuantity: Number(
+              item.physical_quantity,
+            ),
+
+            varianceQuantity:
+              item.variance_quantity === null
+                ? null
+                : Number(
+                    item.variance_quantity,
+                  ),
+
+            normalizedUnit:
+              item.normalized_unit,
+
+            reason: item.reason,
+          }));
+
+        return {
+          id: reconciliation.id,
+
+          driverId:
+            reconciliation.driver_id,
+
+          driverName:
+            reconciliation.driver?.full_name ??
+            "Unknown driver",
+
+          driverEmail:
+            reconciliation.driver?.email ??
+            null,
+
+          status: reconciliation.status,
+
+          countedAt:
+            reconciliation.counted_at,
+
+          confirmedAt:
+            reconciliation.confirmed_at,
+
+          countedByName:
+            reconciliation.counted_by_user
+              ?.full_name ??
+            "Unknown user",
+
+          confirmedByName:
+            reconciliation.confirmed_by_user
+              ?.full_name ??
+            null,
+
+          notes:
+            reconciliation.notes,
+
+          productCount:
+            items.length,
+
+          discrepancyCount:
+            items.filter(
+              (item) =>
+                item.varianceQuantity !== null &&
+                item.varianceQuantity !== 0,
+            ).length,
+
+          items,
+        };
+      },
+    );
+
+  return {
+    drivers:
+      (drivers ??
+        []) as InventoryReconciliationDriver[],
+
+    reconciliations: rows,
+  };
 }
