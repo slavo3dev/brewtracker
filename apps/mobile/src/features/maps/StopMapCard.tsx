@@ -1,5 +1,5 @@
 import type { GeoPoint } from "@brewtracker/types";
-import { useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -42,7 +42,10 @@ export default function StopMapCard({
 }: Props) {
   const mapRef = useRef<MapView | null>(null);
 
-  function handleFitMap(): void {
+  const hasAutoFitRef = useRef(false);
+  const [mapReady, setMapReady] = useState(false);
+
+  const handleFitMap = useCallback((): void => {
     const coordinates: LatLng[] = [
       {
         latitude: destination.latitude,
@@ -72,6 +75,19 @@ export default function StopMapCard({
         left: 70,
       },
     });
+  }, [currentPosition, destination]);
+
+  useEffect(() => {
+    if (!mapReady || !currentPosition || hasAutoFitRef.current) {
+      return;
+    }
+
+    hasAutoFitRef.current = true;
+    handleFitMap();
+  }, [currentPosition, handleFitMap, mapReady]);
+
+  function handleMapReady(): void {
+    setMapReady(true);
   }
 
   return (
@@ -85,7 +101,7 @@ export default function StopMapCard({
           showsScale
           showsUserLocation={currentPosition !== null}
           showsMyLocationButton={false}
-          onMapReady={handleFitMap}
+          onMapReady={handleMapReady}
         >
           <Marker
             coordinate={{
