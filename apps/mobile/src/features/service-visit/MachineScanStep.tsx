@@ -15,21 +15,15 @@ import {
 import { useServiceVisit } from "./ServiceVisitProvider";
 
 export default function MachineScanStep() {
-  const {
-    activeVisit,
-    completeMachineScan,
-  } = useServiceVisit();
+  const { activeVisit, completeMachineScan } = useServiceVisit();
 
-  const [permission, requestPermission] =
-    useCameraPermissions();
+  const [permission, requestPermission] = useCameraPermissions();
 
-  const [processingScan, setProcessingScan] =
-    useState(false);
+  const [processingScan, setProcessingScan] = useState(false);
 
   const [scanEnabled, setScanEnabled] = useState(true);
 
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const lastScannedValue = useRef<string | null>(null);
 
@@ -84,9 +78,7 @@ export default function MachineScanStep() {
       <View style={styles.card}>
         <ActivityIndicator color="#9c5621" />
 
-        <Text style={styles.loadingText}>
-          Checking camera permission…
-        </Text>
+        <Text style={styles.loadingText}>Checking camera permission…</Text>
       </View>
     );
   }
@@ -94,15 +86,11 @@ export default function MachineScanStep() {
   if (!permission.granted) {
     return (
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>Step 2 of 8</Text>
-
-        <Text style={styles.title}>
-          Camera permission required
-        </Text>
+        <Text style={styles.title}>Camera permission required</Text>
 
         <Text style={styles.description}>
-          Camera access is required to scan and verify the machine
-          assigned to this stop.
+          Camera access is required to scan and verify the machine assigned to
+          this stop.
         </Text>
 
         {permission.canAskAgain ? (
@@ -116,15 +104,13 @@ export default function MachineScanStep() {
               void requestPermission();
             }}
           >
-            <Text style={styles.primaryButtonText}>
-              Allow Camera Access
-            </Text>
+            <Text style={styles.primaryButtonText}>Allow Camera Access</Text>
           </Pressable>
         ) : (
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>
-              Camera permission is disabled in device settings.
-              Enable it before continuing service.
+              Camera permission is disabled in device settings. Enable it before
+              continuing service.
             </Text>
           </View>
         )}
@@ -135,28 +121,21 @@ export default function MachineScanStep() {
   return (
     <View>
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>Step 2 of 8</Text>
-
         <Text style={styles.title}>Scan machine QR code</Text>
 
         <Text style={styles.description}>
-          Scan the QR code attached to the machine assigned to this
-          stop.
+          Scan the QR code attached to the machine assigned to this stop.
         </Text>
 
         <View style={styles.machineCard}>
-          <Text style={styles.machineLabel}>
-            Expected machine
-          </Text>
+          <Text style={styles.machineLabel}>Expected machine</Text>
 
           <Text style={styles.machineName}>
             {machine.name ?? machine.model ?? "Assigned machine"}
           </Text>
 
           {machine.model && machine.name !== machine.model ? (
-            <Text style={styles.machineDetail}>
-              Model: {machine.model}
-            </Text>
+            <Text style={styles.machineDetail}>Model: {machine.model}</Text>
           ) : null}
 
           {machine.serialNumber ? (
@@ -190,16 +169,12 @@ export default function MachineScanStep() {
             <View style={styles.processingOverlay}>
               <ActivityIndicator color="#ffffff" size="large" />
 
-              <Text style={styles.processingText}>
-                Verifying machine…
-              </Text>
+              <Text style={styles.processingText}>Verifying machine…</Text>
             </View>
           ) : null}
         </View>
 
-        <Text style={styles.scanHint}>
-          Hold the QR code inside the frame.
-        </Text>
+        <Text style={styles.scanHint}>Hold the QR code inside the frame.</Text>
       </View>
 
       {errorMessage ? (
@@ -218,9 +193,7 @@ export default function MachineScanStep() {
               setScanEnabled(true);
             }}
           >
-            <Text style={styles.retryButtonText}>
-              Scan Again
-            </Text>
+            <Text style={styles.retryButtonText}>Scan Again</Text>
           </Pressable>
         </View>
       ) : null}

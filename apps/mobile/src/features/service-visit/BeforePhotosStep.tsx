@@ -62,8 +62,7 @@ function getUploadLabel(photo: BeforePhotoRecord): string {
 }
 
 function getFriendlyUploadError(error: unknown): string {
-  const technicalMessage =
-    error instanceof Error ? error.message : "";
+  const technicalMessage = error instanceof Error ? error.message : "";
 
   const normalizedMessage = technicalMessage.toLowerCase();
 
@@ -348,8 +347,6 @@ export default function BeforePhotosStep() {
   if (!permission.granted) {
     return (
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>Step 3 of 8</Text>
-
         <Text style={styles.title}>Camera permission required</Text>
 
         <Text style={styles.description}>
@@ -383,8 +380,6 @@ export default function BeforePhotosStep() {
   if (captureState === "camera" && activeKind) {
     return (
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>Step 3 of 8</Text>
-
         <Text style={styles.title}>{getPhotoTitle(activeKind)}</Text>
 
         <Text style={styles.description}>
@@ -511,8 +506,6 @@ export default function BeforePhotosStep() {
   return (
     <View>
       <View style={styles.card}>
-        <Text style={styles.eyebrow}>Step 3 of 8</Text>
-
         <Text style={styles.title}>Before-service photos</Text>
 
         <Text style={styles.description}>
