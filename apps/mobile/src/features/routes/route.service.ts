@@ -78,19 +78,21 @@ export function getLocalDateString(date = new Date()): string {
 
 async function requireAuthenticatedUserId(): Promise<string> {
   const {
-    data: { user },
+    data: { session },
     error,
-  } = await supabase.auth.getUser();
+  } = await supabase.auth.getSession();
 
   if (error) {
-    throw new Error(`Unable to verify your session: ${error.message}`);
+    throw new Error(`Unable to read your session: ${error.message}`);
   }
 
-  if (!user) {
+  const userId = session?.user.id;
+
+  if (!userId) {
     throw new Error("You must be signed in to load today's route.");
   }
 
-  return user.id;
+  return userId;
 }
 
 async function fetchTodayRouteRows(

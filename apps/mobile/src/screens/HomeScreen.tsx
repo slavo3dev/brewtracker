@@ -38,6 +38,13 @@ function formatClockTime(value: string): string {
   }).format(new Date(value));
 }
 
+function isNetworkError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("network request failed")
+  );
+}
+
 export default function HomeScreen({
   onClockInPress,
   onResumeSelfie,
@@ -70,6 +77,10 @@ export default function HomeScreen({
       const entry = await getOpenTimeEntry();
       setOpenEntry(entry);
     } catch (error) {
+      if (isNetworkError(error)) {
+        return;
+      }
+
       setTimeClockError(
         error instanceof Error
           ? error.message
