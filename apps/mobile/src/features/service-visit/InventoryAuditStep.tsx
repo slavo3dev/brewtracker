@@ -59,6 +59,20 @@ function normalizeWholeQuantityInput(value: string): string {
   return value;
 }
 
+function getInventoryAuditErrorMessage(
+  error: unknown,
+  fallbackMessage: string,
+): string {
+  if (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("network request failed")
+  ) {
+    return "Unable to sync inventory audit. Check your connection and try again.";
+  }
+
+  return error instanceof Error ? error.message : fallbackMessage;
+}
+
 export default function InventoryAuditStep() {
   const { activeVisit, completeInventoryAudit } = useServiceVisit();
 
@@ -135,9 +149,10 @@ export default function InventoryAuditStep() {
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "Unable to load the client reserve.",
+            getInventoryAuditErrorMessage(
+              error,
+              "Unable to load the client reserve.",
+            ),
           );
         }
       } finally {
@@ -311,9 +326,10 @@ export default function InventoryAuditStep() {
       });
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to complete the inventory audit.",
+        getInventoryAuditErrorMessage(
+          error,
+          "Unable to complete the inventory audit.",
+        ),
       );
     } finally {
       setSubmitting(false);
