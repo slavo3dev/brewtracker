@@ -68,6 +68,7 @@ export type TimeEntryListItem =
       Database["public"]["Tables"]["stops"]["Row"],
       "id" | "sequence_number" | "status"
     > | null;
+    clock_in_selfie_signed_url: string | null;
   };
 
 export async function getTimeEntryReviewQueue(): Promise<ReviewQueueItem[]> {
@@ -176,7 +177,19 @@ export async function getTimeEntries(): Promise<TimeEntryListItem[]> {
     throw new Error(error.message);
   }
 
-  return data as TimeEntryListItem[];
+  const entries = data as Omit<
+    TimeEntryListItem,
+    "clock_in_selfie_signed_url"
+  >[];
+
+  return Promise.all(
+    entries.map(async (entry) => ({
+      ...entry,
+      clock_in_selfie_signed_url: await createSelfieSignedUrl(
+        entry.clock_in_selfie_url,
+      ),
+    })),
+  );
 }
 
 export async function autoCloseForgottenClockOuts(input: {
