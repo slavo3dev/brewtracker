@@ -159,18 +159,22 @@ export default function StopDetailsScreen({
       return;
     }
 
-    setStartingService(true);
-    setServiceError(null);
-
     if (!stop.machine) {
-      throw new Error("No machine is assigned to this service stop.");
+      setServiceError(
+        "No machine is assigned to this service stop.",
+      );
+      return;
     }
 
     if (!stop.machine.qrCode?.trim()) {
-      throw new Error(
+      setServiceError(
         "The assigned machine does not have a QR code. Ask a manager to update the machine record.",
       );
+      return;
     }
+
+    setStartingService(true);
+    setServiceError(null);
 
     try {
       await startVisit({
