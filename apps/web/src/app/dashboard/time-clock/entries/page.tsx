@@ -112,6 +112,34 @@ export default async function TimeEntriesPage() {
                   </dd>
                 </div>
               </dl>
+              {entry.clock_in_selfie_signed_url ? (
+                <div className="mt-5">
+                  <p className="mb-2 text-sm font-medium text-espresso-950">
+                    Clock-in selfie
+                  </p>
+
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={entry.clock_in_selfie_signed_url}
+                    alt={`Clock-in selfie for ${
+                      entry.driver?.full_name ?? "field worker"
+                    }`}
+                    className="max-h-64 rounded-xl border border-latte-200 object-cover"
+                  />
+                </div>
+              ) : entry.clock_in_selfie_url ? (
+                <div className="mt-5 rounded-xl border border-copper-100 bg-copper-100/40 px-4 py-3">
+                  <p className="text-sm text-copper-600">
+                    The selfie exists, but it could not be loaded.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-xl border border-latte-200 bg-latte-100 px-4 py-3">
+                  <p className="text-sm text-steam-400">
+                    No clock-in selfie was submitted.
+                  </p>
+                </div>
+              )}
             </article>
           ))}
         </section>
