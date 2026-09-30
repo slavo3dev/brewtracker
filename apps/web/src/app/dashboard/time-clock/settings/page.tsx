@@ -1,15 +1,26 @@
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { autoCloseForgottenClockOutsAction } from "./actions";
 
-export default async function TimeClockSettingsPage() {
+type TimeClockSettingsPageProps = {
+  searchParams: Promise<{
+    autoCloseCount?: string;
+  }>;
+};
+
+export default async function TimeClockSettingsPage({
+  searchParams,
+}: TimeClockSettingsPageProps) {
   await requireAdmin();
+
+  const params = await searchParams;
+
+  const autoCloseCount =
+    params.autoCloseCount !== undefined ? Number(params.autoCloseCount) : null;
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
       <header className="mb-8">
-        <h1 className="text-display text-3xl text-espresso-950">
-          Clock Rules
-        </h1>
+        <h1 className="text-display text-3xl text-espresso-950">Clock Rules</h1>
 
         <p className="mt-2 text-sm text-steam-400">
           Configure and run time-clock edge case handling.
@@ -22,8 +33,9 @@ export default async function TimeClockSettingsPage() {
         </h2>
 
         <p className="mt-2 text-sm text-steam-400">
-          Auto-close open time entries whose shift end time has passed, flag them
-          for manager review, and keep the reason visible in the review queue.
+          Auto-close open time entries whose shift end time has passed, flag
+          them for manager review, and keep the reason visible in the review
+          queue.
         </p>
 
         <form action={autoCloseForgottenClockOutsAction} className="mt-5">
@@ -31,6 +43,16 @@ export default async function TimeClockSettingsPage() {
             Run auto-close check
           </button>
         </form>
+
+        {autoCloseCount !== null ? (
+          <p className="mt-4 text-sm text-steam-500">
+            {autoCloseCount === 0
+              ? "Auto-close check completed. No eligible open entries were found."
+              : `Auto-close check completed. ${autoCloseCount} ${
+                  autoCloseCount === 1 ? "entry was" : "entries were"
+                } flagged for review.`}
+          </p>
+        ) : null}
       </section>
 
       <section className="mt-6 rounded-2xl border border-latte-200 bg-crema-0 p-6 shadow-sm">
