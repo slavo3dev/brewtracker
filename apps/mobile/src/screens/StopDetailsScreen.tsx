@@ -1,4 +1,8 @@
-import { distanceMeters, type GeoPoint } from "@brewtracker/types";
+import {
+  distanceMeters,
+  formatDistanceMeters,
+  type GeoPoint,
+} from "@brewtracker/types";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -32,14 +36,6 @@ function formatScheduleTime(value: string | null): string | null {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
-}
-
-function formatDistance(distance: number): string {
-  if (distance >= 1000) {
-    return `${(distance / 1000).toFixed(1)} km`;
-  }
-
-  return `${Math.round(distance)} m`;
 }
 
 function getStatusLabel(status: TodayRouteStop["status"]): string {
@@ -295,7 +291,7 @@ export default function StopDetailsScreen({
             label="Distance"
             value={
               distanceFromDestination != null
-                ? formatDistance(distanceFromDestination)
+                ? formatDistanceMeters(distanceFromDestination)
                 : locationStatus === "loading"
                   ? "Calculating…"
                   : "Unavailable"

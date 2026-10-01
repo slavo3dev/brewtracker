@@ -19,6 +19,10 @@ import type {
 import { useGeofence } from "../hooks/useGeofence";
 import { useAuth } from "../features/auth/AuthProvider";
 import { startLocationTracking } from "../features/fleet/location-tracking.service";
+import {
+  formatDistanceMeters,
+  formatFeet,
+} from "@brewtracker/types";
 
 type Props = {
   onBack: () => void;
@@ -119,18 +123,14 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
 
       case "out_of_range":
         if (distanceMeters != null && nearestTarget != null) {
-          const formattedDistance =
-            distanceMeters >= 1000
-              ? `${(distanceMeters / 1000).toFixed(1)} km`
-              : `${Math.round(distanceMeters)} m`;
-
-          return `You are ${formattedDistance} from ${nearestTarget.label}. Move inside its ${nearestTarget.radiusMeters} m clock-in area.`;
+          return `You are ${formatDistanceMeters(
+            distanceMeters,
+          )} from ${nearestTarget.label}. Move inside its ${formatFeet(
+            nearestTarget.radiusMeters,
+          )} clock-in area.`;
         }
 
         return "You are outside all allowed clock-in areas.";
-
-      case "error":
-        return errorMessage ?? "Unable to determine location.";
 
       case "in_range":
         return matchedTarget
