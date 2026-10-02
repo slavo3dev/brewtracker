@@ -194,26 +194,30 @@ export async function getTimeEntries(): Promise<TimeEntryListItem[]> {
 
 export async function autoCloseForgottenClockOuts(input: {
   reviewedBy: string;
-}) {
+}): Promise<number> {
   const supabase = createAdminClient();
+  const now = new Date().toISOString();
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("time_entries")
     .update({
-      clock_out_at: new Date().toISOString(),
+      clock_out_at: now,
       status: "flagged",
       review_status: "pending",
       review_reason: "Forgotten clock-out auto-closed after shift end.",
-      auto_closed_at: new Date().toISOString(),
+      auto_closed_at: now,
       auto_close_reason: "Shift ended without driver clock-out.",
       reviewed_by: input.reviewedBy,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
     .eq("status", "open")
     .not("shift_end_at", "is", null)
-    .lt("shift_end_at", new Date().toISOString());
+    .lt("shift_end_at", now)
+    .select("id");
 
   if (error) {
     throw new Error(error.message);
   }
+
+  return data?.length ?? 0;
 }

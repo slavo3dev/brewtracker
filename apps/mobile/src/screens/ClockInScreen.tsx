@@ -40,11 +40,18 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
   const {
     status,
     position,
-    distanceMeters,
-    nearestTarget,
-    matchedTarget,
     errorMessage,
   } = useGeofence(targets);
+
+  const clockInTarget =
+    targets.find((target) => target.kind === "warehouse") ??
+    targets[0] ??
+    null;
+
+  const canClockIn =
+    position !== null &&
+    clockInTarget !== null &&
+    !submitting;
 
   useEffect(() => {
     let mounted = true;
@@ -81,12 +88,6 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
     };
   }, []);
 
-  const canClockIn =
-    status === "in_range" &&
-    position !== null &&
-    matchedTarget !== null &&
-    !submitting;
-
   function getTargetDescription(target: ClockTarget): string {
     if (target.kind === "warehouse") {
       return `Warehouse: ${target.label}`;
@@ -101,7 +102,7 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
     }
 
     if (loadingTargets) {
-      return "Loading today’s route and allowed clock-in locations…";
+      return "Loading today’s clock-in information…";
     }
 
     switch (status) {
@@ -109,7 +110,7 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
         return "Checking location permission…";
 
       case "permission_denied":
-        return "Location permission is denied. Enable it in Settings to clock in.";
+        return "Location permission is denied. Enable it in Settings to record your clock-in location.";
 
       case "locating":
         return "Getting your current location…";
@@ -118,24 +119,11 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
         return "No warehouse or scheduled stop is available for today. Contact your manager.";
 
       case "out_of_range":
-        if (distanceMeters != null && nearestTarget != null) {
-          const formattedDistance =
-            distanceMeters >= 1000
-              ? `${(distanceMeters / 1000).toFixed(1)} km`
-              : `${Math.round(distanceMeters)} m`;
-
-          return `You are ${formattedDistance} from ${nearestTarget.label}. Move inside its ${nearestTarget.radiusMeters} m clock-in area.`;
-        }
-
-        return "You are outside all allowed clock-in areas.";
+      case "in_range":
+        return "Your current location will be recorded with this clock-in.";
 
       case "error":
         return errorMessage ?? "Unable to determine location.";
-
-      case "in_range":
-        return matchedTarget
-          ? `You are inside the allowed area for ${matchedTarget.label}.`
-          : "You are ready to clock in.";
 
       default:
         return "";
@@ -143,7 +131,7 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
   }
 
   async function handleClockIn(): Promise<void> {
-    if (!position || !matchedTarget || !canClockIn) {
+    if (!position || !clockInTarget || !canClockIn) {
       return;
     }
 
@@ -153,7 +141,7 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
     try {
       const result = await createClockIn({
         position,
-        target: matchedTarget,
+        target: clockInTarget,
       });
 
       if (user) {
@@ -191,13 +179,9 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
       <View style={styles.content}>
         <Text style={styles.title}>Clock In</Text>
 
-        {matchedTarget ? (
+        {clockInTarget ? (
           <Text style={styles.targetLabel}>
-            {getTargetDescription(matchedTarget)}
-          </Text>
-        ) : nearestTarget ? (
-          <Text style={styles.targetLabel}>
-            Nearest: {getTargetDescription(nearestTarget)}
+            {getTargetDescription(clockInTarget)}
           </Text>
         ) : null}
 
