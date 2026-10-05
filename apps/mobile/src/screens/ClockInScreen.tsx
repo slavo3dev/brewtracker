@@ -19,10 +19,6 @@ import type {
 import { useGeofence } from "../hooks/useGeofence";
 import { useAuth } from "../features/auth/AuthProvider";
 import { startLocationTracking } from "../features/fleet/location-tracking.service";
-import {
-  formatDistanceMeters,
-  formatFeet,
-} from "@brewtracker/types";
 
 type Props = {
   onBack: () => void;
@@ -30,10 +26,9 @@ type Props = {
 };
 
 export default function ClockInScreen({ onBack, onClockedIn }: Props) {
-  
   const { session } = useAuth();
   const user = session?.user ?? null;
-  
+
   const [clockContext, setClockContext] = useState<ClockContext | null>(null);
   const [loadingTargets, setLoadingTargets] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -41,21 +36,12 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
 
   const targets = useMemo(() => clockContext?.targets ?? [], [clockContext]);
 
-  const {
-    status,
-    position,
-    errorMessage,
-  } = useGeofence(targets);
+  const { status, position, errorMessage } = useGeofence(targets);
 
   const clockInTarget =
-    targets.find((target) => target.kind === "warehouse") ??
-    targets[0] ??
-    null;
+    targets.find((target) => target.kind === "warehouse") ?? targets[0] ?? null;
 
-  const canClockIn =
-    position !== null &&
-    clockInTarget !== null &&
-    !submitting;
+  const canClockIn = position !== null && clockInTarget !== null && !submitting;
 
   useEffect(() => {
     let mounted = true;
@@ -123,28 +109,11 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
         return "No warehouse or scheduled stop is available for today. Contact your manager.";
 
       case "out_of_range":
-<<<<<<< HEAD
-        if (distanceMeters != null && nearestTarget != null) {
-          return `You are ${formatDistanceMeters(
-            distanceMeters,
-          )} from ${nearestTarget.label}. Move inside its ${formatFeet(
-            nearestTarget.radiusMeters,
-          )} clock-in area.`;
-        }
-
-        return "You are outside all allowed clock-in areas.";
-
-      case "in_range":
-        return matchedTarget
-          ? `You are inside the allowed area for ${matchedTarget.label}.`
-          : "You are ready to clock in.";
-=======
       case "in_range":
         return "Your current location will be recorded with this clock-in.";
 
       case "error":
         return errorMessage ?? "Unable to determine location.";
->>>>>>> dev
 
       default:
         return "";
@@ -181,7 +150,6 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
       }
 
       onClockedIn(result.timeEntry.id);
-
     } catch (error) {
       setScreenError(
         error instanceof Error ? error.message : "Unable to clock in.",
