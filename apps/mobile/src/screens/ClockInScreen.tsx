@@ -26,10 +26,9 @@ type Props = {
 };
 
 export default function ClockInScreen({ onBack, onClockedIn }: Props) {
-  
   const { session } = useAuth();
   const user = session?.user ?? null;
-  
+
   const [clockContext, setClockContext] = useState<ClockContext | null>(null);
   const [loadingTargets, setLoadingTargets] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -37,21 +36,12 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
 
   const targets = useMemo(() => clockContext?.targets ?? [], [clockContext]);
 
-  const {
-    status,
-    position,
-    errorMessage,
-  } = useGeofence(targets);
+  const { status, position, errorMessage } = useGeofence(targets);
 
   const clockInTarget =
-    targets.find((target) => target.kind === "warehouse") ??
-    targets[0] ??
-    null;
+    targets.find((target) => target.kind === "warehouse") ?? targets[0] ?? null;
 
-  const canClockIn =
-    position !== null &&
-    clockInTarget !== null &&
-    !submitting;
+  const canClockIn = position !== null && clockInTarget !== null && !submitting;
 
   useEffect(() => {
     let mounted = true;
@@ -160,7 +150,6 @@ export default function ClockInScreen({ onBack, onClockedIn }: Props) {
       }
 
       onClockedIn(result.timeEntry.id);
-
     } catch (error) {
       setScreenError(
         error instanceof Error ? error.message : "Unable to clock in.",

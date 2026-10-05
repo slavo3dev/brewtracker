@@ -1,4 +1,9 @@
-import { distanceMeters, type GeoPoint } from "@brewtracker/types";
+import {
+  distanceMeters,
+  formatDistanceMeters,
+  formatFeet,
+  type GeoPoint,
+} from "@brewtracker/types";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -11,14 +16,6 @@ import {
 
 import { useCurrentLocation } from "../maps/useCurrentLocation";
 import { useServiceVisit } from "./ServiceVisitProvider";
-
-function formatDistance(value: number): string {
-  if (value >= 1000) {
-    return `${(value / 1000).toFixed(1)} km`;
-  }
-
-  return `${Math.round(value)} m`;
-}
 
 export default function ArrivalStep() {
   const { activeVisit, completeArrival } = useServiceVisit();
@@ -105,14 +102,18 @@ export default function ArrivalStep() {
         }
 
         if (isInsideGeofence) {
-          return `You are ${formatDistance(
+          return `You are ${formatDistanceMeters(
             currentDistance,
-          )} from ${visit.target.clientName}, inside the ${radius} m service area.`;
+          )} from ${visit.target.clientName}, inside the ${formatFeet(
+            radius,
+          )} service area.`;
         }
 
-        return `You are ${formatDistance(
+        return `You are ${formatDistanceMeters(
           currentDistance,
-        )} from ${visit.target.clientName}. Move inside the ${radius} m service area.`;
+        )} from ${visit.target.clientName}. Move inside the ${formatFeet(
+          radius,
+        )} service area.`;
     }
   }
 
@@ -206,7 +207,9 @@ export default function ArrivalStep() {
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Allowed radius</Text>
 
-          <Text style={styles.detailValue}>{radius} m</Text>
+          <Text style={styles.detailValue}>
+            {formatFeet(radius)}
+          </Text>
         </View>
 
         <View style={styles.detailRow}>
@@ -215,7 +218,7 @@ export default function ArrivalStep() {
           <Text style={styles.detailValue}>
             {currentDistance == null
               ? "Unavailable"
-              : formatDistance(currentDistance)}
+              : formatDistanceMeters(currentDistance)}
           </Text>
         </View>
 

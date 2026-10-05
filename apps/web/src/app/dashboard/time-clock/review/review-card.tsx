@@ -1,6 +1,10 @@
 "use client";
 
-import { distanceMeters } from "@brewtracker/types";
+import {
+  distanceMeters,
+  formatDistanceMeters,
+  formatFeet,
+} from "@brewtracker/types";
 import { useActionState } from "react";
 import type { ReviewQueueItem } from "@/lib/time-clock/time-entry-service";
 import { approveClockIn, flagClockIn, rejectClockIn } from "./actions";
@@ -38,20 +42,18 @@ export function ReviewCard({ entry }: ReviewCardProps) {
     entry.warehouse.geofence_radius_meters != null;
 
   const distanceFromWarehouse =
-    hasClockInLocation && hasWarehouseGeofence
-      ? Math.round(
-          distanceMeters(
-            {
-              latitude: entry.clock_in_latitude!,
-              longitude: entry.clock_in_longitude!,
-            },
-            {
-              latitude: entry.warehouse!.latitude!,
-              longitude: entry.warehouse!.longitude!,
-            },
-          ),
-        )
-      : null;
+  hasClockInLocation && hasWarehouseGeofence
+    ? distanceMeters(
+        {
+          latitude: entry.clock_in_latitude!,
+          longitude: entry.clock_in_longitude!,
+        },
+        {
+          latitude: entry.warehouse!.latitude!,
+          longitude: entry.warehouse!.longitude!,
+        },
+      )
+    : null;
 
   const outsideByMeters =
     distanceFromWarehouse != null &&
@@ -109,7 +111,7 @@ export function ReviewCard({ entry }: ReviewCardProps) {
           <dt className="text-steam-400">Distance</dt>
           <dd className="text-espresso-950">
             {distanceFromWarehouse != null
-              ? `${distanceFromWarehouse} m from warehouse`
+              ? `${formatDistanceMeters(distanceFromWarehouse)} from warehouse`
               : "Missing location"}
           </dd>
         </div>
@@ -119,7 +121,7 @@ export function ReviewCard({ entry }: ReviewCardProps) {
           <dd className="text-espresso-950">
             {outsideByMeters != null
               ? outsideByMeters > 0
-                ? `Outside by ${outsideByMeters} m`
+                ? `Outside by ${formatFeet(outsideByMeters)}`
                 : "Inside geofence"
               : "Unavailable"}
           </dd>
