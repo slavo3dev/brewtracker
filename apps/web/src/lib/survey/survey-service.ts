@@ -1,11 +1,12 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export async function isSurveyTokenValid(
-  token: string,
-): Promise<boolean> {
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function isSurveyTokenValid(token: string): Promise<boolean> {
   const normalizedToken = token.trim();
 
-  if (!normalizedToken) {
+  if (!normalizedToken || !UUID_PATTERN.test(normalizedToken)) {
     return false;
   }
 
@@ -18,10 +19,7 @@ export async function isSurveyTokenValid(
     .maybeSingle();
 
   if (error) {
-    console.error(
-      "Unable to validate survey token:",
-      error,
-    );
+    console.error("Unable to validate survey token:", error);
 
     return false;
   }
