@@ -2,6 +2,10 @@ import {
   getGoogleReviewUrl,
 } from "./actions";
 import SurveyForm from "./survey-form";
+import {
+  isSurveyTokenValid,
+} from "@/lib/survey/survey-service";
+
 
 type Props = {
   params: Promise<{
@@ -13,6 +17,29 @@ export default async function SurveyPage({
   params,
 }: Props) {
   const { token } = await params;
+
+  const isValidToken =
+    await isSurveyTokenValid(token);
+
+  if (!isValidToken) {
+    return (
+      <main className="min-h-screen bg-crema-50 px-4 py-16">
+        <section className="mx-auto max-w-lg rounded-3xl border border-latte-200 bg-crema-0 p-8 shadow-sm">
+          <p className="text-sm font-medium text-copper-600">
+            BrewTracker
+          </p>
+
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-espresso-950">
+            Survey unavailable
+          </h1>
+
+          <p className="mt-3 text-sm leading-6 text-steam-400">
+            This survey link is invalid.
+          </p>
+        </section>
+      </main>
+    );
+  }
 
   const googleReviewUrl =
     await getGoogleReviewUrl();
