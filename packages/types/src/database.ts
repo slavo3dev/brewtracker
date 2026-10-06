@@ -2499,6 +2499,10 @@ export type Database = {
         }
         Returns: string
       }
+      remove_route_template_exception: {
+        Args: { p_exception_id: string }
+        Returns: undefined
+      }
       save_client_delivery: {
         Args: {
           p_client_id: string

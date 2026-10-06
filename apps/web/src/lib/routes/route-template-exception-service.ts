@@ -230,12 +230,16 @@ export async function deleteRouteTemplateException(
 ): Promise<void> {
   const supabase = createAdminClient();
 
-  const { error } = await supabase
-    .from("route_template_exceptions")
-    .delete()
-    .eq("id", exceptionId);
+  const { error } = await supabase.rpc(
+    "remove_route_template_exception",
+    {
+      p_exception_id: exceptionId,
+    },
+  );
 
   if (error) {
-    throw new Error(`Unable to remove route exception: ${error.message}`);
+    throw new Error(
+      `Unable to remove route exception: ${error.message}`,
+    );
   }
 }
