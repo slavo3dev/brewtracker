@@ -103,11 +103,77 @@ export default function InventoryAuditStep() {
       setErrorMessage(null);
 
       try {
-        // 1. Load products configured for this client.
+        /*
+         * Products are network-first with an AsyncStorage
+         * fallback, so they can still be loaded offline
+         * after they have previously been cached.
+         */
         const result = await loadClientInventoryProducts(clientId);
 
-        // 2. Load previous after-service reserve
-        // balances for those products.
+        if (cancelled) {
+          return;
+        }
+
+        setProducts(result);
+
+        /*
+         * Restore locally persisted driver input BEFORE
+         * making any additional network-dependent request.
+         *
+         * This allows an unfinished Inventory Audit to
+         * survive an offline retry or app restoration.
+         */
+        const savedAudit = activeVisit?.inventoryAudit;
+
+        const activeVisitId = activeVisit?.id;
+
+        if (
+          savedAudit &&
+          activeVisitId &&
+          savedAudit.sourceVisitId === activeVisitId &&
+          savedAudit.syncStatus !== "synced"
+        ) {
+          const restoredCounts = Object.fromEntries(
+            savedAudit.items.map((item) => [
+              item.productId,
+              {
+                issueQuantity: String(item.issueQuantity ?? 0),
+
+                looseQuantity: String(item.looseQuantity ?? 0),
+              },
+            ]),
+          );
+
+          setCounts((current) =>
+            Object.keys(current).length > 0 ? current : restoredCounts,
+          );
+
+          /*
+           * The previous balances used when this audit was
+           * originally submitted are already persisted in
+           * the audit items.
+           *
+           * Restore them locally rather than requiring the
+           * server again.
+           */
+          setPreviousBalances(
+            new Map(
+              savedAudit.items.map((item) => [
+                item.productId,
+                item.previousReserveAfter,
+              ]),
+            ),
+          );
+
+          return;
+        }
+
+        /*
+         * No unfinished local audit exists.
+         *
+         * Only a new audit needs the previous reserve
+         * balances from the server.
+         */
         const balances = await loadPreviousClientReserveBalances(
           clientId,
           result,
@@ -115,36 +181,7 @@ export default function InventoryAuditStep() {
         );
 
         if (!cancelled) {
-          // 3. Store products and their previous balances.
-          setProducts(result);
           setPreviousBalances(balances);
-
-          // 4. Restore an unfinished local reserve count.
-          const savedAudit = activeVisit?.inventoryAudit;
-
-          const activeVisitId = activeVisit?.id;
-
-          if (
-            savedAudit &&
-            activeVisitId &&
-            savedAudit.sourceVisitId === activeVisitId &&
-            savedAudit.syncStatus !== "synced"
-          ) {
-            const restoredCounts = Object.fromEntries(
-              savedAudit.items.map((item) => [
-                item.productId,
-                {
-                  issueQuantity: String(item.issueQuantity ?? 0),
-
-                  looseQuantity: String(item.looseQuantity ?? 0),
-                },
-              ]),
-            );
-
-            setCounts((current) =>
-              Object.keys(current).length > 0 ? current : restoredCounts,
-            );
-          }
         }
       } catch (error) {
         if (!cancelled) {

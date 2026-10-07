@@ -125,6 +125,36 @@ export default function RestockDropStep() {
 
         if (!cancelled) {
           setProducts(result);
+
+          /*
+           * Restore an unfinished locally saved client delivery.
+           *
+           * The delivery is persisted before the Supabase sync
+           * attempt, so an offline/failed submission must restore
+           * the driver's actual entered quantities instead of
+           * recalculating the recommendation.
+           */
+          const savedDelivery = activeVisit.restockDrop;
+
+          if (
+            savedDelivery &&
+            savedDelivery.sourceVisitId === activeVisit.id &&
+            savedDelivery.syncStatus !== "synced"
+          ) {
+            const restoredValues: DeliveryValues = Object.fromEntries(
+              savedDelivery.items.map((item) => [
+                item.productId,
+                {
+                  issueQuantity: formatQuantity(item.issueQuantity ?? 0),
+                  looseQuantity: formatQuantity(item.looseQuantity ?? 0),
+                },
+              ]),
+            );
+
+            setValues((current) =>
+              Object.keys(current).length > 0 ? current : restoredValues,
+            );
+          }
         }
       } catch (error) {
         if (!cancelled) {
@@ -146,7 +176,7 @@ export default function RestockDropStep() {
     return () => {
       cancelled = true;
     };
-  }, [activeVisit?.clientId]);
+  }, [activeVisit?.clientId, activeVisit?.id, activeVisit?.restockDrop]);
 
   const reserveBefore = activeVisit?.inventoryAudit ?? null;
 
@@ -320,18 +350,14 @@ export default function RestockDropStep() {
     try {
       await completeRestockDrop({
         quantities: deliveryRows.map((row) => {
-          const value =
-            values[row.product.productId] ??
-            emptyDeliveryValue();
+          const value = values[row.product.productId] ?? emptyDeliveryValue();
 
           return {
             productId: row.product.productId,
 
-            issueQuantity:
-              Number(value.issueQuantity || 0),
+            issueQuantity: Number(value.issueQuantity || 0),
 
-            looseQuantity:
-              Number(value.looseQuantity || 0),
+            looseQuantity: Number(value.looseQuantity || 0),
           };
         }),
 

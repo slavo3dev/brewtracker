@@ -91,7 +91,7 @@ function AppContent() {
   const {
     activeVisit,
     restoringVisit,
-    errorMessage: serviceVisitError,
+    restoreErrorMessage: serviceVisitRestoreError,
     retryRestore,
     clearLocalVisit,
   } = useServiceVisit();
@@ -120,10 +120,7 @@ function AppContent() {
 
     if (status === "authenticated") {
       void restoreLocationTracking().catch((error: unknown) => {
-        console.warn(
-          "Unable to restore live location tracking:",
-          error,
-        );
+        console.warn("Unable to restore live location tracking:", error);
       });
     }
   }, [status]);
@@ -262,14 +259,14 @@ function AppContent() {
     return <LoadingScreen message="Restoring service visit…" />;
   }
 
-  if (serviceVisitError) {
+  if (serviceVisitRestoreError) {
     const recoveryPending = serviceVisitRecoveryAction !== null;
 
     return (
       <View style={styles.centeredScreen}>
         <Text style={styles.errorTitle}>Unable to restore service visit</Text>
 
-        <Text style={styles.errorText}>{serviceVisitError}</Text>
+        <Text style={styles.errorText}>{serviceVisitRestoreError}</Text>
 
         <Text style={styles.recoveryDescription}>
           You can try loading the saved visit again or discard the local copy
