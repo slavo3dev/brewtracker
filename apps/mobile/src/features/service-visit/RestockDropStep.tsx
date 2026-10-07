@@ -320,16 +320,22 @@ export default function RestockDropStep() {
     try {
       await completeRestockDrop({
         quantities: deliveryRows.map((row) => {
-          const value = values[row.product.productId] ?? emptyDeliveryValue();
+          const value =
+            values[row.product.productId] ??
+            emptyDeliveryValue();
 
           return {
             productId: row.product.productId,
 
-            issueQuantity: Number(value.issueQuantity || 0),
+            issueQuantity:
+              Number(value.issueQuantity || 0),
 
-            looseQuantity: Number(value.looseQuantity || 0),
+            looseQuantity:
+              Number(value.looseQuantity || 0),
           };
         }),
+
+        configuredProducts: products,
       });
     } catch (error) {
       setErrorMessage(

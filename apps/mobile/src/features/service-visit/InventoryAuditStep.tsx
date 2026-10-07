@@ -317,12 +317,13 @@ export default function InventoryAuditStep() {
 
           return {
             productId: product.productId,
-
             issueQuantity: Number(count?.issueQuantity || 0),
-
             looseQuantity: Number(count?.looseQuantity || 0),
           };
         }),
+
+        configuredProducts: products,
+        previousBalances,
       });
     } catch (error) {
       setErrorMessage(

@@ -332,19 +332,26 @@ export default function MachineRefillStep() {
     try {
       await completeMachineRefill({
         quantities: refillProducts.map((product) => {
-          const value = values[product.productId] ?? emptyValue();
+          const value =
+            values[product.productId] ??
+            emptyValue();
 
-          const issueQuantity = Number(value.issueQuantity || 0);
+          const issueQuantity =
+            Number(value.issueQuantity || 0);
 
-          const looseQuantity = product.packaging.allowsLooseUnits
-            ? Number(value.looseQuantity || 0)
-            : 0;
+          const looseQuantity =
+            product.packaging.allowsLooseUnits
+              ? Number(value.looseQuantity || 0)
+              : 0;
 
           const actualQuantity =
-            issueQuantity * product.packaging.unitsPerIssueUnit + looseQuantity;
+            issueQuantity *
+              product.packaging.unitsPerIssueUnit +
+            looseQuantity;
 
           const zeroReason =
-            zeroReasons[product.productId] ?? emptyZeroReason();
+            zeroReasons[product.productId] ??
+            emptyZeroReason();
 
           return {
             productId: product.productId,
@@ -353,18 +360,20 @@ export default function MachineRefillStep() {
 
             looseQuantity,
 
-            /*
-             * Never send stale zero-reason
-             * metadata for a positive refill.
-             */
-            zeroReason: actualQuantity === 0 ? zeroReason.reason : null,
+            zeroReason:
+              actualQuantity === 0
+                ? zeroReason.reason
+                : null,
 
             zeroReasonNote:
-              actualQuantity === 0 && zeroReason.reason === "other"
+              actualQuantity === 0 &&
+              zeroReason.reason === "other"
                 ? zeroReason.note.trim() || null
                 : null,
           };
         }),
+
+        configuredProducts: products,
       });
     } catch (error) {
       setErrorMessage(
