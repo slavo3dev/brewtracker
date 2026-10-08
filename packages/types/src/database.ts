@@ -2377,6 +2377,10 @@ export type Database = {
         Args: { p_route_template_id: string }
         Returns: undefined
       }
+      attach_technical_ticket_photo: {
+        Args: { p_storage_path: string; p_ticket_id: string }
+        Returns: string
+      }
       calculate_client_reserve_decrease: {
         Args: {
           p_current_reserve_before: number
