@@ -1,7 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 
 import { saveClientReserveAfterService } from "../features/service-visit/client-reserve-after.service";
-import { loadClientInventoryProducts } from "../features/service-visit/inventory-audit.service";
 import { saveMachineRefill } from "../features/service-visit/machine-refill.service";
 import { saveServiceVisit } from "../features/service-visit/service-visit.storage";
 
@@ -350,9 +349,8 @@ export function useMachineRefillStep({
         );
       }
 
-      const configuredProducts = await loadClientInventoryProducts(
-        activeVisit.clientId,
-      );
+      const configuredProducts =
+        input.configuredProducts;
 
       const configuredById = new Map(
         configuredProducts.map((product) => [

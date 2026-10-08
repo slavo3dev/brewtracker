@@ -1,8 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 
 import {
-  loadClientInventoryProducts,
-  loadPreviousClientReserveBalances,
   saveClientReserveBefore,
 } from "../../src/features/service-visit/inventory-audit.service";
 import { saveServiceVisit } from "../../src/features/service-visit/service-visit.storage";
@@ -71,9 +69,7 @@ export function useInventoryAuditStep({
         productIds.add(count.productId);
       }
 
-      const configuredProducts = await loadClientInventoryProducts(
-        activeVisit.clientId,
-      );
+      const configuredProducts = input.configuredProducts;
 
       const configuredById = new Map(
         configuredProducts.map((product) => [product.productId, product]),
@@ -89,11 +85,7 @@ export function useInventoryAuditStep({
 
       const recordedAt = new Date().toISOString();
 
-      const previousBalances = await loadPreviousClientReserveBalances(
-        activeVisit.clientId,
-        configuredProducts,
-        recordedAt,
-      );
+      const previousBalances = input.previousBalances;
 
       const items: InventoryAuditItemRecord[] = input.counts.map((count) => {
         const product = configuredById.get(count.productId);

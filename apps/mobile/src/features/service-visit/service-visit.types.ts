@@ -237,6 +237,8 @@ export type ClientReserveCountInput = {
 
 export type CompleteInventoryAuditInput = {
   counts: ClientReserveCountInput[];
+  configuredProducts: ClientInventoryProduct[];
+  previousBalances: Map<string, number | null>;
 };
 
 export type InventoryAuditItemRecord = {
@@ -278,6 +280,7 @@ export type ClientDeliveryQuantityInput = {
 
 export type CompleteRestockDropInput = {
   quantities: ClientDeliveryQuantityInput[];
+  configuredProducts: ClientInventoryProduct[];
 };
 
 export type RestockDropItemRecord = {
@@ -350,6 +353,7 @@ export type MachineRefillQuantityInput = {
 
 export type CompleteMachineRefillInput = {
   quantities: MachineRefillQuantityInput[];
+  configuredProducts: ClientInventoryProduct[];
 };
 
 export type MachineRefillItemRecord = {

@@ -5,10 +5,6 @@ import {
 } from "react";
 
 import {
-  loadClientInventoryProducts,
-} from "../../src/features/service-visit/inventory-audit.service";
-
-import {
   saveClientDelivery,
 } from "../../src/features/service-visit/restock-drop.service";
 
@@ -78,9 +74,7 @@ export function useRestockStep({
         }
 
         const configuredProducts =
-          await loadClientInventoryProducts(
-            activeVisit.clientId,
-          );
+          input.configuredProducts;
 
         const configuredById =
           new Map(

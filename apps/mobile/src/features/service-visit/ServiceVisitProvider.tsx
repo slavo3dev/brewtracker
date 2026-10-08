@@ -52,6 +52,7 @@ type ServiceVisitContextValue = {
   activeVisit: ServiceVisit | null;
   restoringVisit: boolean;
   errorMessage: string | null;
+  restoreErrorMessage: string | null;
 
   startVisit: (
     input: Omit<StartServiceVisitInput, "userId">,
@@ -138,6 +139,10 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   const [restoringVisit, setRestoringVisit] = useState(true);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [restoreErrorMessage, setRestoreErrorMessage] = useState<string | null>(
+    null,
+  );
 
   const userId = session?.user.id ?? null;
 
@@ -239,13 +244,13 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     if (authStatus !== "authenticated" || !userId) {
       setActiveVisit(null);
       setRestoringVisit(false);
-      setErrorMessage(null);
+      setRestoreErrorMessage(null);
 
       return;
     }
 
     setRestoringVisit(true);
-    setErrorMessage(null);
+    setRestoreErrorMessage(null);
 
     try {
       const storedVisit = await loadServiceVisit(userId);
@@ -268,7 +273,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     } catch (error) {
       setActiveVisit(null);
 
-      setErrorMessage(
+      setRestoreErrorMessage(
         error instanceof Error
           ? error.message
           : "Unable to restore the active service visit.",
@@ -290,6 +295,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     if (!userId) {
       setActiveVisit(null);
       setErrorMessage(null);
+      setRestoreErrorMessage(null);
       setRestoringVisit(false);
 
       return;
@@ -302,8 +308,9 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
       setActiveVisit(null);
       setErrorMessage(null);
+      setRestoreErrorMessage(null);
     } catch (error) {
-      setErrorMessage(
+      setRestoreErrorMessage(
         error instanceof Error
           ? error.message
           : "Unable to discard the saved service visit.",
@@ -669,6 +676,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       activeVisit,
       restoringVisit,
       errorMessage,
+      restoreErrorMessage,
 
       startVisit,
 
@@ -711,6 +719,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       activeVisit,
       restoringVisit,
       errorMessage,
+      restoreErrorMessage,
 
       startVisit,
 

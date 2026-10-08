@@ -116,6 +116,50 @@ export default function MachineRefillStep() {
 
         if (!cancelled) {
           setProducts(result);
+
+          /*
+           * Restore an unfinished locally saved machine refill.
+           *
+           * The refill is persisted before the Supabase sync
+           * attempt, so a failed/offline submission must be
+           * reconstructed from the saved ServiceVisit.
+           */
+          const savedRefill = activeVisit.machineRefill;
+
+          if (
+            savedRefill &&
+            savedRefill.sourceVisitId === activeVisit.id &&
+            savedRefill.syncStatus !== "synced"
+          ) {
+            const restoredValues: RefillValues = Object.fromEntries(
+              savedRefill.items.map((item) => [
+                item.productId,
+                {
+                  issueQuantity: formatQuantity(item.issueQuantity ?? 0),
+
+                  looseQuantity: formatQuantity(item.looseQuantity ?? 0),
+                },
+              ]),
+            );
+
+            const restoredZeroReasons: ZeroReasonValues = Object.fromEntries(
+              savedRefill.items.map((item) => [
+                item.productId,
+                {
+                  reason: item.zeroReason ?? null,
+                  note: item.zeroReasonNote ?? "",
+                },
+              ]),
+            );
+
+            setValues((current) =>
+              Object.keys(current).length > 0 ? current : restoredValues,
+            );
+
+            setZeroReasons((current) =>
+              Object.keys(current).length > 0 ? current : restoredZeroReasons,
+            );
+          }
         }
       } catch (error) {
         if (!cancelled) {
@@ -137,7 +181,7 @@ export default function MachineRefillStep() {
     return () => {
       cancelled = true;
     };
-  }, [activeVisit?.clientId]);
+  }, [activeVisit?.clientId, activeVisit?.id, activeVisit?.machineRefill]);
 
   /*
    * Use products already participating in the
@@ -353,10 +397,6 @@ export default function MachineRefillStep() {
 
             looseQuantity,
 
-            /*
-             * Never send stale zero-reason
-             * metadata for a positive refill.
-             */
             zeroReason: actualQuantity === 0 ? zeroReason.reason : null,
 
             zeroReasonNote:
@@ -365,6 +405,8 @@ export default function MachineRefillStep() {
                 : null,
           };
         }),
+
+        configuredProducts: products,
       });
     } catch (error) {
       setErrorMessage(
