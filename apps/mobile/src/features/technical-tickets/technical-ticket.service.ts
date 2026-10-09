@@ -110,28 +110,63 @@ export async function uploadTechnicalTicketPhoto({
     .upload(storagePath, decode(base64), {
       contentType: "image/jpeg",
       cacheControl: "3600",
-      upsert: true,
+      upsert: false,
     });
 
   if (uploadError) {
     throw new Error(`Unable to upload the issue photo: ${uploadError.message}`);
   }
 
-  const { error: updateError } = await supabase
-    .from("technical_tickets")
-    .update({
-      photo_storage_path: storagePath,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", ticketId)
-    .eq("reported_by", userId);
+  const { data: attachedPath, error: attachError } = await supabase.rpc(
+    "attach_technical_ticket_photo",
+    {
+      p_ticket_id: ticketId,
+      p_storage_path: storagePath,
+    },
+  );
 
-  if (updateError) {
-    // Avoid leaving an orphaned file.
-    await supabase.storage.from(TECHNICAL_TICKET_BUCKET).remove([storagePath]);
-
-    throw new Error(`Unable to attach the issue photo: ${updateError.message}`);
+  if (!attachError && attachedPath === storagePath) {
+    return storagePath;
   }
 
-  return storagePath;
+  // The RPC may have committed even if its response failed.
+  // Verify the saved path before removing the uploaded file.
+  const { data: ticket, error: verificationError } = await supabase
+    .from("technical_tickets")
+    .select("photo_storage_path")
+    .eq("id", ticketId)
+    .eq("reported_by", userId)
+    .single();
+
+  if (verificationError || !ticket) {
+    throw new Error(
+      "The issue ticket was created, but its photo attachment could not " +
+        "be verified. Contact your manager before submitting again.",
+    );
+  }
+
+  if (ticket.photo_storage_path === storagePath) {
+    return storagePath;
+  }
+
+  const { error: cleanupError } = await supabase.storage
+    .from(TECHNICAL_TICKET_BUCKET)
+    .remove([storagePath]);
+
+  const reason =
+    attachError?.message ?? "The saved photo path could not be confirmed.";
+
+  if (cleanupError) {
+    console.warn("Unable to remove unattached issue photo:", cleanupError);
+
+    throw new Error(
+      `The issue ticket was created, but its photo could not be attached: ` +
+        `${reason} The uploaded file could not be removed.`,
+    );
+  }
+
+  throw new Error(
+    `The issue ticket was created, but its photo could not be attached: ` +
+      `${reason} The uploaded photo was removed.`,
+  );
 }
