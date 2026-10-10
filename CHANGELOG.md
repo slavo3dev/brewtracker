@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0
+## 1.0.1
 
 ### Added
 
@@ -51,7 +51,12 @@
 
 ### Fixed
 
-- [List the fixes included.]
+- MOB-FLEET-07: Retry uploading queued location pings when an authenticated
+  user brings the app to the foreground. Previously, pings recorded offline
+  could remain queued after connectivity returned until another location
+  update or tracking lifecycle event occurred.
+- Preserve queued location pings when an upload fails so they can be
+  retried later.
 
 ### Deployment notes
 
