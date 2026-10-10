@@ -1,0 +1,146 @@
+import { useCallback } from "react";
+
+import { syncCompletedServiceVisit } from "../features/service-visit/service-visit-summary.service";
+
+import { assertVisitReadyForCompletion } from "../features/service-visit/state/service-visit.completion";
+
+import { transitionToNextStep } from "../features/service-visit/state/service-visit.transitions";
+
+import type { ServiceVisit } from "../features/service-visit/service-visit.types";
+
+type CommitVisitMutation = (
+  mutation: (
+    currentVisit: ServiceVisit,
+  ) => ServiceVisit | Promise<ServiceVisit>,
+) => Promise<ServiceVisit>;
+
+type UseSummaryStepParams = {
+  commitVisitMutation: CommitVisitMutation;
+  setErrorMessage: (message: string | null) => void;
+};
+
+export function useSummaryStep({
+  commitVisitMutation,
+  setErrorMessage,
+}: UseSummaryStepParams) {
+  const syncVisit = useCallback(
+    async (visit: ServiceVisit): Promise<ServiceVisit> => {
+      try {
+        const result = await syncCompletedServiceVisit(visit);
+
+        const syncedVisit = await commitVisitMutation((currentVisit) => ({
+          ...currentVisit,
+
+          summary: {
+            ...currentVisit.summary,
+
+            syncStatus: "synced",
+
+            syncError: null,
+
+            databaseId: result.summaryId,
+
+            surveyToken: result.surveyToken,
+
+            emailSentAt: result.emailSentAt,
+          },
+
+          updatedAt: new Date().toISOString(),
+        }));
+
+        setErrorMessage(null);
+
+        return syncedVisit;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to sync the completed service visit.";
+
+        await commitVisitMutation((currentVisit) => ({
+          ...currentVisit,
+
+          summary: {
+            ...currentVisit.summary,
+
+            syncStatus: "failed",
+            syncError: message,
+          },
+
+          updatedAt: new Date().toISOString(),
+        }));
+
+        setErrorMessage(
+          "Service was saved on this device, but could not be synced. Retry before leaving this visit.",
+        );
+
+        throw new Error(message);
+      }
+    },
+    [commitVisitMutation, setErrorMessage],
+  );
+
+  const completeSummary = useCallback(async (): Promise<ServiceVisit> => {
+    const completedVisit = await commitVisitMutation((currentVisit) => {
+      assertVisitReadyForCompletion(currentVisit);
+
+      const now = new Date().toISOString();
+
+      const pendingVisit: ServiceVisit = {
+        ...currentVisit,
+
+        summary: {
+          ...currentVisit.summary,
+
+          syncStatus: "pending_sync",
+
+          syncError: null,
+        },
+
+        updatedAt: now,
+      };
+
+      /*
+       * "summary" is the final state-machine
+       * step, so this changes status to
+       * "completed" and sets completedAt.
+       */
+      return transitionToNextStep(pendingVisit, "summary", now);
+    });
+
+    /*
+     * The visit is persisted locally before this
+     * network operation starts.
+     */
+    return syncVisit(completedVisit);
+  }, [commitVisitMutation, syncVisit]);
+
+  const retrySummarySync = useCallback(async (): Promise<ServiceVisit> => {
+    const visit = await commitVisitMutation((currentVisit) => {
+      if (currentVisit.status !== "completed") {
+        throw new Error("Only a completed visit can retry synchronization.");
+      }
+
+      return {
+        ...currentVisit,
+
+        summary: {
+          ...currentVisit.summary,
+
+          syncStatus: "pending_sync",
+
+          syncError: null,
+        },
+
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    return syncVisit(visit);
+  }, [commitVisitMutation, syncVisit]);
+
+  return {
+    completeSummary,
+    retrySummarySync,
+  };
+}

@@ -14,6 +14,357 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          created_at: string
+          google_review_url: string | null
+          id: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          google_review_url?: string | null
+          id?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          google_review_url?: string | null
+          id?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      client_deliveries: {
+        Row: {
+          client_id: string
+          confirmed_at: string
+          created_at: string
+          delivered_by: string
+          id: string
+          machine_id: string
+          reserve_snapshot_id: string
+          source_visit_id: string
+          stop_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          confirmed_at: string
+          created_at?: string
+          delivered_by: string
+          id?: string
+          machine_id: string
+          reserve_snapshot_id: string
+          source_visit_id: string
+          stop_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          confirmed_at?: string
+          created_at?: string
+          delivered_by?: string
+          id?: string
+          machine_id?: string
+          reserve_snapshot_id?: string
+          source_visit_id?: string
+          stop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_deliveries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_deliveries_delivered_by_fkey"
+            columns: ["delivered_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_deliveries_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_deliveries_reserve_snapshot_id_fkey"
+            columns: ["reserve_snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "client_reserve_snapshots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_deliveries_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_delivery_items: {
+        Row: {
+          actual_quantity: number
+          base_unit_snapshot: string
+          created_at: string
+          delivery_id: string
+          entered_issue_quantity: number
+          entered_loose_quantity: number
+          id: string
+          issue_unit_snapshot: string
+          movement_id: string | null
+          normalized_unit: string
+          package_description_snapshot: string | null
+          par_level: number
+          product_id: string
+          recommended_quantity: number
+          reserve_before_quantity: number
+          units_per_issue_unit_snapshot: number
+        }
+        Insert: {
+          actual_quantity: number
+          base_unit_snapshot: string
+          created_at?: string
+          delivery_id: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          id?: string
+          issue_unit_snapshot: string
+          movement_id?: string | null
+          normalized_unit: string
+          package_description_snapshot?: string | null
+          par_level: number
+          product_id: string
+          recommended_quantity: number
+          reserve_before_quantity: number
+          units_per_issue_unit_snapshot: number
+        }
+        Update: {
+          actual_quantity?: number
+          base_unit_snapshot?: string
+          created_at?: string
+          delivery_id?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          id?: string
+          issue_unit_snapshot?: string
+          movement_id?: string | null
+          normalized_unit?: string
+          package_description_snapshot?: string | null
+          par_level?: number
+          product_id?: string
+          recommended_quantity?: number
+          reserve_before_quantity?: number
+          units_per_issue_unit_snapshot?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_delivery_items_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "client_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_delivery_items_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_delivery_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_inventory_products: {
+        Row: {
+          client_id: string
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          is_required: boolean
+          par_level: number | null
+          product_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          par_level?: number | null
+          product_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          par_level?: number | null
+          product_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_inventory_products_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_inventory_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_reserve_snapshot_items: {
+        Row: {
+          base_unit_snapshot: string
+          created_at: string
+          entered_issue_quantity: number
+          entered_loose_quantity: number
+          id: string
+          issue_unit_snapshot: string
+          normalized_quantity: number
+          normalized_unit: string
+          package_description_snapshot: string | null
+          product_id: string
+          snapshot_id: string
+          units_per_issue_unit_snapshot: number
+        }
+        Insert: {
+          base_unit_snapshot: string
+          created_at?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          id?: string
+          issue_unit_snapshot: string
+          normalized_quantity: number
+          normalized_unit: string
+          package_description_snapshot?: string | null
+          product_id: string
+          snapshot_id: string
+          units_per_issue_unit_snapshot: number
+        }
+        Update: {
+          base_unit_snapshot?: string
+          created_at?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          id?: string
+          issue_unit_snapshot?: string
+          normalized_quantity?: number
+          normalized_unit?: string
+          package_description_snapshot?: string | null
+          product_id?: string
+          snapshot_id?: string
+          units_per_issue_unit_snapshot?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_reserve_snapshot_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_reserve_snapshot_items_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "client_reserve_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_reserve_snapshots: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          machine_id: string
+          recorded_at: string
+          recorded_by: string
+          source_visit_id: string
+          stage: Database["public"]["Enums"]["client_reserve_snapshot_stage"]
+          stop_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          machine_id: string
+          recorded_at: string
+          recorded_by: string
+          source_visit_id: string
+          stage: Database["public"]["Enums"]["client_reserve_snapshot_stage"]
+          stop_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          machine_id?: string
+          recorded_at?: string
+          recorded_by?: string
+          source_visit_id?: string
+          stage?: Database["public"]["Enums"]["client_reserve_snapshot_stage"]
+          stop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_reserve_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_reserve_snapshots_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_reserve_snapshots_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_reserve_snapshots_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
@@ -28,6 +379,8 @@ export type Database = {
           longitude: number | null
           name: string
           region: string | null
+          service_email: string | null
+          signature_required: boolean
           updated_at: string
         }
         Insert: {
@@ -43,6 +396,8 @@ export type Database = {
           longitude?: number | null
           name: string
           region?: string | null
+          service_email?: string | null
+          signature_required?: boolean
           updated_at?: string
         }
         Update: {
@@ -58,9 +413,868 @@ export type Database = {
           longitude?: number | null
           name?: string
           region?: string | null
+          service_email?: string | null
+          signature_required?: boolean
           updated_at?: string
         }
         Relationships: []
+      }
+      inventory_audit_items: {
+        Row: {
+          audit_id: string
+          created_at: string
+          id: string
+          product_id: string
+          quantity: number
+          updated_at: string
+        }
+        Insert: {
+          audit_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+          quantity: number
+          updated_at?: string
+        }
+        Update: {
+          audit_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_audit_items_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audit_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_audits: {
+        Row: {
+          client_id: string
+          counted_at: string
+          counted_by: string
+          created_at: string
+          id: string
+          machine_id: string
+          source_visit_id: string
+          stop_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          counted_at: string
+          counted_by: string
+          created_at?: string
+          id?: string
+          machine_id: string
+          source_visit_id: string
+          stop_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          counted_at?: string
+          counted_by?: string
+          created_at?: string
+          id?: string
+          machine_id?: string
+          source_visit_id?: string
+          stop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_audits_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audits_counted_by_fkey"
+            columns: ["counted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audits_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_audits_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_locations: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          driver_id: string | null
+          id: string
+          location_type: Database["public"]["Enums"]["inventory_location_type"]
+          machine_id: string | null
+          warehouse_id: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          driver_id?: string | null
+          id?: string
+          location_type: Database["public"]["Enums"]["inventory_location_type"]
+          machine_id?: string | null
+          warehouse_id?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          driver_id?: string | null
+          id?: string
+          location_type?: Database["public"]["Enums"]["inventory_location_type"]
+          machine_id?: string | null
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_locations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_locations_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_locations_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_locations_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_movements: {
+        Row: {
+          base_unit_snapshot: string
+          created_at: string
+          entered_issue_quantity: number
+          entered_loose_quantity: number
+          from_location_id: string | null
+          id: string
+          issue_unit_snapshot: string
+          machine_id: string | null
+          movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          normalized_quantity: number
+          normalized_unit: string
+          occurred_at: string
+          package_description_snapshot: string | null
+          product_id: string
+          recorded_by: string
+          source_visit_id: string | null
+          stop_id: string | null
+          to_location_id: string | null
+          units_per_issue_unit_snapshot: number
+        }
+        Insert: {
+          base_unit_snapshot: string
+          created_at?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          from_location_id?: string | null
+          id?: string
+          issue_unit_snapshot: string
+          machine_id?: string | null
+          movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          normalized_quantity: number
+          normalized_unit: string
+          occurred_at: string
+          package_description_snapshot?: string | null
+          product_id: string
+          recorded_by: string
+          source_visit_id?: string | null
+          stop_id?: string | null
+          to_location_id?: string | null
+          units_per_issue_unit_snapshot: number
+        }
+        Update: {
+          base_unit_snapshot?: string
+          created_at?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          from_location_id?: string | null
+          id?: string
+          issue_unit_snapshot?: string
+          machine_id?: string | null
+          movement_type?: Database["public"]["Enums"]["inventory_movement_type"]
+          normalized_quantity?: number
+          normalized_unit?: string
+          occurred_at?: string
+          package_description_snapshot?: string | null
+          product_id?: string
+          recorded_by?: string
+          source_visit_id?: string | null
+          stop_id?: string | null
+          to_location_id?: string | null
+          units_per_issue_unit_snapshot?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_movements_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_movements_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_products: {
+        Row: {
+          allows_loose_units: boolean
+          allows_partial_base_unit: boolean
+          base_unit: string
+          category: Database["public"]["Enums"]["inventory_product_category"]
+          created_at: string
+          id: string
+          is_active: boolean
+          issue_unit: string
+          name: string
+          package_description: string | null
+          sku: string | null
+          sort_order: number
+          unit_label: string
+          units_per_issue_unit: number
+          updated_at: string
+        }
+        Insert: {
+          allows_loose_units?: boolean
+          allows_partial_base_unit?: boolean
+          base_unit: string
+          category: Database["public"]["Enums"]["inventory_product_category"]
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          issue_unit: string
+          name: string
+          package_description?: string | null
+          sku?: string | null
+          sort_order?: number
+          unit_label: string
+          units_per_issue_unit: number
+          updated_at?: string
+        }
+        Update: {
+          allows_loose_units?: boolean
+          allows_partial_base_unit?: boolean
+          base_unit?: string
+          category?: Database["public"]["Enums"]["inventory_product_category"]
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          issue_unit?: string
+          name?: string
+          package_description?: string | null
+          sku?: string | null
+          sort_order?: number
+          unit_label?: string
+          units_per_issue_unit?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inventory_reconciliation_items: {
+        Row: {
+          base_unit_snapshot: string
+          created_at: string
+          expected_quantity: number | null
+          id: string
+          issue_unit_snapshot: string
+          normalized_unit: string
+          package_description_snapshot: string | null
+          physical_quantity: number
+          product_id: string
+          reason: string | null
+          reconciliation_id: string
+          units_per_issue_unit_snapshot: number
+          variance_quantity: number | null
+        }
+        Insert: {
+          base_unit_snapshot: string
+          created_at?: string
+          expected_quantity?: number | null
+          id?: string
+          issue_unit_snapshot: string
+          normalized_unit: string
+          package_description_snapshot?: string | null
+          physical_quantity: number
+          product_id: string
+          reason?: string | null
+          reconciliation_id: string
+          units_per_issue_unit_snapshot: number
+          variance_quantity?: number | null
+        }
+        Update: {
+          base_unit_snapshot?: string
+          created_at?: string
+          expected_quantity?: number | null
+          id?: string
+          issue_unit_snapshot?: string
+          normalized_unit?: string
+          package_description_snapshot?: string | null
+          physical_quantity?: number
+          product_id?: string
+          reason?: string | null
+          reconciliation_id?: string
+          units_per_issue_unit_snapshot?: number
+          variance_quantity?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_reconciliation_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reconciliation_items_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_reconciliations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_reconciliations: {
+        Row: {
+          confirmed_at: string | null
+          confirmed_by: string | null
+          counted_at: string
+          counted_by: string
+          created_at: string
+          driver_id: string
+          id: string
+          inventory_location_id: string
+          notes: string | null
+          status: Database["public"]["Enums"]["inventory_reconciliation_status"]
+          updated_at: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          counted_at?: string
+          counted_by: string
+          created_at?: string
+          driver_id: string
+          id?: string
+          inventory_location_id: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["inventory_reconciliation_status"]
+          updated_at?: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          counted_at?: string
+          counted_by?: string
+          created_at?: string
+          driver_id?: string
+          id?: string
+          inventory_location_id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["inventory_reconciliation_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_reconciliations_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reconciliations_counted_by_fkey"
+            columns: ["counted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reconciliations_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reconciliations_inventory_location_id_fkey"
+            columns: ["inventory_location_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_restock_drop_items: {
+        Row: {
+          actual_quantity: number
+          counted_quantity: number
+          created_at: string
+          id: string
+          movement_from: string
+          movement_to: string
+          par_level: number
+          product_id: string
+          recommended_quantity: number
+          restock_drop_id: string
+          updated_at: string
+        }
+        Insert: {
+          actual_quantity: number
+          counted_quantity: number
+          created_at?: string
+          id?: string
+          movement_from?: string
+          movement_to?: string
+          par_level: number
+          product_id: string
+          recommended_quantity: number
+          restock_drop_id: string
+          updated_at?: string
+        }
+        Update: {
+          actual_quantity?: number
+          counted_quantity?: number
+          created_at?: string
+          id?: string
+          movement_from?: string
+          movement_to?: string
+          par_level?: number
+          product_id?: string
+          recommended_quantity?: number
+          restock_drop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_restock_drop_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_restock_drop_items_restock_drop_id_fkey"
+            columns: ["restock_drop_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_restock_drops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_restock_drops: {
+        Row: {
+          audit_id: string
+          client_id: string
+          confirmed_at: string
+          created_at: string
+          id: string
+          machine_id: string
+          source_driver_id: string
+          source_visit_id: string
+          stop_id: string
+          updated_at: string
+        }
+        Insert: {
+          audit_id: string
+          client_id: string
+          confirmed_at: string
+          created_at?: string
+          id?: string
+          machine_id: string
+          source_driver_id: string
+          source_visit_id: string
+          stop_id: string
+          updated_at?: string
+        }
+        Update: {
+          audit_id?: string
+          client_id?: string
+          confirmed_at?: string
+          created_at?: string
+          id?: string
+          machine_id?: string
+          source_driver_id?: string
+          source_visit_id?: string
+          stop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_restock_drops_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_restock_drops_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_restock_drops_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_restock_drops_source_driver_id_fkey"
+            columns: ["source_driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_restock_drops_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      location_pings: {
+        Row: {
+          accuracy_meters: number | null
+          created_at: string
+          driver_id: string
+          heading: number | null
+          id: string
+          latitude: number
+          longitude: number
+          recorded_at: string
+          route_id: string | null
+          speed_meters_per_second: number | null
+        }
+        Insert: {
+          accuracy_meters?: number | null
+          created_at?: string
+          driver_id: string
+          heading?: number | null
+          id?: string
+          latitude: number
+          longitude: number
+          recorded_at?: string
+          route_id?: string | null
+          speed_meters_per_second?: number | null
+        }
+        Update: {
+          accuracy_meters?: number | null
+          created_at?: string
+          driver_id?: string
+          heading?: number | null
+          id?: string
+          latitude?: number
+          longitude?: number
+          recorded_at?: string
+          route_id?: string | null
+          speed_meters_per_second?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_pings_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_pings_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machine_meter_readings: {
+        Row: {
+          archive_total: number | null
+          created_at: string
+          delta: number | null
+          id: string
+          machine_id: string
+          notes: string | null
+          previous_reading: number | null
+          reading: number
+          recorded_at: string
+          recorded_by: string | null
+          service_stop_id: string | null
+          source_visit_id: string
+        }
+        Insert: {
+          archive_total?: number | null
+          created_at?: string
+          delta?: number | null
+          id?: string
+          machine_id: string
+          notes?: string | null
+          previous_reading?: number | null
+          reading: number
+          recorded_at?: string
+          recorded_by?: string | null
+          service_stop_id?: string | null
+          source_visit_id: string
+        }
+        Update: {
+          archive_total?: number | null
+          created_at?: string
+          delta?: number | null
+          id?: string
+          machine_id?: string
+          notes?: string | null
+          previous_reading?: number | null
+          reading?: number
+          recorded_at?: string
+          recorded_by?: string | null
+          service_stop_id?: string | null
+          source_visit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_meter_readings_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_meter_readings_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_meter_readings_service_stop_id_fkey"
+            columns: ["service_stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machine_refill_items: {
+        Row: {
+          actual_quantity: number
+          base_unit_snapshot: string
+          created_at: string
+          entered_issue_quantity: number
+          entered_loose_quantity: number
+          id: string
+          issue_unit_snapshot: string
+          machine_refill_id: string
+          movement_id: string | null
+          normalized_unit: string
+          package_description_snapshot: string | null
+          product_id: string
+          units_per_issue_unit_snapshot: number
+          zero_reason: string | null
+          zero_reason_note: string | null
+        }
+        Insert: {
+          actual_quantity: number
+          base_unit_snapshot: string
+          created_at?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          id?: string
+          issue_unit_snapshot: string
+          machine_refill_id: string
+          movement_id?: string | null
+          normalized_unit: string
+          package_description_snapshot?: string | null
+          product_id: string
+          units_per_issue_unit_snapshot: number
+          zero_reason?: string | null
+          zero_reason_note?: string | null
+        }
+        Update: {
+          actual_quantity?: number
+          base_unit_snapshot?: string
+          created_at?: string
+          entered_issue_quantity?: number
+          entered_loose_quantity?: number
+          id?: string
+          issue_unit_snapshot?: string
+          machine_refill_id?: string
+          movement_id?: string | null
+          normalized_unit?: string
+          package_description_snapshot?: string | null
+          product_id?: string
+          units_per_issue_unit_snapshot?: number
+          zero_reason?: string | null
+          zero_reason_note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_refill_items_machine_refill_id_fkey"
+            columns: ["machine_refill_id"]
+            isOneToOne: false
+            referencedRelation: "machine_refills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_refill_items_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_refill_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machine_refills: {
+        Row: {
+          client_id: string
+          confirmed_at: string
+          created_at: string
+          id: string
+          machine_id: string
+          refilled_by: string
+          source_visit_id: string
+          stop_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          confirmed_at: string
+          created_at?: string
+          id?: string
+          machine_id: string
+          refilled_by: string
+          source_visit_id: string
+          stop_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          confirmed_at?: string
+          created_at?: string
+          id?: string
+          machine_id?: string
+          refilled_by?: string
+          source_visit_id?: string
+          stop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_refills_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_refills_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_refills_refilled_by_fkey"
+            columns: ["refilled_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_refills_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       machines: {
         Row: {
@@ -112,6 +1326,294 @@ export type Database = {
           },
         ]
       }
+      route_template_exceptions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          exception_date: string
+          id: string
+          is_skipped: boolean
+          notes: string | null
+          override_driver_id: string | null
+          route_template_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          exception_date: string
+          id?: string
+          is_skipped?: boolean
+          notes?: string | null
+          override_driver_id?: string | null
+          route_template_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          exception_date?: string
+          id?: string
+          is_skipped?: boolean
+          notes?: string | null
+          override_driver_id?: string | null
+          route_template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_template_exceptions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_exceptions_override_driver_id_fkey"
+            columns: ["override_driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_exceptions_route_template_id_fkey"
+            columns: ["route_template_id"]
+            isOneToOne: false
+            referencedRelation: "route_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_template_stop_exceptions: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          drink_count_required: boolean
+          exception_date: string
+          exception_type: Database["public"]["Enums"]["route_stop_exception_type"]
+          id: string
+          machine_id: string | null
+          notes: string | null
+          route_template_id: string
+          route_template_stop_id: string | null
+          scheduled_end_time: string | null
+          scheduled_start_time: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          drink_count_required?: boolean
+          exception_date: string
+          exception_type: Database["public"]["Enums"]["route_stop_exception_type"]
+          id?: string
+          machine_id?: string | null
+          notes?: string | null
+          route_template_id: string
+          route_template_stop_id?: string | null
+          scheduled_end_time?: string | null
+          scheduled_start_time?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          drink_count_required?: boolean
+          exception_date?: string
+          exception_type?: Database["public"]["Enums"]["route_stop_exception_type"]
+          id?: string
+          machine_id?: string | null
+          notes?: string | null
+          route_template_id?: string
+          route_template_stop_id?: string | null
+          scheduled_end_time?: string | null
+          scheduled_start_time?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_template_stop_exceptions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_stop_exceptions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_stop_exceptions_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_stop_exceptions_route_template_id_fkey"
+            columns: ["route_template_id"]
+            isOneToOne: false
+            referencedRelation: "route_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_stop_exceptions_route_template_stop_id_fkey"
+            columns: ["route_template_stop_id"]
+            isOneToOne: false
+            referencedRelation: "route_template_stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_template_stops: {
+        Row: {
+          client_id: string
+          created_at: string
+          drink_count_required: boolean
+          id: string
+          machine_id: string | null
+          notes: string | null
+          route_template_id: string
+          scheduled_end_time: string | null
+          scheduled_start_time: string | null
+          sequence_number: number
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          drink_count_required?: boolean
+          id?: string
+          machine_id?: string | null
+          notes?: string | null
+          route_template_id: string
+          scheduled_end_time?: string | null
+          scheduled_start_time?: string | null
+          sequence_number: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          drink_count_required?: boolean
+          id?: string
+          machine_id?: string | null
+          notes?: string | null
+          route_template_id?: string
+          scheduled_end_time?: string | null
+          scheduled_start_time?: string | null
+          sequence_number?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_template_stops_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_stops_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_template_stops_route_template_id_fkey"
+            columns: ["route_template_id"]
+            isOneToOne: false
+            referencedRelation: "route_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          driver_id: string
+          friday: boolean
+          id: string
+          is_active: boolean
+          monday: boolean
+          name: string
+          notes: string | null
+          saturday: boolean
+          sunday: boolean
+          thursday: boolean
+          tuesday: boolean
+          updated_at: string
+          warehouse_id: string
+          wednesday: boolean
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          driver_id: string
+          friday?: boolean
+          id?: string
+          is_active?: boolean
+          monday?: boolean
+          name: string
+          notes?: string | null
+          saturday?: boolean
+          sunday?: boolean
+          thursday?: boolean
+          tuesday?: boolean
+          updated_at?: string
+          warehouse_id: string
+          wednesday?: boolean
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string
+          friday?: boolean
+          id?: string
+          is_active?: boolean
+          monday?: boolean
+          name?: string
+          notes?: string | null
+          saturday?: boolean
+          sunday?: boolean
+          thursday?: boolean
+          tuesday?: boolean
+          updated_at?: string
+          warehouse_id?: string
+          wednesday?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_templates_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_templates_warehouse_id_fkey"
+            columns: ["warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       routes: {
         Row: {
           created_at: string
@@ -120,6 +1622,7 @@ export type Database = {
           id: string
           notes: string | null
           route_date: string
+          source_route_template_id: string | null
           status: Database["public"]["Enums"]["route_status"]
           updated_at: string
           warehouse_id: string | null
@@ -131,6 +1634,7 @@ export type Database = {
           id?: string
           notes?: string | null
           route_date: string
+          source_route_template_id?: string | null
           status?: Database["public"]["Enums"]["route_status"]
           updated_at?: string
           warehouse_id?: string | null
@@ -142,6 +1646,7 @@ export type Database = {
           id?: string
           notes?: string | null
           route_date?: string
+          source_route_template_id?: string | null
           status?: Database["public"]["Enums"]["route_status"]
           updated_at?: string
           warehouse_id?: string | null
@@ -162,10 +1667,261 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "routes_source_route_template_id_fkey"
+            columns: ["source_route_template_id"]
+            isOneToOne: false
+            referencedRelation: "route_templates"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "routes_warehouse_id_fkey"
             columns: ["warehouse_id"]
             isOneToOne: false
             referencedRelation: "warehouses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_visit_photos: {
+        Row: {
+          captured_at: string
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["service_photo_kind"]
+          machine_id: string
+          source_visit_id: string
+          stage: Database["public"]["Enums"]["service_photo_stage"]
+          stop_id: string
+          storage_path: string
+          uploaded_by: string
+        }
+        Insert: {
+          captured_at: string
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["service_photo_kind"]
+          machine_id: string
+          source_visit_id: string
+          stage: Database["public"]["Enums"]["service_photo_stage"]
+          stop_id: string
+          storage_path: string
+          uploaded_by: string
+        }
+        Update: {
+          captured_at?: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["service_photo_kind"]
+          machine_id?: string
+          source_visit_id?: string
+          stage?: Database["public"]["Enums"]["service_photo_stage"]
+          stop_id?: string
+          storage_path?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_visit_photos_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_photos_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_photos_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_visit_signatures: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          machine_id: string
+          signed_at: string
+          signed_by: string
+          source_visit_id: string
+          stop_id: string
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          machine_id: string
+          signed_at: string
+          signed_by: string
+          source_visit_id: string
+          stop_id: string
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          machine_id?: string
+          signed_at?: string
+          signed_by?: string
+          source_visit_id?: string
+          stop_id?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_visit_signatures_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_signatures_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_signatures_signed_by_fkey"
+            columns: ["signed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_signatures_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_visit_summaries: {
+        Row: {
+          client_id: string
+          closing_scanned_value: string | null
+          closing_verified_at: string | null
+          completed_at: string
+          completed_by: string
+          created_at: string
+          email_sent_at: string | null
+          id: string
+          machine_id: string
+          notification_error: string | null
+          notification_status: string
+          source_visit_id: string
+          stop_id: string
+          summary: Json
+          survey_token: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          closing_scanned_value?: string | null
+          closing_verified_at?: string | null
+          completed_at: string
+          completed_by: string
+          created_at?: string
+          email_sent_at?: string | null
+          id?: string
+          machine_id: string
+          notification_error?: string | null
+          notification_status?: string
+          source_visit_id: string
+          stop_id: string
+          summary?: Json
+          survey_token?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          closing_scanned_value?: string | null
+          closing_verified_at?: string | null
+          completed_at?: string
+          completed_by?: string
+          created_at?: string
+          email_sent_at?: string | null
+          id?: string
+          machine_id?: string
+          notification_error?: string | null
+          notification_status?: string
+          source_visit_id?: string
+          stop_id?: string
+          summary?: Json
+          survey_token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_visit_summaries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_summaries_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_summaries_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_summaries_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_visit_surveys: {
+        Row: {
+          id: string
+          rating: number
+          submitted_at: string
+          summary_id: string
+        }
+        Insert: {
+          id?: string
+          rating: number
+          submitted_at?: string
+          summary_id: string
+        }
+        Update: {
+          id?: string
+          rating?: number
+          submitted_at?: string
+          summary_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_visit_surveys_summary_id_fkey"
+            columns: ["summary_id"]
+            isOneToOne: true
+            referencedRelation: "service_visit_summaries"
             referencedColumns: ["id"]
           },
         ]
@@ -176,6 +1932,7 @@ export type Database = {
           client_id: string
           completed_at: string | null
           created_at: string
+          drink_count_required: boolean
           id: string
           machine_id: string | null
           notes: string | null
@@ -192,6 +1949,7 @@ export type Database = {
           client_id: string
           completed_at?: string | null
           created_at?: string
+          drink_count_required?: boolean
           id?: string
           machine_id?: string | null
           notes?: string | null
@@ -208,6 +1966,7 @@ export type Database = {
           client_id?: string
           completed_at?: string | null
           created_at?: string
+          drink_count_required?: boolean
           id?: string
           machine_id?: string | null
           notes?: string | null
@@ -243,6 +2002,90 @@ export type Database = {
           },
         ]
       }
+      technical_tickets: {
+        Row: {
+          assigned_to: string | null
+          client_id: string
+          created_at: string
+          description: string
+          id: string
+          machine_id: string
+          photo_storage_path: string | null
+          reported_by: string
+          resolved_at: string | null
+          source_visit_id: string
+          status: Database["public"]["Enums"]["technical_ticket_status"]
+          stop_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          client_id: string
+          created_at?: string
+          description: string
+          id?: string
+          machine_id: string
+          photo_storage_path?: string | null
+          reported_by: string
+          resolved_at?: string | null
+          source_visit_id: string
+          status?: Database["public"]["Enums"]["technical_ticket_status"]
+          stop_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          client_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          machine_id?: string
+          photo_storage_path?: string | null
+          reported_by?: string
+          resolved_at?: string | null
+          source_visit_id?: string
+          status?: Database["public"]["Enums"]["technical_ticket_status"]
+          stop_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technical_tickets_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technical_tickets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technical_tickets_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technical_tickets_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technical_tickets_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_entries: {
         Row: {
           auto_close_reason: string | null
@@ -266,6 +2109,7 @@ export type Database = {
           reviewed_at: string | null
           reviewed_by: string | null
           route_id: string | null
+          selfie_status: Database["public"]["Enums"]["selfie_verification_status"]
           shift_end_at: string | null
           status: Database["public"]["Enums"]["time_entry_status"]
           stop_id: string | null
@@ -294,6 +2138,7 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           route_id?: string | null
+          selfie_status?: Database["public"]["Enums"]["selfie_verification_status"]
           shift_end_at?: string | null
           status?: Database["public"]["Enums"]["time_entry_status"]
           stop_id?: string | null
@@ -322,6 +2167,7 @@ export type Database = {
           reviewed_at?: string | null
           reviewed_by?: string | null
           route_id?: string | null
+          selfie_status?: Database["public"]["Enums"]["selfie_verification_status"]
           shift_end_at?: string | null
           status?: Database["public"]["Enums"]["time_entry_status"]
           stop_id?: string | null
@@ -453,21 +2299,332 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      active_fleet_locations: {
+        Row: {
+          accuracy_meters: number | null
+          created_at: string | null
+          driver_email: string | null
+          driver_full_name: string | null
+          driver_id: string | null
+          driver_region: string | null
+          heading: number | null
+          id: string | null
+          latitude: number | null
+          longitude: number | null
+          recorded_at: string | null
+          route_date: string | null
+          route_id: string | null
+          route_status: Database["public"]["Enums"]["route_status"] | null
+          speed_meters_per_second: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_pings_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_pings_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      add_route_stop_exception: {
+        Args: {
+          p_client_id: string
+          p_created_by?: string
+          p_drink_count_required?: boolean
+          p_exception_date: string
+          p_machine_id?: string
+          p_notes?: string
+          p_route_template_id: string
+          p_scheduled_end_time?: string
+          p_scheduled_start_time?: string
+        }
+        Returns: string
+      }
+      add_route_template_stop_checked: {
+        Args: {
+          p_client_id: string
+          p_drink_count_required: boolean
+          p_machine_id?: string
+          p_notes?: string
+          p_route_template_id: string
+          p_scheduled_end_time?: string
+          p_scheduled_start_time?: string
+        }
+        Returns: undefined
+      }
+      apply_route_template_exception: {
+        Args: {
+          p_created_by?: string
+          p_exception_date: string
+          p_is_skipped: boolean
+          p_notes?: string
+          p_override_driver_id?: string
+          p_route_template_id: string
+        }
+        Returns: string
+      }
+      assert_route_template_has_no_conflicts: {
+        Args: { p_route_template_id: string }
+        Returns: undefined
+      }
+      attach_technical_ticket_photo: {
+        Args: { p_storage_path: string; p_ticket_id: string }
+        Returns: string
+      }
+      calculate_client_reserve_decrease: {
+        Args: {
+          p_current_reserve_before: number
+          p_previous_reserve_after: number
+        }
+        Returns: number
+      }
+      cancel_operational_route: {
+        Args: { p_route_id: string }
+        Returns: undefined
+      }
+      client_is_in_current_user_region: {
+        Args: { target_client_id: string }
+        Returns: boolean
+      }
+      confirm_driver_inventory_reconciliation: {
+        Args: { p_reconciliation_id: string }
+        Returns: undefined
+      }
+      create_driver_inventory_reconciliation: {
+        Args: { p_driver_id: string; p_items: Json; p_notes?: string }
+        Returns: string
+      }
+      current_user_has_client_stop: {
+        Args: { target_client_id: string }
+        Returns: boolean
+      }
+      current_user_has_machine_stop: {
+        Args: { target_machine_id: string }
+        Returns: boolean
+      }
+      current_user_has_route: {
+        Args: { target_route_id: string }
+        Returns: boolean
+      }
+      current_user_has_route_for_warehouse: {
+        Args: { target_warehouse_id: string }
+        Returns: boolean
+      }
       current_user_region: { Args: never; Returns: string }
       current_user_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      delete_route_template: {
+        Args: { p_route_template_id: string }
+        Returns: undefined
+      }
+      driver_has_route_at_warehouse: {
+        Args: { target_warehouse_id: string }
+        Returns: boolean
+      }
+      generate_routes_from_templates: {
+        Args: { p_route_date: string }
+        Returns: {
+          driver_id: string
+          route_date: string
+          route_id: string
+          route_template_id: string
+          stops_created: number
+        }[]
+      }
+      get_driver_inventory_expected_balance: {
+        Args: { p_as_of?: string; p_driver_id: string; p_product_id: string }
+        Returns: {
+          baseline_at: string
+          baseline_quantity: number
+          expected_quantity: number
+          has_baseline: boolean
+          inventory_location_id: string
+          movement_delta: number
+          normalized_unit: string
+          product_id: string
+        }[]
+      }
+      get_inventory_location_id: {
+        Args: {
+          p_entity_id: string
+          p_location_type: Database["public"]["Enums"]["inventory_location_type"]
+        }
+        Returns: string
+      }
+      get_previous_client_reserve_balance: {
+        Args: { p_before: string; p_client_id: string; p_product_id: string }
+        Returns: number
+      }
       is_ceo: { Args: never; Returns: boolean }
       is_driver: { Args: never; Returns: boolean }
       is_field_staff: { Args: never; Returns: boolean }
       is_manager: { Args: never; Returns: boolean }
+      record_warehouse_driver_transfer: {
+        Args: {
+          p_driver_id: string
+          p_issue_quantity: number
+          p_loose_quantity: number
+          p_movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          p_occurred_at?: string
+          p_product_id: string
+          p_warehouse_id: string
+        }
+        Returns: string
+      }
+      record_warehouse_driver_transfer_batch: {
+        Args: {
+          p_driver_id: string
+          p_items: Json
+          p_movement_type: Database["public"]["Enums"]["inventory_movement_type"]
+          p_occurred_at?: string
+          p_warehouse_id: string
+        }
+        Returns: string[]
+      }
+      remove_route_stop_exception: {
+        Args: {
+          p_created_by?: string
+          p_exception_date: string
+          p_notes?: string
+          p_route_template_id: string
+          p_route_template_stop_id: string
+        }
+        Returns: string
+      }
+      remove_route_template_exception: {
+        Args: { p_exception_id: string }
+        Returns: undefined
+      }
+      save_client_delivery: {
+        Args: {
+          p_client_id: string
+          p_confirmed_at: string
+          p_items: Json
+          p_machine_id: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
+      save_client_reserve_after_service: {
+        Args: {
+          p_calculated_at: string
+          p_client_id: string
+          p_machine_id: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
+      save_client_reserve_before_service: {
+        Args: {
+          p_client_id: string
+          p_items: Json
+          p_machine_id: string
+          p_recorded_at: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
+      save_inventory_audit: {
+        Args: {
+          p_client_id: string
+          p_counted_at: string
+          p_items: Json
+          p_machine_id: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
+      save_inventory_restock_drop: {
+        Args: {
+          p_audit_id: string
+          p_client_id: string
+          p_confirmed_at: string
+          p_items: Json
+          p_machine_id: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
+      save_machine_refill: {
+        Args: {
+          p_client_id: string
+          p_confirmed_at: string
+          p_items: Json
+          p_machine_id: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
+      set_route_template_active: {
+        Args: { p_is_active: boolean; p_route_template_id: string }
+        Returns: undefined
+      }
+      update_route_template_checked: {
+        Args: {
+          p_driver_id: string
+          p_friday: boolean
+          p_monday: boolean
+          p_name: string
+          p_notes?: string
+          p_route_template_id: string
+          p_saturday: boolean
+          p_sunday: boolean
+          p_thursday: boolean
+          p_tuesday: boolean
+          p_warehouse_id: string
+          p_wednesday: boolean
+        }
+        Returns: undefined
+      }
+      warehouse_is_in_current_user_region: {
+        Args: { target_warehouse_id: string }
+        Returns: boolean
+      }
+      was_machine_refilled: {
+        Args: { p_machine_refill_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "driver" | "tech" | "manager" | "ceo"
+      client_reserve_snapshot_stage: "before_service" | "after_service"
+      inventory_location_type:
+        | "warehouse"
+        | "driver"
+        | "client_reserve"
+        | "machine"
+      inventory_movement_type:
+        | "warehouse_issue"
+        | "client_delivery"
+        | "machine_refill"
+        | "warehouse_return"
+        | "adjustment"
+      inventory_product_category:
+        | "coffee"
+        | "powders"
+        | "sweeteners_stirrers"
+        | "cups_lids"
+        | "creamers"
+        | "cleaning"
+      inventory_reconciliation_status: "draft" | "confirmed"
       machine_status: "active" | "inactive" | "maintenance" | "retired"
       route_status:
         | "draft"
@@ -475,7 +2632,12 @@ export type Database = {
         | "in_progress"
         | "completed"
         | "cancelled"
+      route_stop_exception_type: "add" | "remove"
+      selfie_verification_status: "required" | "uploaded" | "missing" | "waived"
+      service_photo_kind: "exterior" | "interior_hopper" | "completed_machine"
+      service_photo_stage: "before" | "after" | "signature"
       stop_status: "pending" | "in_progress" | "completed" | "skipped"
+      technical_ticket_status: "open" | "in_progress" | "resolved" | "cancelled"
       time_entry_review_status: "pending" | "approved" | "flagged" | "rejected"
       time_entry_status: "open" | "closed" | "flagged" | "manager_override"
     }
@@ -493,12 +2655,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -522,11 +2684,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -547,11 +2709,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -572,11 +2734,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -589,11 +2751,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -606,6 +2768,29 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["driver", "tech", "manager", "ceo"],
+      client_reserve_snapshot_stage: ["before_service", "after_service"],
+      inventory_location_type: [
+        "warehouse",
+        "driver",
+        "client_reserve",
+        "machine",
+      ],
+      inventory_movement_type: [
+        "warehouse_issue",
+        "client_delivery",
+        "machine_refill",
+        "warehouse_return",
+        "adjustment",
+      ],
+      inventory_product_category: [
+        "coffee",
+        "powders",
+        "sweeteners_stirrers",
+        "cups_lids",
+        "creamers",
+        "cleaning",
+      ],
+      inventory_reconciliation_status: ["draft", "confirmed"],
       machine_status: ["active", "inactive", "maintenance", "retired"],
       route_status: [
         "draft",
@@ -614,7 +2799,12 @@ export const Constants = {
         "completed",
         "cancelled",
       ],
+      route_stop_exception_type: ["add", "remove"],
+      selfie_verification_status: ["required", "uploaded", "missing", "waived"],
+      service_photo_kind: ["exterior", "interior_hopper", "completed_machine"],
+      service_photo_stage: ["before", "after", "signature"],
       stop_status: ["pending", "in_progress", "completed", "skipped"],
+      technical_ticket_status: ["open", "in_progress", "resolved", "cancelled"],
       time_entry_review_status: ["pending", "approved", "flagged", "rejected"],
       time_entry_status: ["open", "closed", "flagged", "manager_override"],
     },

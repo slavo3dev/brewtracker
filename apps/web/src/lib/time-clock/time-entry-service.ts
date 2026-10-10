@@ -1,6 +1,33 @@
 import type { Database } from "@brewtracker/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+const TIME_ENTRY_SELFIES_BUCKET = "time-entry-selfies";
+
+async function createSelfieSignedUrl(
+  storagePath: string | null,
+): Promise<string | null> {
+  if (!storagePath) {
+    return null;
+  }
+
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase.storage
+    .from(TIME_ENTRY_SELFIES_BUCKET)
+    .createSignedUrl(storagePath, 60 * 10);
+
+  if (error) {
+    console.error("Unable to create clock-in selfie signed URL:", {
+      storagePath,
+      error: error.message,
+    });
+
+    return null;
+  }
+
+  return data.signedUrl;
+}
+
 export type TimeEntryReviewStatus =
   Database["public"]["Enums"]["time_entry_review_status"];
 
@@ -20,6 +47,7 @@ export type ReviewQueueItem =
       | "longitude"
       | "geofence_radius_meters"
     > | null;
+    clock_in_selfie_signed_url: string | null;
   };
 
 export type TimeEntryListItem =
@@ -40,6 +68,7 @@ export type TimeEntryListItem =
       Database["public"]["Tables"]["stops"]["Row"],
       "id" | "sequence_number" | "status"
     > | null;
+    clock_in_selfie_signed_url: string | null;
   };
 
 export async function getTimeEntryReviewQueue(): Promise<ReviewQueueItem[]> {
@@ -74,7 +103,16 @@ export async function getTimeEntryReviewQueue(): Promise<ReviewQueueItem[]> {
     throw new Error(error.message);
   }
 
-  return data as ReviewQueueItem[];
+  const entries = data as Omit<ReviewQueueItem, "clock_in_selfie_signed_url">[];
+
+  return Promise.all(
+    entries.map(async (entry) => ({
+      ...entry,
+      clock_in_selfie_signed_url: await createSelfieSignedUrl(
+        entry.clock_in_selfie_url,
+      ),
+    })),
+  );
 }
 
 export async function reviewTimeEntry(input: {
@@ -139,31 +177,47 @@ export async function getTimeEntries(): Promise<TimeEntryListItem[]> {
     throw new Error(error.message);
   }
 
-  return data as TimeEntryListItem[];
+  const entries = data as Omit<
+    TimeEntryListItem,
+    "clock_in_selfie_signed_url"
+  >[];
+
+  return Promise.all(
+    entries.map(async (entry) => ({
+      ...entry,
+      clock_in_selfie_signed_url: await createSelfieSignedUrl(
+        entry.clock_in_selfie_url,
+      ),
+    })),
+  );
 }
 
 export async function autoCloseForgottenClockOuts(input: {
   reviewedBy: string;
-}) {
+}): Promise<number> {
   const supabase = createAdminClient();
+  const now = new Date().toISOString();
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("time_entries")
     .update({
-      clock_out_at: new Date().toISOString(),
+      clock_out_at: now,
       status: "flagged",
       review_status: "pending",
       review_reason: "Forgotten clock-out auto-closed after shift end.",
-      auto_closed_at: new Date().toISOString(),
+      auto_closed_at: now,
       auto_close_reason: "Shift ended without driver clock-out.",
       reviewed_by: input.reviewedBy,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
     .eq("status", "open")
     .not("shift_end_at", "is", null)
-    .lt("shift_end_at", new Date().toISOString());
+    .lt("shift_end_at", now)
+    .select("id");
 
   if (error) {
     throw new Error(error.message);
   }
+
+  return data?.length ?? 0;
 }

@@ -1,0 +1,779 @@
+import {
+  createContext,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import { useAuth } from "../auth/AuthProvider";
+
+import { useAfterServiceStep } from "../../hooks/useAfterServiceStep";
+import { useBeforePhotosStep } from "../../hooks/useBeforePhotosStep";
+import { useInventoryAuditStep } from "../../hooks/useInventoryAuditStep";
+import { useDrinkCountStep } from "../../hooks/useDrinkCountStep";
+import { useRestockStep } from "../../hooks/useRestockStep";
+import { useVisitMutation } from "../../hooks/useVisitMutation";
+import { useSummaryStep } from "../../hooks/useSummaryStep";
+import { useMachineRefillStep } from "../../hooks/useMachineRefillStep";
+import { useClientConfirmation } from "../../hooks/useClientConfirmation";
+import {
+  loadServiceVisit,
+  removeServiceVisit,
+  saveServiceVisit,
+} from "./service-visit.storage";
+import { markServiceStopArrived } from "./service-visit-stop.service";
+import { assertStopCanStartService } from "../routes/route.service";
+
+import {
+  createInitialStepStates,
+  type BeforePhotoKind,
+  type CompleteArrivalInput,
+  type CompleteDrinkCountInput,
+  type CompleteInventoryAuditInput,
+  type CompleteMachineScanInput,
+  type CompleteRestockDropInput,
+  type CompleteMachineRefillInput,
+  type SaveAfterPhotoInput,
+  type SaveBeforePhotoInput,
+  type SaveSignatureInput,
+  type ServiceVisit,
+  type StartServiceVisitInput,
+  type UpdateBeforePhotoUploadInput,
+  type UpdateMediaUploadInput,
+} from "./service-visit.types";
+
+import { transitionToNextStep } from "./state/service-visit.transitions";
+import { validateRestoredVisit } from "./state/service-visit.validation";
+
+type ServiceVisitContextValue = {
+  activeVisit: ServiceVisit | null;
+  restoringVisit: boolean;
+  errorMessage: string | null;
+  restoreErrorMessage: string | null;
+
+  startVisit: (
+    input: Omit<StartServiceVisitInput, "userId">,
+  ) => Promise<ServiceVisit>;
+
+  completeArrival: (input: CompleteArrivalInput) => Promise<ServiceVisit>;
+
+  completeMachineScan: (
+    input: CompleteMachineScanInput,
+  ) => Promise<ServiceVisit>;
+
+  saveBeforePhoto: (input: SaveBeforePhotoInput) => Promise<ServiceVisit>;
+
+  updateBeforePhotoUpload: (
+    visit: ServiceVisit,
+    kind: BeforePhotoKind,
+    input: UpdateBeforePhotoUploadInput,
+  ) => Promise<ServiceVisit>;
+
+  removeBeforePhoto: (kind: BeforePhotoKind) => Promise<ServiceVisit>;
+
+  completeBeforePhotos: () => Promise<ServiceVisit>;
+
+  completeDrinkCount: (input: CompleteDrinkCountInput) => Promise<ServiceVisit>;
+
+  completeInventoryAudit: (
+    input: CompleteInventoryAuditInput,
+  ) => Promise<ServiceVisit>;
+
+  completeRestockDrop: (
+    input: CompleteRestockDropInput,
+  ) => Promise<ServiceVisit>;
+
+  completeMachineRefill: (
+    input: CompleteMachineRefillInput,
+  ) => Promise<ServiceVisit>;
+
+  saveAfterPhoto: (input: SaveAfterPhotoInput) => Promise<ServiceVisit>;
+
+  updateAfterPhotoUpload: (
+    localUri: string,
+    input: UpdateMediaUploadInput,
+  ) => Promise<ServiceVisit>;
+
+  saveSignature: (input: SaveSignatureInput) => Promise<ServiceVisit>;
+
+  updateSignatureUpload: (
+    localUri: string,
+    input: UpdateMediaUploadInput,
+  ) => Promise<ServiceVisit>;
+
+  removeSignature: () => Promise<ServiceVisit>;
+
+  completeAfterService: () => Promise<ServiceVisit>;
+
+  cancelVisit: () => Promise<void>;
+
+  clearCompletedVisit: () => Promise<void>;
+
+  retryRestore: () => Promise<void>;
+
+  clearLocalVisit: () => Promise<void>;
+
+  isVisitForStop: (stopId: string) => boolean;
+
+  completeSummary: () => Promise<ServiceVisit>;
+
+  retrySummarySync: () => Promise<ServiceVisit>;
+};
+
+const ServiceVisitContext = createContext<ServiceVisitContextValue | null>(
+  null,
+);
+
+function createVisitId(): string {
+  return `visit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function ServiceVisitProvider({ children }: PropsWithChildren) {
+  const { session, status: authStatus } = useAuth();
+
+  const [activeVisit, setActiveVisit] = useState<ServiceVisit | null>(null);
+
+  const [restoringVisit, setRestoringVisit] = useState(true);
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [restoreErrorMessage, setRestoreErrorMessage] = useState<string | null>(
+    null,
+  );
+
+  const userId = session?.user.id ?? null;
+
+  /*
+   * Shared helper passed into hooks which only
+   * need to clear an existing provider error.
+   */
+  const clearError = useCallback(() => {
+    setErrorMessage(null);
+  }, []);
+
+  /*
+   * Central serialized mutation queue.
+   *
+   * Step 7 media operations use this because
+   * upload callbacks may finish after another
+   * visit mutation has already happened.
+   */
+  const { commitVisitMutation } = useVisitMutation({
+    activeVisit,
+    setActiveVisit,
+  });
+
+  const { saveSignature, updateSignatureUpload, removeSignature } =
+    useClientConfirmation({
+      commitVisitMutation,
+      setErrorMessage,
+    });
+
+  const { completeSummary, retrySummarySync } = useSummaryStep({
+    commitVisitMutation,
+    setErrorMessage,
+  });
+
+  /*
+   * Step 3 - Before photos
+   */
+  const {
+    saveBeforePhoto,
+    updateBeforePhotoUpload,
+    removeBeforePhoto,
+    completeBeforePhotos,
+  } = useBeforePhotosStep({
+    activeVisit,
+    setActiveVisit,
+    clearError,
+  });
+
+  /*
+   * Drink Count
+   *
+   * This step exists only when the admin assigned
+   * the task to the route stop.
+   */
+  const { completeDrinkCount } = useDrinkCountStep({
+    activeVisit,
+    setActiveVisit,
+    clearError,
+  });
+
+  /*
+   * Step 5 - Inventory audit
+   */
+  const { completeInventoryAudit } = useInventoryAuditStep({
+    activeVisit,
+    setActiveVisit,
+    setErrorMessage,
+  });
+
+  /*
+   * Step 6 - Restock / drop
+   */
+  const { completeRestockDrop } = useRestockStep({
+    activeVisit,
+    setActiveVisit,
+    setErrorMessage,
+  });
+
+  const { completeMachineRefill } = useMachineRefillStep({
+    activeVisit,
+    setActiveVisit,
+    setErrorMessage,
+  });
+
+  /*
+   * Step 7 - After photo + signature
+   */
+  const { saveAfterPhoto, updateAfterPhotoUpload, completeAfterService } =
+    useAfterServiceStep({
+      commitVisitMutation,
+      clearError,
+    });
+
+  /*
+   * Restore an unfinished service visit for
+   * the currently authenticated user.
+   */
+  const restoreVisit = useCallback(async (): Promise<void> => {
+    if (authStatus !== "authenticated" || !userId) {
+      setActiveVisit(null);
+      setRestoringVisit(false);
+      setRestoreErrorMessage(null);
+
+      return;
+    }
+
+    setRestoringVisit(true);
+    setRestoreErrorMessage(null);
+
+    try {
+      const storedVisit = await loadServiceVisit(userId);
+
+      if (!storedVisit) {
+        setActiveVisit(null);
+
+        return;
+      }
+
+      const validVisit = validateRestoredVisit(storedVisit, userId);
+
+      if (!validVisit) {
+        throw new Error(
+          "The saved service visit is invalid or uses an unsupported local format.",
+        );
+      }
+
+      setActiveVisit(validVisit);
+    } catch (error) {
+      setActiveVisit(null);
+
+      setRestoreErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to restore the active service visit.",
+      );
+    } finally {
+      setRestoringVisit(false);
+    }
+  }, [authStatus, userId]);
+
+  useEffect(() => {
+    void restoreVisit();
+  }, [restoreVisit]);
+
+  const retryRestore = useCallback(async (): Promise<void> => {
+    await restoreVisit();
+  }, [restoreVisit]);
+
+  const clearLocalVisit = useCallback(async (): Promise<void> => {
+    if (!userId) {
+      setActiveVisit(null);
+      setErrorMessage(null);
+      setRestoreErrorMessage(null);
+      setRestoringVisit(false);
+
+      return;
+    }
+
+    setRestoringVisit(true);
+
+    try {
+      await removeServiceVisit(userId);
+
+      setActiveVisit(null);
+      setErrorMessage(null);
+      setRestoreErrorMessage(null);
+    } catch (error) {
+      setRestoreErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to discard the saved service visit.",
+      );
+    } finally {
+      setRestoringVisit(false);
+    }
+  }, [userId]);
+
+  /*
+   * Start a new visit.
+   */
+  const startVisit = useCallback(
+    async (
+      input: Omit<StartServiceVisitInput, "userId">,
+    ): Promise<ServiceVisit> => {
+      if (!userId) {
+        throw new Error("You must be signed in to start a service visit.");
+      }
+
+      if (activeVisit?.status === "in_progress") {
+        if (activeVisit.stopId === input.stopId) {
+          return activeVisit;
+        }
+
+        throw new Error(
+          "Complete or cancel the active service visit before starting another stop.",
+        );
+      }
+
+      await assertStopCanStartService(input.stopId);
+
+      if (input.target.latitude == null || input.target.longitude == null) {
+        throw new Error(
+          "This client has no valid geofence coordinates. Ask a manager to update the client location.",
+        );
+      }
+
+      if (input.target.geofenceRadiusMeters <= 0) {
+        throw new Error("This client has an invalid geofence radius.");
+      }
+
+      if (!input.machineId) {
+        throw new Error("A machine must be assigned before starting service.");
+      }
+
+      if (
+        input.machineTarget.id !== input.machineId ||
+        !input.machineTarget.qrCode.trim()
+      ) {
+        throw new Error(
+          "The assigned machine has invalid QR verification data.",
+        );
+      }
+
+      const now = new Date().toISOString();
+
+      const visit: ServiceVisit = {
+        id: createVisitId(),
+
+        userId,
+
+        routeId: input.routeId,
+        stopId: input.stopId,
+        clientId: input.clientId,
+        machineId: input.machineId,
+
+        target: input.target,
+
+        machineTarget: {
+          ...input.machineTarget,
+          qrCode: input.machineTarget.qrCode.trim(),
+        },
+
+        tasks: input.tasks,
+
+        status: "in_progress",
+
+        currentStep: "arrival",
+
+        steps: createInitialStepStates(input.tasks),
+
+        arrivalVerification: null,
+        machineScanVerification: null,
+
+        beforePhotos: [],
+
+        drinkCount: null,
+
+        inventoryAudit: null,
+        restockDrop: null,
+        machineRefill: null,
+        reserveAfter: null,
+
+        afterService: {
+          afterPhoto: null,
+        },
+
+        clientConfirmation: {
+          signature: null,
+          confirmedAt: null,
+        },
+
+        summary: {
+          syncStatus: "not_started",
+          syncError: null,
+
+          databaseId: null,
+          surveyToken: null,
+          emailSentAt: null,
+        },
+
+        startedAt: now,
+        updatedAt: now,
+
+        completedAt: null,
+        cancelledAt: null,
+      };
+
+      await saveServiceVisit(visit);
+
+      setActiveVisit(visit);
+      setErrorMessage(null);
+
+      return visit;
+    },
+    [activeVisit, userId],
+  );
+
+  /*
+   * Step 1 - Arrival / geofence
+   *
+   * We have not extracted this step yet, so it
+   * remains in the provider for now.
+   */
+  const completeArrival = useCallback(
+    async (input: CompleteArrivalInput): Promise<ServiceVisit> => {
+      if (!activeVisit) {
+        throw new Error("There is no active service visit.");
+      }
+
+      if (activeVisit.currentStep !== "arrival") {
+        throw new Error(
+          "Arrival verification can only be completed during the Arrival step.",
+        );
+      }
+
+      const expectedRadius = activeVisit.target.geofenceRadiusMeters;
+
+      if (expectedRadius <= 0) {
+        throw new Error("The client geofence radius is invalid.");
+      }
+
+      if (input.method === "geofence") {
+        if (!input.driverPosition || !input.targetPosition) {
+          throw new Error(
+            "A valid GPS position is required to confirm arrival.",
+          );
+        }
+
+        if (input.distanceMeters == null) {
+          throw new Error(
+            "The distance from the client could not be calculated.",
+          );
+        }
+
+        if (input.distanceMeters > expectedRadius) {
+          throw new Error("You are outside the client geofence.");
+        }
+      }
+
+      const normalizedOverrideReason = input.overrideReason?.trim() ?? "";
+
+      if (
+        input.method === "manual_override" &&
+        normalizedOverrideReason.length < 10
+      ) {
+        throw new Error(
+          "Enter a clear override reason of at least 10 characters.",
+        );
+      }
+
+      const now = new Date().toISOString();
+
+      const visitWithArrival: ServiceVisit = {
+        ...activeVisit,
+
+        arrivalVerification: {
+          method: input.method,
+
+          driverPosition: input.driverPosition,
+
+          targetPosition: input.targetPosition,
+
+          distanceMeters: input.distanceMeters,
+
+          geofenceRadiusMeters: expectedRadius,
+
+          overrideReason:
+            input.method === "manual_override"
+              ? normalizedOverrideReason
+              : null,
+
+          verifiedAt: now,
+        },
+      };
+
+      const updatedVisit = transitionToNextStep(
+        visitWithArrival,
+        "arrival",
+        now,
+      );
+
+      /*
+       * Persist the authoritative start of time spent
+       * servicing this client.
+       *
+       * Visit duration is derived later as:
+       * stops.completed_at - stops.arrived_at
+       */
+      await markServiceStopArrived(activeVisit.stopId, now);
+
+      await saveServiceVisit(updatedVisit);
+
+      setActiveVisit(updatedVisit);
+      setErrorMessage(null);
+
+      return updatedVisit;
+    },
+    [activeVisit],
+  );
+
+  /*
+   * Step 2 - Machine QR scan
+   *
+   * Also remains here until you extract the
+   * machine-scan hook.
+   */
+  const completeMachineScan = useCallback(
+    async (input: CompleteMachineScanInput): Promise<ServiceVisit> => {
+      if (!activeVisit) {
+        throw new Error("There is no active service visit.");
+      }
+
+      if (activeVisit.currentStep !== "machine_scan") {
+        throw new Error(
+          "Machine scanning can only be completed during the Machine Scan step.",
+        );
+      }
+
+      const scannedValue = input.scannedValue.trim();
+
+      if (!scannedValue) {
+        throw new Error("The scanned QR code is empty.");
+      }
+
+      const expectedQrCode = activeVisit.machineTarget.qrCode.trim();
+
+      if (!expectedQrCode) {
+        throw new Error("The assigned machine has no valid QR code.");
+      }
+
+      if (scannedValue !== expectedQrCode) {
+        throw new Error(
+          "This QR code belongs to a different machine. Scan the machine assigned to this stop.",
+        );
+      }
+
+      const now = new Date().toISOString();
+
+      const visitWithScan: ServiceVisit = {
+        ...activeVisit,
+
+        machineScanVerification: {
+          scannedValue,
+          expectedQrCode,
+
+          machineId: activeVisit.machineTarget.id,
+
+          verifiedAt: now,
+        },
+      };
+
+      const updatedVisit = transitionToNextStep(
+        visitWithScan,
+        "machine_scan",
+        now,
+      );
+
+      await saveServiceVisit(updatedVisit);
+
+      setActiveVisit(updatedVisit);
+      setErrorMessage(null);
+
+      return updatedVisit;
+    },
+    [activeVisit],
+  );
+
+  /*
+   * Cancel the current visit.
+   */
+  const cancelVisit = useCallback(async (): Promise<void> => {
+    if (!activeVisit) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    const cancelledVisit: ServiceVisit = {
+      ...activeVisit,
+
+      status: "cancelled",
+
+      updatedAt: now,
+      cancelledAt: now,
+    };
+
+    await saveServiceVisit(cancelledVisit);
+
+    setActiveVisit(cancelledVisit);
+    setErrorMessage(null);
+  }, [activeVisit]);
+
+  /*
+   * Remove finished/cancelled visit state.
+   *
+   * Never remove a currently in-progress visit.
+   */
+  const clearCompletedVisit = useCallback(async (): Promise<void> => {
+    if (!userId) {
+      setActiveVisit(null);
+      return;
+    }
+
+    if (activeVisit && activeVisit.status === "in_progress") {
+      throw new Error("An in-progress visit cannot be removed.");
+    }
+
+    if (
+      activeVisit?.status === "completed" &&
+      activeVisit.summary.syncStatus !== "synced"
+    ) {
+      throw new Error(
+        "The completed service visit must sync successfully before it can be removed.",
+      );
+    }
+
+    await removeServiceVisit(userId);
+
+    setActiveVisit(null);
+    setErrorMessage(null);
+  }, [activeVisit, userId]);
+
+  const isVisitForStop = useCallback(
+    (stopId: string): boolean =>
+      activeVisit?.status === "in_progress" && activeVisit.stopId === stopId,
+    [activeVisit],
+  );
+
+  const value = useMemo<ServiceVisitContextValue>(
+    () => ({
+      activeVisit,
+      restoringVisit,
+      errorMessage,
+      restoreErrorMessage,
+
+      startVisit,
+
+      completeArrival,
+      completeMachineScan,
+
+      saveBeforePhoto,
+      updateBeforePhotoUpload,
+      removeBeforePhoto,
+      completeBeforePhotos,
+
+      completeDrinkCount,
+
+      completeInventoryAudit,
+
+      completeRestockDrop,
+      completeMachineRefill,
+
+      saveAfterPhoto,
+      updateAfterPhotoUpload,
+
+      saveSignature,
+      updateSignatureUpload,
+      removeSignature,
+
+      completeAfterService,
+
+      completeSummary,
+      retrySummarySync,
+
+      cancelVisit,
+      clearCompletedVisit,
+
+      retryRestore,
+      clearLocalVisit,
+
+      isVisitForStop,
+    }),
+    [
+      activeVisit,
+      restoringVisit,
+      errorMessage,
+      restoreErrorMessage,
+
+      startVisit,
+
+      completeArrival,
+      completeMachineScan,
+
+      saveBeforePhoto,
+      updateBeforePhotoUpload,
+      removeBeforePhoto,
+      completeBeforePhotos,
+
+      completeDrinkCount,
+
+      completeInventoryAudit,
+
+      completeRestockDrop,
+
+      saveAfterPhoto,
+      updateAfterPhotoUpload,
+
+      saveSignature,
+      updateSignatureUpload,
+      removeSignature,
+
+      completeAfterService,
+
+      completeSummary,
+      retrySummarySync,
+
+      cancelVisit,
+      clearCompletedVisit,
+
+      retryRestore,
+      clearLocalVisit,
+
+      isVisitForStop,
+    ],
+  );
+
+  return (
+    <ServiceVisitContext.Provider value={value}>
+      {children}
+    </ServiceVisitContext.Provider>
+  );
+}
+
+export function useServiceVisit(): ServiceVisitContextValue {
+  const context = useContext(ServiceVisitContext);
+
+  if (!context) {
+    throw new Error(
+      "useServiceVisit must be used inside ServiceVisitProvider.",
+    );
+  }
+
+  return context;
+}

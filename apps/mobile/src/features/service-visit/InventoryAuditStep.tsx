@@ -1,0 +1,735 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+
+import {
+  loadClientInventoryProducts,
+  loadPreviousClientReserveBalances,
+} from "./inventory-audit.service";
+import { useServiceVisit } from "./ServiceVisitProvider";
+import type {
+  ClientInventoryProduct,
+  InventoryProductCategory,
+} from "./service-visit.types";
+
+const CATEGORY_LABELS: Record<InventoryProductCategory, string> = {
+  coffee: "Coffee",
+  powders: "Powders",
+  sweeteners_stirrers: "Sweeteners & Stirrers",
+  cups_lids: "Cups & Lids",
+  creamers: "Creamers",
+  cleaning: "Cleaning",
+};
+
+type ProductCountValue = {
+  issueQuantity: string;
+  looseQuantity: string;
+};
+
+type CountValues = Record<string, ProductCountValue>;
+
+function emptyCount(): ProductCountValue {
+  return {
+    issueQuantity: "",
+    looseQuantity: "",
+  };
+}
+
+function normalizeQuantityInput(value: string): string {
+  const normalized = value.replace(",", ".");
+
+  if (!/^\d*(\.\d{0,3})?$/.test(normalized)) {
+    return "";
+  }
+
+  return normalized;
+}
+
+function normalizeWholeQuantityInput(value: string): string {
+  if (!/^\d*$/.test(value)) {
+    return "";
+  }
+
+  return value;
+}
+
+function getInventoryAuditErrorMessage(
+  error: unknown,
+  fallbackMessage: string,
+): string {
+  if (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("network request failed")
+  ) {
+    return "Unable to sync inventory audit. Check your connection and try again.";
+  }
+
+  return error instanceof Error ? error.message : fallbackMessage;
+}
+
+export default function InventoryAuditStep() {
+  const { activeVisit, completeInventoryAudit } = useServiceVisit();
+
+  const [products, setProducts] = useState<ClientInventoryProduct[]>([]);
+
+  const [counts, setCounts] = useState<CountValues>({});
+
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [previousBalances, setPreviousBalances] = useState<
+    Map<string, number | null>
+  >(new Map());
+
+  const clientId = activeVisit?.clientId ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProducts(): Promise<void> {
+      if (!clientId) {
+        return;
+      }
+
+      setLoading(true);
+      setErrorMessage(null);
+
+      try {
+        /*
+         * Products are network-first with an AsyncStorage
+         * fallback, so they can still be loaded offline
+         * after they have previously been cached.
+         */
+        const result = await loadClientInventoryProducts(clientId);
+
+        if (cancelled) {
+          return;
+        }
+
+        setProducts(result);
+
+        /*
+         * Restore locally persisted driver input BEFORE
+         * making any additional network-dependent request.
+         *
+         * This allows an unfinished Inventory Audit to
+         * survive an offline retry or app restoration.
+         */
+        const savedAudit = activeVisit?.inventoryAudit;
+
+        const activeVisitId = activeVisit?.id;
+
+        if (
+          savedAudit &&
+          activeVisitId &&
+          savedAudit.sourceVisitId === activeVisitId &&
+          savedAudit.syncStatus !== "synced"
+        ) {
+          const restoredCounts = Object.fromEntries(
+            savedAudit.items.map((item) => [
+              item.productId,
+              {
+                issueQuantity: String(item.issueQuantity ?? 0),
+
+                looseQuantity: String(item.looseQuantity ?? 0),
+              },
+            ]),
+          );
+
+          setCounts((current) =>
+            Object.keys(current).length > 0 ? current : restoredCounts,
+          );
+
+          /*
+           * The previous balances used when this audit was
+           * originally submitted are already persisted in
+           * the audit items.
+           *
+           * Restore them locally rather than requiring the
+           * server again.
+           */
+          setPreviousBalances(
+            new Map(
+              savedAudit.items.map((item) => [
+                item.productId,
+                item.previousReserveAfter,
+              ]),
+            ),
+          );
+
+          return;
+        }
+
+        /*
+         * No unfinished local audit exists.
+         *
+         * Only a new audit needs the previous reserve
+         * balances from the server.
+         */
+        const balances = await loadPreviousClientReserveBalances(
+          clientId,
+          result,
+          new Date().toISOString(),
+        );
+
+        if (!cancelled) {
+          setPreviousBalances(balances);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(
+            getInventoryAuditErrorMessage(
+              error,
+              "Unable to load the client reserve.",
+            ),
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadProducts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId, activeVisit?.id, activeVisit?.inventoryAudit]);
+
+  const groupedProducts = useMemo(() => {
+    const groups = new Map<
+      InventoryProductCategory,
+      ClientInventoryProduct[]
+    >();
+
+    for (const product of products) {
+      const categoryProducts = groups.get(product.category) ?? [];
+
+      categoryProducts.push(product);
+      groups.set(product.category, categoryProducts);
+    }
+
+    return Array.from(groups.entries());
+  }, [products]);
+
+  if (!activeVisit) {
+    return null;
+  }
+
+  const missingRequiredCount = products.filter((product) => {
+    if (!product.isRequired) {
+      return false;
+    }
+
+    const count = counts[product.productId];
+
+    if (!count) {
+      return true;
+    }
+
+    return (
+      count.issueQuantity.trim() === "" && count.looseQuantity.trim() === ""
+    );
+  }).length;
+
+  const hasInvalidQuantity = products.some((product) => {
+    const count = counts[product.productId];
+
+    if (!count) {
+      return false;
+    }
+
+    const issueQuantity =
+      count.issueQuantity.trim() === "" ? 0 : Number(count.issueQuantity);
+
+    const looseQuantity =
+      count.looseQuantity.trim() === "" ? 0 : Number(count.looseQuantity);
+
+    if (
+      !Number.isFinite(issueQuantity) ||
+      issueQuantity < 0 ||
+      !Number.isInteger(issueQuantity)
+    ) {
+      return true;
+    }
+
+    if (!Number.isFinite(looseQuantity) || looseQuantity < 0) {
+      return true;
+    }
+
+    if (
+      !product.packaging.allowsPartialBaseUnit &&
+      !Number.isInteger(looseQuantity)
+    ) {
+      return true;
+    }
+
+    if (!product.packaging.allowsLooseUnits && looseQuantity > 0) {
+      return true;
+    }
+
+    return false;
+  });
+
+  const canSubmit =
+    !loading &&
+    !submitting &&
+    products.length > 0 &&
+    missingRequiredCount === 0 &&
+    !hasInvalidQuantity;
+
+  function updateCount(
+    productId: string,
+    field: "issueQuantity" | "looseQuantity",
+    value: string,
+  ): void {
+    const normalized =
+      field === "issueQuantity"
+        ? normalizeWholeQuantityInput(value)
+        : normalizeQuantityInput(value);
+
+    if (value.length > 0 && normalized === "") {
+      return;
+    }
+
+    setCounts((current) => ({
+      ...current,
+
+      [productId]: {
+        ...(current[productId] ?? emptyCount()),
+        [field]: normalized,
+      },
+    }));
+
+    setErrorMessage(null);
+  }
+
+  const answeredProducts = products.filter((product) => {
+    const count = counts[product.productId];
+
+    if (!count) {
+      return false;
+    }
+
+    return (
+      count.issueQuantity.trim() !== "" || count.looseQuantity.trim() !== ""
+    );
+  });
+
+  async function handleSubmit(): Promise<void> {
+    if (submitting) {
+      return;
+    }
+
+    if (missingRequiredCount > 0) {
+      setErrorMessage(
+        `Enter a quantity for all ${missingRequiredCount} remaining required ${
+          missingRequiredCount === 1 ? "product" : "products"
+        }.`,
+      );
+      return;
+    }
+
+    if (!canSubmit) {
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      await completeInventoryAudit({
+        counts: answeredProducts.map((product) => {
+          const count = counts[product.productId];
+
+          return {
+            productId: product.productId,
+            issueQuantity: Number(count?.issueQuantity || 0),
+            looseQuantity: Number(count?.looseQuantity || 0),
+          };
+        }),
+
+        configuredProducts: products,
+        previousBalances,
+      });
+    } catch (error) {
+      setErrorMessage(
+        getInventoryAuditErrorMessage(
+          error,
+          "Unable to complete the inventory audit.",
+        ),
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.title}>Count client reserve</Text>
+
+      <Text style={styles.description}>
+        Count the stock physically available at this location before today's
+        delivery and before using any stock to refill the machine.
+      </Text>
+
+      <View style={styles.clientCard}>
+        <Text style={styles.clientLabel}>Location</Text>
+
+        <Text style={styles.clientName}>{activeVisit.target.clientName}</Text>
+      </View>
+
+      {products.length === 0 ? (
+        <View style={styles.warningCard}>
+          <Text style={styles.warningText}>
+            No inventory products are configured for this client. A manager must
+            configure the expected product list before this step can be
+            completed.
+          </Text>
+        </View>
+      ) : null}
+
+      {groupedProducts.map(([category, categoryProducts]) => (
+        <View key={category} style={styles.category}>
+          <Text style={styles.categoryTitle}>{CATEGORY_LABELS[category]}</Text>
+
+          {categoryProducts.map((product) => {
+            const count = counts[product.productId] ?? emptyCount();
+
+            const issueQuantity = Number(count.issueQuantity || 0);
+
+            const looseQuantity = Number(count.looseQuantity || 0);
+
+            const total =
+              issueQuantity * product.packaging.unitsPerIssueUnit +
+              looseQuantity;
+
+            const previous = previousBalances.get(product.productId) ?? null;
+
+            const decrease = previous === null ? null : previous - total;
+
+            return (
+              <View key={product.productId} style={styles.reserveProduct}>
+                <Text style={styles.productName}>{product.name}</Text>
+
+                {product.sku ? (
+                  <Text style={styles.productDetail}>SKU {product.sku}</Text>
+                ) : null}
+
+                <Text style={styles.packageDescription}>
+                  {product.packaging.packageDescription ??
+                    `${product.packaging.unitsPerIssueUnit} ${product.packaging.baseUnit} per ${product.packaging.issueUnit}`}
+                </Text>
+
+                <View style={styles.quantityRow}>
+                  <View style={styles.quantityField}>
+                    <Text style={styles.quantityLabel} numberOfLines={1}>
+                      {product.packaging.issueUnit}
+                      {product.packaging.issueUnit.endsWith("s") ? "" : "s"}
+                    </Text>
+
+                    <TextInput
+                      accessibilityLabel={`${product.packaging.issueUnit} quantity for ${product.name}`}
+                      keyboardType="number-pad"
+                      onChangeText={(value) => {
+                        updateCount(product.productId, "issueQuantity", value);
+                      }}
+                      placeholder="0"
+                      placeholderTextColor="#a89c8f"
+                      style={styles.compactQuantityInput}
+                      value={count.issueQuantity}
+                    />
+                  </View>
+
+                  {product.packaging.allowsLooseUnits ? (
+                    <View style={styles.quantityField}>
+                      <Text style={styles.quantityLabel} numberOfLines={1}>
+                        Loose {product.packaging.baseUnit}
+                        {product.packaging.baseUnit.endsWith("s") ? "" : "s"}
+                      </Text>
+
+                      <TextInput
+                        accessibilityLabel={`Loose ${product.packaging.baseUnit} quantity for ${product.name}`}
+                        keyboardType={
+                          product.packaging.allowsPartialBaseUnit
+                            ? "decimal-pad"
+                            : "number-pad"
+                        }
+                        onChangeText={(value) => {
+                          updateCount(
+                            product.productId,
+                            "looseQuantity",
+                            value,
+                          );
+                        }}
+                        placeholder="0"
+                        placeholderTextColor="#a89c8f"
+                        style={styles.compactQuantityInput}
+                        value={count.looseQuantity}
+                      />
+                    </View>
+                  ) : null}
+                </View>
+
+                <View style={styles.reserveSummary}>
+                  <Text style={styles.reserveSummaryText}>
+                    Current:{" "}
+                    <Text style={styles.reserveSummaryValue}>
+                      {total} {product.packaging.baseUnit}
+                      {total === 1 ? "" : "s"}
+                    </Text>
+                  </Text>
+
+                  {previous === null ? (
+                    <Text style={styles.reserveSummaryText}>
+                      No previous baseline
+                    </Text>
+                  ) : (
+                    <Text style={styles.reserveSummaryText}>
+                      Previous: {previous} ·{" "}
+                      {decrease === 0
+                        ? "No change"
+                        : decrease !== null && decrease > 0
+                          ? `${decrease} fewer`
+                          : `${Math.abs(decrease ?? 0)} more`}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      ))}
+
+      {missingRequiredCount > 0 && products.length > 0 ? (
+        <Text style={styles.helperText}>
+          Enter a quantity for all {missingRequiredCount} remaining required{" "}
+          {missingRequiredCount === 1 ? "product" : "products"}. Enter 0 when
+          none remains.
+        </Text>
+      ) : null}
+
+      {errorMessage ? (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        </View>
+      ) : null}
+
+      <Pressable
+        accessibilityRole="button"
+        disabled={!canSubmit}
+        onPress={() => {
+          void handleSubmit();
+        }}
+        style={({ pressed }) => [
+          styles.primaryButton,
+          pressed && canSubmit && styles.buttonPressed,
+          !canSubmit && styles.buttonDisabled,
+        ]}
+      >
+        {submitting ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <Text style={styles.primaryButtonText}>
+            Save Reserve and Continue
+          </Text>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: "#fffdfa",
+    borderColor: "#e2d4c0",
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 18,
+  },
+  eyebrow: {
+    color: "#9c5621",
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  title: {
+    color: "#2e1d12",
+    fontSize: 22,
+    fontWeight: "700",
+    marginTop: 7,
+  },
+  description: {
+    color: "#8a6f53",
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 7,
+  },
+  clientCard: {
+    backgroundColor: "#f7eadc",
+    borderRadius: 12,
+    marginTop: 16,
+    padding: 14,
+  },
+  clientLabel: {
+    color: "#9c5621",
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  clientName: {
+    color: "#4a2c1a",
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  loadingText: {
+    color: "#8a6f53",
+    marginTop: 10,
+    textAlign: "center",
+  },
+  warningCard: {
+    backgroundColor: "#fff3d8",
+    borderColor: "#e8cd86",
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 14,
+  },
+  warningText: {
+    color: "#7a5414",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  category: {
+    marginTop: 22,
+  },
+  categoryTitle: {
+    color: "#4a2c1a",
+    fontSize: 17,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  productName: {
+    color: "#3d2b1f",
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 19,
+  },
+  productDetail: {
+    color: "#8c8076",
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 3,
+  },
+
+  helperText: {
+    color: "#8a6f53",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 16,
+  },
+  errorCard: {
+    backgroundColor: "#f8e4e1",
+    borderColor: "#e6bab4",
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 14,
+  },
+  errorText: {
+    color: "#9f302d",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  primaryButton: {
+    alignItems: "center",
+    backgroundColor: "#7a3f2c",
+    borderRadius: 12,
+    justifyContent: "center",
+    marginTop: 18,
+    minHeight: 52,
+    paddingHorizontal: 20,
+  },
+  primaryButtonText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  buttonPressed: {
+    opacity: 0.84,
+  },
+  buttonDisabled: {
+    opacity: 0.45,
+  },
+  reserveProduct: {
+    borderBottomColor: "#efe6d8",
+    borderBottomWidth: 1,
+    paddingVertical: 14,
+  },
+
+  packageDescription: {
+    color: "#8c8076",
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 4,
+  },
+
+  quantityRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+
+  quantityField: {
+    flex: 1,
+  },
+
+  quantityLabel: {
+    color: "#6b5543",
+    fontSize: 11,
+    fontWeight: "600",
+    marginBottom: 5,
+  },
+
+  compactQuantityInput: {
+    backgroundColor: "#faf6f0",
+    borderColor: "#d8c7b0",
+    borderRadius: 9,
+    borderWidth: 1,
+    color: "#2e1d12",
+    fontSize: 15,
+    fontWeight: "700",
+    height: 40,
+    paddingHorizontal: 10,
+    textAlign: "center",
+  },
+
+  reserveSummary: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+
+  reserveSummaryText: {
+    color: "#8a6f53",
+    fontSize: 11,
+  },
+
+  reserveSummaryValue: {
+    color: "#3d2b1f",
+    fontWeight: "700",
+  },
+});

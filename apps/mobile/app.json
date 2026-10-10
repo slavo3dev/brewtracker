@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "BrewTracker",
+    "slug": "brewtracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "BrewTracker uses your location for clock-in, service visits, and live route tracking.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "BrewTracker uses your location while you are clocked in so dispatch can see your current route position.",
+        "UIBackgroundModes": [
+          "location"
+        ]
+      }
+    },
+    "android": {
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow BrewTracker to use your location for clock-in and service visits.",
+          "locationAlwaysAndWhenInUsePermission": "Allow BrewTracker to track your route while you are clocked in.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ]
+  }
+}

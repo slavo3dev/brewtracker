@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { getWarehouses } from "@/lib/warehouses/warehouse-service";
 import { updateWarehouseGeofenceAction } from "./actions";
+import { metersToFeet } from "@brewtracker/types";
 
 export default async function WarehousesPage() {
   await requireAdmin();
@@ -45,12 +46,20 @@ export default async function WarehousesPage() {
                 className="rounded-xl border border-latte-200 px-4 py-2.5 text-sm"
               />
 
-              <input
-                name="radius"
-                defaultValue={warehouse.geofence_radius_meters}
-                placeholder="Radius meters"
-                className="rounded-xl border border-latte-200 px-4 py-2.5 text-sm"
-              />
+              <label className="text-sm text-espresso-950">
+                Geofence radius (ft)
+
+                <input
+                  type="number"
+                  name="radiusFeet"
+                  min="1"
+                  step="any"
+                  required
+                  defaultValue={metersToFeet(warehouse.geofence_radius_meters)}
+                  placeholder="Radius in feet"
+                  className="mt-1 w-full rounded-xl border border-latte-200 px-4 py-2.5 text-sm"
+                />
+              </label>
             </div>
 
             <button className="mt-4 rounded-full bg-espresso-950 px-4 py-2 text-sm text-crema-50">

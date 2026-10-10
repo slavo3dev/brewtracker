@@ -1,102 +1,141 @@
-import { useEffect, useRef, useState } from 'react';
-import * as Location from 'expo-location';
-import { checkGeofences, type GeofenceTarget } from "@brewtracker/types";
+import {
+  checkGeofences,
+  distanceMeters,
+  type GeoPoint,
+} from "@brewtracker/types";
+import * as Location from "expo-location";
+import { useEffect, useRef, useState } from "react";
 
-/**
- * TEMPORARY test data (AUTH-3 data layer not built yet — that's
- * warehouses/stops tables, pending ROUTE-1). Swap this for a real
- * Supabase fetch once those tables exist; the hook's return shape
- * stays the same.
- */
-const TEST_LOCATIONS: GeofenceTarget[] = [
-	{
-		id: 'test-warehouse-1',
-		label: 'Warehouse (test)',
-		latitude: 26.2379,
-		longitude: -80.1248,
-		radiusMeters: 150,
-	},
-	// First scheduled stop would go here once ROUTE data exists.
-];
+import type { ClockTarget } from "../features/time-clock/time-clock.types";
 
 export type GeofenceStatus =
-	| 'checking_permission'
-	| 'permission_denied'
-	| 'locating'
-	| 'in_range'
-	| 'out_of_range'
-	| 'error';
+  | "checking_permission"
+  | "permission_denied"
+  | "locating"
+  | "in_range"
+  | "out_of_range"
+  | "no_targets"
+  | "error";
 
-export function useGeofence(targets: GeofenceTarget[] = TEST_LOCATIONS) {
-	const [status, setStatus] = useState<GeofenceStatus>('checking_permission');
-	const [distanceMeters, setDistanceMeters] = useState<number | null>(null);
-	const [nearestLabel, setNearestLabel] = useState<string | null>(null);
-	const [errorMessage, setErrorMessage] = useState<string | null>(null);
+type UseGeofenceResult = {
+  status: GeofenceStatus;
+  position: GeoPoint | null;
+  distanceMeters: number | null;
+  nearestTarget: ClockTarget | null;
+  matchedTarget: ClockTarget | null;
+  errorMessage: string | null;
+};
 
-	const subscriptionRef = useRef<Location.LocationSubscription | null>(null);
+export function useGeofence(targets: ClockTarget[]): UseGeofenceResult {
+  const [status, setStatus] = useState<GeofenceStatus>("checking_permission");
+  const [position, setPosition] = useState<GeoPoint | null>(null);
+  const [distance, setDistance] = useState<number | null>(null);
+  const [nearestTarget, setNearestTarget] = useState<ClockTarget | null>(null);
+  const [matchedTarget, setMatchedTarget] = useState<ClockTarget | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-	useEffect(() => {
-		let isMounted = true;
+  const subscriptionRef = useRef<Location.LocationSubscription | null>(null);
 
-		async function start() {
-			const { status: permStatus } =
-				await Location.requestForegroundPermissionsAsync();
+  useEffect(() => {
+    let isMounted = true;
 
-			if (!isMounted) return;
+    async function start(): Promise<void> {
+      setErrorMessage(null);
 
-			if (permStatus !== 'granted') {
-				setStatus('permission_denied');
-				return;
-			}
+      if (targets.length === 0) {
+        setStatus("no_targets");
+        return;
+      }
 
-			setStatus('locating');
+      setStatus("checking_permission");
 
-			try {
-				subscriptionRef.current = await Location.watchPositionAsync(
-					{
-						accuracy: Location.Accuracy.High,
-						timeInterval: 4000,
-						distanceInterval: 5,
-					},
-					(position) => {
-						if (!isMounted) return;
+      const { status: permissionStatus } =
+        await Location.requestForegroundPermissionsAsync();
 
-						const current = {
-							latitude: position.coords.latitude,
-							longitude: position.coords.longitude,
-						};
+      if (!isMounted) {
+        return;
+      }
 
-						const result = checkGeofences(current, targets);
+      if (permissionStatus !== "granted") {
+        setStatus("permission_denied");
+        return;
+      }
 
-						setDistanceMeters(result.nearestDistanceMeters);
-						setNearestLabel(result.nearest?.label ?? null);
-						setStatus(
-							result.withinAny ? 'in_range' : 'out_of_range',
-						);
-					},
-				);
-			} catch (err) {
-				if (!isMounted) return;
-				setErrorMessage(
-					err instanceof Error
-						? err.message
-						: 'Unknown location error',
-				);
-				setStatus('error');
-			}
-		}
+      setStatus("locating");
 
-		start();
+      try {
+        subscriptionRef.current = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 4000,
+            distanceInterval: 5,
+          },
+          (location) => {
+            if (!isMounted) {
+              return;
+            }
 
-		return () => {
-			isMounted = false;
-			subscriptionRef.current?.remove();
-		};
-		// targets intentionally omitted from deps — TEST_LOCATIONS is a
-		// stable module-level constant for now; revisit once targets are
-		// fetched dynamically.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
+            const currentPosition: GeoPoint = {
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            };
 
-	return { status, distanceMeters, nearestLabel, errorMessage };
+            // Log the current GPS coordinates for debugging purposes
+            console.log(
+              "Current GPS:",
+              location.coords.latitude,
+              location.coords.longitude,
+            );
+
+            const result = checkGeofences(currentPosition, targets);
+
+            const nearest =
+              result.nearest == null
+                ? null
+                : (targets.find((target) => target.id === result.nearest?.id) ??
+                  null);
+
+            const matchingTarget =
+              targets.find(
+                (target) =>
+                  distanceMeters(currentPosition, target) <=
+                  target.radiusMeters,
+              ) ?? null;
+
+            setPosition(currentPosition);
+            setDistance(result.nearestDistanceMeters);
+            setNearestTarget(nearest);
+            setMatchedTarget(matchingTarget);
+            setStatus(matchingTarget ? "in_range" : "out_of_range");
+          },
+        );
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setErrorMessage(
+          error instanceof Error ? error.message : "Unknown location error.",
+        );
+        setStatus("error");
+      }
+    }
+
+    void start();
+
+    return () => {
+      isMounted = false;
+      subscriptionRef.current?.remove();
+      subscriptionRef.current = null;
+    };
+  }, [targets]);
+
+  return {
+    status,
+    position,
+    distanceMeters: distance,
+    nearestTarget,
+    matchedTarget,
+    errorMessage,
+  };
 }

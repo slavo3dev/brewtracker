@@ -196,3 +196,453 @@ where not exists (
     and review_status = 'approved'
     and status = 'closed'
 );
+
+------------------------------------------------------------
+-- DEMO DRIVERS FOR FLEET MAP
+------------------------------------------------------------
+
+insert into public.users (
+  id,
+  full_name,
+  email,
+  role,
+  region,
+  is_active,
+  created_at,
+  updated_at
+)
+values
+(
+  '10000000-0000-4000-8000-000000000001',
+  'John Smith',
+  'john.smith@brewtracker.demo',
+  'driver',
+  'Florida',
+  true,
+  now(),
+  now()
+),
+(
+  '10000000-0000-4000-8000-000000000002',
+  'Michael Johnson',
+  'michael.johnson@brewtracker.demo',
+  'driver',
+  'Florida',
+  true,
+  now(),
+  now()
+),
+(
+  '10000000-0000-4000-8000-000000000003',
+  'David Brown',
+  'david.brown@brewtracker.demo',
+  'driver',
+  'Florida',
+  true,
+  now(),
+  now()
+),
+(
+  '10000000-0000-4000-8000-000000000004',
+  'James Wilson',
+  'james.wilson@brewtracker.demo',
+  'driver',
+  'Florida',
+  true,
+  now(),
+  now()
+)
+on conflict (id) do update
+set
+  full_name = excluded.full_name,
+  email = excluded.email,
+  role = excluded.role,
+  region = excluded.region,
+  is_active = excluded.is_active,
+  updated_at = now();
+
+------------------------------------------------------------
+-- LIVE FLEET DEMO (SPREAD ACROSS SOUTH FLORIDA)
+------------------------------------------------------------
+
+insert into public.location_pings (
+    driver_id,
+    route_id,
+    latitude,
+    longitude,
+    accuracy_meters,
+    heading,
+    speed_meters_per_second,
+    recorded_at
+)
+values
+
+-- Marko (Downtown Fort Lauderdale)
+(
+    '9bbd5f7d-d80f-48bd-a259-d9da7f89b0f6',
+    '44444444-4444-4444-8444-444444444444',
+    26.1224,
+    -80.1373,
+    6,
+    90,
+    12.1,
+    now()
+),
+
+-- Driver 1 (Pompano Beach)
+(
+    '1d7b7c29-f226-4217-acd6-05f65ad4eaa7',
+    '44444444-4444-4444-8444-444444444444',
+    26.2379,
+    -80.1248,
+    5,
+    180,
+    9.8,
+    now()
+),
+
+-- Driver 2 (Lauderdale-by-the-Sea)
+(
+    '02767627-e618-4bf7-adf3-4181bbb68378',
+    '44444444-4444-4444-8444-444444444444',
+    26.1896,
+    -80.0970,
+    4,
+    135,
+    11.3,
+    now()
+),
+
+-- Driver 3 (Coral Springs)
+(
+    'ba7e7059-a62b-4ec4-9b9b-6f3d3246502d',
+    '44444444-4444-4444-8444-444444444444',
+    26.2712,
+    -80.2706,
+    7,
+    310,
+    8.9,
+    now()
+),
+
+-- Admin User (Plantation - demo only)
+(
+    '03523b9b-50bf-499d-8081-d5dfd8bbb66a',
+    '44444444-4444-4444-8444-444444444444',
+    26.1266,
+    -80.2564,
+    6,
+    45,
+    10.5,
+    now()
+);
+
+-- LOCATION PINGS / FLEET MAP
+------------------------------------------------------------
+
+insert into public.location_pings (
+  driver_id,
+  route_id,
+  latitude,
+  longitude,
+  accuracy_meters,
+  heading,
+  speed_meters_per_second,
+  recorded_at
+)
+values (
+  '9bbd5f7d-d80f-48bd-a259-d9da7f89b0f6',
+  '44444444-4444-4444-8444-444444444444',
+  44.8176,
+  20.4569,
+  12,
+  90,
+  8.5,
+  now()
+);
+-- CLIENTS
+------------------------------------------------------------
+
+insert into public.clients (
+  id,
+  name,
+  address,
+  city,
+  region,
+  latitude,
+  longitude,
+  geofence_radius_meters
+)
+values
+  (
+    '11111111-1111-4111-8111-111111111111',
+    'Downtown Coffee Office',
+    'Knez Mihailova 10',
+    'Belgrade',
+    'Belgrade',
+    44.8176,
+    20.4569,
+    120
+  ),
+  (
+    '22222222-2222-4222-8222-222222222222',
+    'Riverside Hotel',
+    'Karađorđeva 48',
+    'Belgrade',
+    'Belgrade',
+    44.8132,
+    20.4499,
+    120
+  ),
+  (
+    '33333333-3333-4333-8333-333333333333',
+    'Tech Park Cafe',
+    'Bulevar Milutina Milankovića 11',
+    'Belgrade',
+    'Belgrade',
+    44.8111,
+    20.4098,
+    120
+  )
+on conflict (id) do update
+set
+  name = excluded.name,
+  address = excluded.address,
+  city = excluded.city,
+  region = excluded.region,
+  latitude = excluded.latitude,
+  longitude = excluded.longitude,
+  geofence_radius_meters = excluded.geofence_radius_meters,
+  updated_at = now();
+
+------------------------------------------------------------
+-- MACHINES
+------------------------------------------------------------
+
+insert into public.machines (
+  id,
+  client_id,
+  name,
+  model,
+  serial_number,
+  qr_code,
+  status
+)
+values
+  (
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    '11111111-1111-4111-8111-111111111111',
+    'Lobby Espresso Machine',
+    'La Marzocco Linea Mini',
+    'LM-001',
+    'QR-LM-001',
+    'active'
+  ),
+  (
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    '22222222-2222-4222-8222-222222222222',
+    'Hotel Breakfast Machine',
+    'Rancilio Classe 5',
+    'RC-002',
+    'QR-RC-002',
+    'active'
+  ),
+  (
+    'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    '33333333-3333-4333-8333-333333333333',
+    'Cafe Service Machine',
+    'Nuova Simonelli Appia',
+    'NS-003',
+    'QR-NS-003',
+    'active'
+  )
+on conflict (id) do update
+set
+  client_id = excluded.client_id,
+  name = excluded.name,
+  model = excluded.model,
+  serial_number = excluded.serial_number,
+  qr_code = excluded.qr_code,
+  status = excluded.status,
+  updated_at = now();
+
+------------------------------------------------------------
+-- ROUTES
+------------------------------------------------------------
+
+insert into public.routes (
+  id,
+  driver_id,
+  warehouse_id,
+  route_date,
+  status,
+  notes,
+  created_by
+)
+values (
+  '44444444-4444-4444-8444-444444444444',
+  '9bbd5f7d-d80f-48bd-a259-d9da7f89b0f6',
+  '1df74005-fb1f-48dc-8e72-d27401773795',
+  current_date,
+  'scheduled',
+  'Demo route for ROUTE-2 testing.',
+  '03523b9b-50bf-499d-8081-d5dfd8bbb66a'
+)
+on conflict (id) do update
+set
+  driver_id = excluded.driver_id,
+  warehouse_id = excluded.warehouse_id,
+  route_date = excluded.route_date,
+  status = excluded.status,
+  notes = excluded.notes,
+  created_by = excluded.created_by,
+  updated_at = now();
+
+------------------------------------------------------------
+-- STOPS
+------------------------------------------------------------
+
+insert into public.stops (
+  id,
+  route_id,
+  client_id,
+  machine_id,
+  sequence_number,
+  scheduled_start_at,
+  scheduled_end_at,
+  status,
+  notes
+)
+values
+  (
+    '55555555-5555-4555-8555-555555555555',
+    '44444444-4444-4444-8444-444444444444',
+    '11111111-1111-4111-8111-111111111111',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    1,
+    now() + interval '1 hour',
+    now() + interval '2 hours',
+    'pending',
+    'First demo stop.'
+  ),
+  (
+    '66666666-6666-4666-8666-666666666666',
+    '44444444-4444-4444-8444-444444444444',
+    '22222222-2222-4222-8222-222222222222',
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    2,
+    now() + interval '2 hours',
+    now() + interval '3 hours',
+    'pending',
+    'Second demo stop.'
+  ),
+  (
+    '77777777-7777-4777-8777-777777777777',
+    '44444444-4444-4444-8444-444444444444',
+    '33333333-3333-4333-8333-333333333333',
+    'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    3,
+    now() + interval '3 hours',
+    now() + interval '4 hours',
+    'pending',
+    'Third demo stop.'
+  )
+on conflict (id) do update
+set
+  route_id = excluded.route_id,
+  client_id = excluded.client_id,
+  machine_id = excluded.machine_id,
+  sequence_number = excluded.sequence_number,
+  scheduled_start_at = excluded.scheduled_start_at,
+  scheduled_end_at = excluded.scheduled_end_at,
+  status = excluded.status,
+  notes = excluded.notes,
+  updated_at = now();
+
+------------------------------------------------------------
+-- AUTH-4 MOBILE CLOCK-IN TEST DATA
+------------------------------------------------------------
+
+-- Ensure the demo driver starts with NO open shift.
+
+delete from public.time_entries
+where driver_id = '0d6aa3f3-63ec-4262-b811-3e28edf6384e'
+  and status in ('open', 'manager_override');
+
+------------------------------------------------------------
+-- Ensure today's route exists
+------------------------------------------------------------
+
+insert into public.routes (
+  id,
+  driver_id,
+  warehouse_id,
+  route_date,
+  status,
+  notes,
+  created_by
+)
+values (
+  '44444444-4444-4444-8444-444444444444',
+  '9bbd5f7d-d80f-48bd-a259-d9da7f89b0f6',
+  '1df74005-fb1f-48dc-8e72-d27401773795',
+  current_date,
+  'scheduled',
+  'AUTH-4 mobile testing route.',
+  '03523b9b-50bf-499d-8081-d5dfd8bbb66a'
+)
+on conflict (id) do update
+set
+  route_date = current_date,
+  status = 'scheduled',
+  updated_at = now();
+
+  -- ==========================================================
+-- TODAY'S TEST ROUTE FOR MOBILE DRIVER
+-- ==========================================================
+
+begin;
+
+-- Remove an existing route for this driver today.
+-- Related stops are deleted automatically by ON DELETE CASCADE.
+delete from public.routes
+where driver_id = '0d6aa3f3-63ec-4262-b811-3e28edf6384e'::uuid
+  and route_date = current_date;
+
+with new_route as (
+  insert into public.routes (
+    driver_id,
+    warehouse_id,
+    route_date,
+    status,
+    created_by
+  )
+  select
+    '0d6aa3f3-63ec-4262-b811-3e28edf6384e'::uuid,
+    warehouse_id,
+    current_date,
+    'scheduled'::public.route_status,
+    created_by
+  from public.routes
+  where id = '73d3d34f-d742-4d44-9a6a-22fe169e90eb'::uuid
+  returning id
+)
+insert into public.stops (
+  route_id,
+  client_id,
+  machine_id,
+  sequence_number,
+  status
+)
+select
+  nr.id,
+  s.client_id,
+  s.machine_id,
+  s.sequence_number,
+  'pending'::public.stop_status
+from public.stops s
+cross join new_route nr
+where s.route_id = '73d3d34f-d742-4d44-9a6a-22fe169e90eb'::uuid
+order by s.sequence_number;
+
+commit;

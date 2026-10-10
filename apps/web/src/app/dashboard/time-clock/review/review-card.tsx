@@ -1,6 +1,10 @@
 "use client";
 
-import { distanceMeters } from "@brewtracker/types";
+import {
+  distanceMeters,
+  formatDistanceMeters,
+  formatFeet,
+} from "@brewtracker/types";
 import { useActionState } from "react";
 import type { ReviewQueueItem } from "@/lib/time-clock/time-entry-service";
 import { approveClockIn, flagClockIn, rejectClockIn } from "./actions";
@@ -38,20 +42,18 @@ export function ReviewCard({ entry }: ReviewCardProps) {
     entry.warehouse.geofence_radius_meters != null;
 
   const distanceFromWarehouse =
-    hasClockInLocation && hasWarehouseGeofence
-      ? Math.round(
-          distanceMeters(
-            {
-              latitude: entry.clock_in_latitude!,
-              longitude: entry.clock_in_longitude!,
-            },
-            {
-              latitude: entry.warehouse!.latitude!,
-              longitude: entry.warehouse!.longitude!,
-            },
-          ),
-        )
-      : null;
+  hasClockInLocation && hasWarehouseGeofence
+    ? distanceMeters(
+        {
+          latitude: entry.clock_in_latitude!,
+          longitude: entry.clock_in_longitude!,
+        },
+        {
+          latitude: entry.warehouse!.latitude!,
+          longitude: entry.warehouse!.longitude!,
+        },
+      )
+    : null;
 
   const outsideByMeters =
     distanceFromWarehouse != null &&
@@ -109,7 +111,7 @@ export function ReviewCard({ entry }: ReviewCardProps) {
           <dt className="text-steam-400">Distance</dt>
           <dd className="text-espresso-950">
             {distanceFromWarehouse != null
-              ? `${distanceFromWarehouse} m from warehouse`
+              ? `${formatDistanceMeters(distanceFromWarehouse)} from warehouse`
               : "Missing location"}
           </dd>
         </div>
@@ -119,7 +121,7 @@ export function ReviewCard({ entry }: ReviewCardProps) {
           <dd className="text-espresso-950">
             {outsideByMeters != null
               ? outsideByMeters > 0
-                ? `Outside by ${outsideByMeters} m`
+                ? `Outside by ${formatFeet(outsideByMeters)}`
                 : "Inside geofence"
               : "Unavailable"}
           </dd>
@@ -134,12 +136,13 @@ export function ReviewCard({ entry }: ReviewCardProps) {
 
         <div>
           <dt className="text-steam-400">Reason</dt>
-          <dd className="text-espresso-950">
-            {entry.review_reason ||
-              entry.override_reason ||
-              entry.auto_close_reason ||
-              "—"}
-          </dd>
+            <dd className="text-espresso-950">
+              {entry.review_note ||
+                entry.review_reason ||
+                entry.override_reason ||
+                entry.auto_close_reason ||
+                "—"}
+            </dd>
         </div>
 
         <div>
@@ -148,7 +151,7 @@ export function ReviewCard({ entry }: ReviewCardProps) {
         </div>
       </dl>
 
-      {entry.clock_in_selfie_url && (
+      {entry.clock_in_selfie_signed_url ? (
         <div className="mb-5">
           <p className="mb-2 text-sm font-medium text-espresso-950">
             Clock-in selfie
@@ -156,10 +159,24 @@ export function ReviewCard({ entry }: ReviewCardProps) {
 
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={entry.clock_in_selfie_url}
-            alt="Clock-in selfie"
+            src={entry.clock_in_selfie_signed_url}
+            alt={`Clock-in selfie for ${
+              entry.driver?.full_name ?? "field worker"
+            }`}
             className="max-h-64 rounded-xl border border-latte-200 object-cover"
           />
+        </div>
+      ) : entry.clock_in_selfie_url ? (
+        <div className="mb-5 rounded-xl border border-copper-100 bg-copper-100/40 px-4 py-3">
+          <p className="text-sm text-copper-600">
+            The selfie exists, but it could not be loaded.
+          </p>
+        </div>
+      ) : (
+        <div className="mb-5 rounded-xl border border-latte-200 bg-latte-100 px-4 py-3">
+          <p className="text-sm text-steam-400">
+            No clock-in selfie was submitted.
+          </p>
         </div>
       )}
 

@@ -8,9 +8,12 @@ apps/web/.next/
 apps/web/out/
 
 # expo
+
 apps/mobile/.expo/
 apps/mobile/dist/
 apps/mobile/web-build/
+apps/mobile/ios/
+apps/mobile/android/
 
 # env files
 .env
