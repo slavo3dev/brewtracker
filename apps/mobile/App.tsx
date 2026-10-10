@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   View,
+  AppState,
 } from "react-native";
 import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -30,6 +31,7 @@ import {
   restoreLocationTracking,
   stopLocationTracking,
 } from "./src/features/fleet/location-tracking.service";
+import { flushLocationPingQueue } from "./src/features/fleet/location-ping.service";
 
 type Screen =
   | "home"
@@ -123,6 +125,26 @@ function AppContent() {
         console.warn("Unable to restore live location tracking:", error);
       });
     }
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== "authenticated") {
+      return;
+    }
+
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState !== "active") {
+        return;
+      }
+
+      void flushLocationPingQueue().catch((error: unknown) => {
+        console.warn("Unable to flush pending location pings:", error);
+      });
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [status]);
 
   useEffect(() => {
