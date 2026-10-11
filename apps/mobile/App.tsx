@@ -132,21 +132,15 @@ function AppContent() {
       return;
     }
 
-    const subscription = AppState.addEventListener(
-      "change",
-      (nextState) => {
-        if (nextState !== "active") {
-          return;
-        }
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState !== "active") {
+        return;
+      }
 
-        void flushLocationPingQueue().catch((error: unknown) => {
-          console.warn(
-            "Unable to flush pending location pings:",
-            error,
-          );
-        });
-      },
-    );
+      void flushLocationPingQueue().catch((error: unknown) => {
+        console.warn("Unable to flush pending location pings:", error);
+      });
+    });
 
     return () => {
       subscription.remove();
