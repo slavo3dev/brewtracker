@@ -11,7 +11,11 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "BrewTracker uses your location for clock-in, service visits, and live route tracking.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "BrewTracker uses your location while you are clocked in so dispatch can see your current route position.",
-        "UIBackgroundModes": ["location"]
+        "UIBackgroundModes": [
+          "location",
+          "location"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

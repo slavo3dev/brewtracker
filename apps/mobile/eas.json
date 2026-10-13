@@ -28,7 +28,11 @@
     }
   },
   "submit": {
-    "testflight": {},
+    "testflight": {
+      "ios": {
+        "ascAppId": "6822059504"
+      }
+    },
     "production": {}
   }
 }
