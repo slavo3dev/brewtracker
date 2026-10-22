@@ -736,6 +736,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       completeInventoryAudit,
 
       completeRestockDrop,
+      completeMachineRefill,
 
       saveAfterPhoto,
       updateAfterPhotoUpload,
