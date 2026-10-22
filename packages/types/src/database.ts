@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.18"
   }
   public: {
     Tables: {
@@ -368,6 +368,7 @@ export type Database = {
       clients: {
         Row: {
           address: string | null
+          business_type: Database["public"]["Enums"]["inventory_business_type"]
           city: string | null
           contact_email: string | null
           contact_name: string | null
@@ -380,11 +381,11 @@ export type Database = {
           name: string
           region: string | null
           service_email: string | null
-          signature_required: boolean
           updated_at: string
         }
         Insert: {
           address?: string | null
+          business_type?: Database["public"]["Enums"]["inventory_business_type"]
           city?: string | null
           contact_email?: string | null
           contact_name?: string | null
@@ -397,11 +398,11 @@ export type Database = {
           name: string
           region?: string | null
           service_email?: string | null
-          signature_required?: boolean
           updated_at?: string
         }
         Update: {
           address?: string | null
+          business_type?: Database["public"]["Enums"]["inventory_business_type"]
           city?: string | null
           contact_email?: string | null
           contact_name?: string | null
@@ -414,7 +415,6 @@ export type Database = {
           name?: string
           region?: string | null
           service_email?: string | null
-          signature_required?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -690,6 +690,32 @@ export type Database = {
             columns: ["to_location_id"]
             isOneToOne: false
             referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_product_business_types: {
+        Row: {
+          business_type: Database["public"]["Enums"]["inventory_business_type"]
+          created_at: string
+          product_id: string
+        }
+        Insert: {
+          business_type: Database["public"]["Enums"]["inventory_business_type"]
+          created_at?: string
+          product_id: string
+        }
+        Update: {
+          business_type?: Database["public"]["Enums"]["inventory_business_type"]
+          created_at?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_product_business_types_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
             referencedColumns: ["id"]
           },
         ]
@@ -1070,13 +1096,11 @@ export type Database = {
       }
       machine_meter_readings: {
         Row: {
-          archive_total: number | null
+          archive_total: number
           created_at: string
-          delta: number | null
           id: string
           machine_id: string
           notes: string | null
-          previous_reading: number | null
           reading: number
           recorded_at: string
           recorded_by: string | null
@@ -1084,13 +1108,11 @@ export type Database = {
           source_visit_id: string
         }
         Insert: {
-          archive_total?: number | null
+          archive_total: number
           created_at?: string
-          delta?: number | null
           id?: string
           machine_id: string
           notes?: string | null
-          previous_reading?: number | null
           reading: number
           recorded_at?: string
           recorded_by?: string | null
@@ -1098,13 +1120,11 @@ export type Database = {
           source_visit_id: string
         }
         Update: {
-          archive_total?: number | null
+          archive_total?: number
           created_at?: string
-          delta?: number | null
           id?: string
           machine_id?: string
           notes?: string | null
-          previous_reading?: number | null
           reading?: number
           recorded_at?: string
           recorded_by?: string | null
@@ -1743,74 +1763,6 @@ export type Database = {
           },
         ]
       }
-      service_visit_signatures: {
-        Row: {
-          client_id: string
-          created_at: string
-          id: string
-          machine_id: string
-          signed_at: string
-          signed_by: string
-          source_visit_id: string
-          stop_id: string
-          storage_path: string
-          updated_at: string
-        }
-        Insert: {
-          client_id: string
-          created_at?: string
-          id?: string
-          machine_id: string
-          signed_at: string
-          signed_by: string
-          source_visit_id: string
-          stop_id: string
-          storage_path: string
-          updated_at?: string
-        }
-        Update: {
-          client_id?: string
-          created_at?: string
-          id?: string
-          machine_id?: string
-          signed_at?: string
-          signed_by?: string
-          source_visit_id?: string
-          stop_id?: string
-          storage_path?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "service_visit_signatures_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_visit_signatures_machine_id_fkey"
-            columns: ["machine_id"]
-            isOneToOne: false
-            referencedRelation: "machines"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_visit_signatures_signed_by_fkey"
-            columns: ["signed_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_visit_signatures_stop_id_fkey"
-            columns: ["stop_id"]
-            isOneToOne: false
-            referencedRelation: "stops"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       service_visit_summaries: {
         Row: {
           client_id: string
@@ -2429,10 +2381,6 @@ export type Database = {
         Args: { p_route_template_id: string }
         Returns: undefined
       }
-      driver_has_route_at_warehouse: {
-        Args: { target_warehouse_id: string }
-        Returns: boolean
-      }
       generate_routes_from_templates: {
         Args: { p_route_date: string }
         Returns: {
@@ -2606,6 +2554,7 @@ export type Database = {
     Enums: {
       app_role: "driver" | "tech" | "manager" | "ceo"
       client_reserve_snapshot_stage: "before_service" | "after_service"
+      inventory_business_type: "ocs" | "horeca"
       inventory_location_type:
         | "warehouse"
         | "driver"
@@ -2769,6 +2718,7 @@ export const Constants = {
     Enums: {
       app_role: ["driver", "tech", "manager", "ceo"],
       client_reserve_snapshot_stage: ["before_service", "after_service"],
+      inventory_business_type: ["ocs", "horeca"],
       inventory_location_type: [
         "warehouse",
         "driver",
