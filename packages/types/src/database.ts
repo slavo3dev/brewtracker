@@ -1763,6 +1763,74 @@ export type Database = {
           },
         ]
       }
+      service_visit_signatures: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          machine_id: string
+          signed_at: string
+          signed_by: string
+          source_visit_id: string
+          stop_id: string
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          machine_id: string
+          signed_at: string
+          signed_by: string
+          source_visit_id: string
+          stop_id: string
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          machine_id?: string
+          signed_at?: string
+          signed_by?: string
+          source_visit_id?: string
+          stop_id?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_visit_signatures_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_signatures_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_signatures_signed_by_fkey"
+            columns: ["signed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_visit_signatures_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "stops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_visit_summaries: {
         Row: {
           client_id: string

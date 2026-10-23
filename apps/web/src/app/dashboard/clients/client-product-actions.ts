@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireInventoryManager } from
-  "@/lib/auth/require-inventory-manager";
+import { requireInventoryManager } from "@/lib/auth/require-inventory-manager";
 import { createClient } from "@/lib/supabase/server";
 
 type AssignClientProductInput = {
@@ -11,6 +10,15 @@ type AssignClientProductInput = {
   productId: string;
   parLevel: number | null;
   isRequired: boolean;
+};
+
+export type UpdateClientProductInput = {
+  assignmentId: string;
+  clientId: string;
+  parLevel: number | null;
+  isRequired: boolean;
+  displayOrder: number;
+  isActive: boolean;
 };
 
 export async function assignClientProduct(
@@ -24,12 +32,9 @@ export async function assignClientProduct(
 
   if (
     input.parLevel !== null &&
-    (!Number.isFinite(input.parLevel) ||
-      input.parLevel < 0)
+    (!Number.isFinite(input.parLevel) || input.parLevel < 0)
   ) {
-    throw new Error(
-      "Par level must be a non-negative number.",
-    );
+    throw new Error("Par level must be a non-negative number.");
   }
 
   const supabase = await createClient();
@@ -54,13 +59,12 @@ export async function assignClientProduct(
     throw new Error("Product not found or inactive.");
   }
 
-  const { data: eligibility, error: eligibilityError } =
-    await supabase
-      .from("inventory_product_business_types")
-      .select("product_id")
-      .eq("product_id", input.productId)
-      .eq("business_type", client.business_type)
-      .maybeSingle();
+  const { data: eligibility, error: eligibilityError } = await supabase
+    .from("inventory_product_business_types")
+    .select("product_id")
+    .eq("product_id", input.productId)
+    .eq("business_type", client.business_type)
+    .maybeSingle();
 
   if (eligibilityError || !eligibility) {
     throw new Error(
@@ -68,20 +72,77 @@ export async function assignClientProduct(
     );
   }
 
-  const { error } = await supabase
-    .from("client_inventory_products")
-    .insert({
-      client_id: input.clientId,
-      product_id: input.productId,
-      par_level: input.parLevel,
-      is_required: input.isRequired,
-      is_active: true,
-    });
+  const { error } = await supabase.from("client_inventory_products").insert({
+    client_id: input.clientId,
+    product_id: input.productId,
+    par_level: input.parLevel,
+    is_required: input.isRequired,
+    is_active: true,
+  });
 
   if (error) {
-    throw new Error(
-      `Unable to assign product: ${error.message}`,
-    );
+    throw new Error(`Unable to assign product: ${error.message}`);
+  }
+
+  revalidatePath(`/dashboard/clients/${input.clientId}`);
+}
+
+export async function updateClientProduct(
+  input: UpdateClientProductInput,
+): Promise<void> {
+  await requireInventoryManager();
+
+  if (!input.assignmentId || !input.clientId) {
+    throw new Error("Assignment and client are required.");
+  }
+
+  if (
+    input.parLevel !== null &&
+    (!Number.isFinite(input.parLevel) || input.parLevel < 0)
+  ) {
+    throw new Error("Par level must be a non-negative number.");
+  }
+
+  if (!Number.isSafeInteger(input.displayOrder) || input.displayOrder < 0) {
+    throw new Error("Display order must be a non-negative integer.");
+  }
+
+  const supabase = await createClient();
+
+  const { data: assignment, error: lookupError } = await supabase
+    .from("client_inventory_products")
+    .select("id, client_id")
+    .eq("id", input.assignmentId)
+    .eq("client_id", input.clientId)
+    .maybeSingle();
+
+  if (lookupError) {
+    throw new Error(`Unable to load assignment: ${lookupError.message}`);
+  }
+
+  if (!assignment) {
+    throw new Error("Assignment not found or access denied.");
+  }
+
+  const { data: updated, error: updateError } = await supabase
+    .from("client_inventory_products")
+    .update({
+      par_level: input.parLevel,
+      is_required: input.isRequired,
+      display_order: input.displayOrder,
+      is_active: input.isActive,
+    })
+    .eq("id", input.assignmentId)
+    .eq("client_id", input.clientId)
+    .select("id")
+    .maybeSingle();
+
+  if (updateError) {
+    throw new Error(`Unable to update assignment: ${updateError.message}`);
+  }
+
+  if (!updated) {
+    throw new Error("Assignment was not updated. Check your permissions.");
   }
 
   revalidatePath(`/dashboard/clients/${input.clientId}`);

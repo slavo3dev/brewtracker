@@ -1,21 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { requireInventoryManager } from
-  "@/lib/auth/require-inventory-manager";
+import { requireInventoryManager } from "@/lib/auth/require-inventory-manager";
 
 import {
   getClientById,
   getClientInventoryAssignments,
+  getEligibleClientProducts,
 } from "@/lib/clients/client-service";
+
+import { AssignProductForm } from "./assign-product-form";
+import { ClientProductAssignmentCard } from "./client-product-assignment-card";
 
 type Props = {
   params: Promise<{ clientId: string }>;
 };
 
-export default async function ClientDetailsPage({
-  params,
-}: Props) {
+export default async function ClientDetailsPage({ params }: Props) {
   await requireInventoryManager();
 
   const { clientId } = await params;
@@ -26,8 +27,10 @@ export default async function ClientDetailsPage({
     notFound();
   }
 
-  const assignments =
-    await getClientInventoryAssignments(clientId);
+  const [assignments, eligibleProducts] = await Promise.all([
+    getClientInventoryAssignments(clientId),
+    getEligibleClientProducts(clientId),
+  ]);
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
@@ -74,58 +77,17 @@ export default async function ClientDetailsPage({
         ) : (
           <div className="grid gap-4">
             {assignments.map((assignment) => (
-              <article
+              <ClientProductAssignmentCard
                 key={assignment.id}
-                className="rounded-2xl border border-latte-200 bg-crema-0 p-5 shadow-sm"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold text-espresso-950">
-                      {assignment.product.name}
-                    </h3>
-
-                    <p className="mt-1 text-sm text-steam-400">
-                      SKU: {assignment.product.sku ?? "Not assigned"}
-                    </p>
-                  </div>
-
-                  <span className="rounded-full bg-latte-100 px-3 py-1 text-xs text-espresso-800">
-                    {assignment.is_active ? "Active" : "Inactive"}
-                  </span>
-                </div>
-
-                <div className="mt-4 grid gap-4 border-t border-latte-200 pt-4 sm:grid-cols-3">
-                  <div>
-                    <p className="text-xs text-steam-400">
-                      Par level
-                    </p>
-                    <p className="font-medium text-espresso-950">
-                      {assignment.par_level ?? "Not configured"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-steam-400">
-                      Required
-                    </p>
-                    <p className="font-medium text-espresso-950">
-                      {assignment.is_required ? "Yes" : "No"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-steam-400">
-                      Display order
-                    </p>
-                    <p className="font-medium text-espresso-950">
-                      {assignment.display_order}
-                    </p>
-                  </div>
-                </div>
-              </article>
+                clientId={clientId}
+                assignment={assignment}
+              />
             ))}
           </div>
         )}
+      </section>
+      <section className="mt-8">
+        <AssignProductForm clientId={clientId} products={eligibleProducts} />
       </section>
     </main>
   );
