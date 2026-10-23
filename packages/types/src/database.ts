@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.18"
   }
   public: {
     Tables: {
@@ -368,6 +368,7 @@ export type Database = {
       clients: {
         Row: {
           address: string | null
+          business_type: Database["public"]["Enums"]["inventory_business_type"]
           city: string | null
           contact_email: string | null
           contact_name: string | null
@@ -380,11 +381,11 @@ export type Database = {
           name: string
           region: string | null
           service_email: string | null
-          signature_required: boolean
           updated_at: string
         }
         Insert: {
           address?: string | null
+          business_type?: Database["public"]["Enums"]["inventory_business_type"]
           city?: string | null
           contact_email?: string | null
           contact_name?: string | null
@@ -397,11 +398,11 @@ export type Database = {
           name: string
           region?: string | null
           service_email?: string | null
-          signature_required?: boolean
           updated_at?: string
         }
         Update: {
           address?: string | null
+          business_type?: Database["public"]["Enums"]["inventory_business_type"]
           city?: string | null
           contact_email?: string | null
           contact_name?: string | null
@@ -414,7 +415,6 @@ export type Database = {
           name?: string
           region?: string | null
           service_email?: string | null
-          signature_required?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -690,6 +690,32 @@ export type Database = {
             columns: ["to_location_id"]
             isOneToOne: false
             referencedRelation: "inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_product_business_types: {
+        Row: {
+          business_type: Database["public"]["Enums"]["inventory_business_type"]
+          created_at: string
+          product_id: string
+        }
+        Insert: {
+          business_type: Database["public"]["Enums"]["inventory_business_type"]
+          created_at?: string
+          product_id: string
+        }
+        Update: {
+          business_type?: Database["public"]["Enums"]["inventory_business_type"]
+          created_at?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_product_business_types_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
             referencedColumns: ["id"]
           },
         ]
@@ -1070,13 +1096,11 @@ export type Database = {
       }
       machine_meter_readings: {
         Row: {
-          archive_total: number | null
+          archive_total: number
           created_at: string
-          delta: number | null
           id: string
           machine_id: string
           notes: string | null
-          previous_reading: number | null
           reading: number
           recorded_at: string
           recorded_by: string | null
@@ -1084,13 +1108,11 @@ export type Database = {
           source_visit_id: string
         }
         Insert: {
-          archive_total?: number | null
+          archive_total: number
           created_at?: string
-          delta?: number | null
           id?: string
           machine_id: string
           notes?: string | null
-          previous_reading?: number | null
           reading: number
           recorded_at?: string
           recorded_by?: string | null
@@ -1098,13 +1120,11 @@ export type Database = {
           source_visit_id: string
         }
         Update: {
-          archive_total?: number | null
+          archive_total?: number
           created_at?: string
-          delta?: number | null
           id?: string
           machine_id?: string
           notes?: string | null
-          previous_reading?: number | null
           reading?: number
           recorded_at?: string
           recorded_by?: string | null
@@ -2404,6 +2424,24 @@ export type Database = {
         Args: { p_driver_id: string; p_items: Json; p_notes?: string }
         Returns: string
       }
+      create_inventory_product: {
+        Args: {
+          p_allows_loose_units?: boolean
+          p_allows_partial_base_unit?: boolean
+          p_base_unit: string
+          p_business_types: Database["public"]["Enums"]["inventory_business_type"][]
+          p_category: Database["public"]["Enums"]["inventory_product_category"]
+          p_is_active?: boolean
+          p_issue_unit: string
+          p_name: string
+          p_package_description?: string
+          p_sku?: string
+          p_sort_order?: number
+          p_unit_label: string
+          p_units_per_issue_unit: number
+        }
+        Returns: string
+      }
       current_user_has_client_stop: {
         Args: { target_client_id: string }
         Returns: boolean
@@ -2428,10 +2466,6 @@ export type Database = {
       delete_route_template: {
         Args: { p_route_template_id: string }
         Returns: undefined
-      }
-      driver_has_route_at_warehouse: {
-        Args: { target_warehouse_id: string }
-        Returns: boolean
       }
       generate_routes_from_templates: {
         Args: { p_route_date: string }
@@ -2577,6 +2611,25 @@ export type Database = {
         Args: { p_is_active: boolean; p_route_template_id: string }
         Returns: undefined
       }
+      update_inventory_product: {
+        Args: {
+          p_allows_loose_units?: boolean
+          p_allows_partial_base_unit?: boolean
+          p_base_unit: string
+          p_business_types: Database["public"]["Enums"]["inventory_business_type"][]
+          p_category: Database["public"]["Enums"]["inventory_product_category"]
+          p_is_active?: boolean
+          p_issue_unit: string
+          p_name: string
+          p_package_description?: string
+          p_product_id: string
+          p_sku?: string
+          p_sort_order?: number
+          p_unit_label: string
+          p_units_per_issue_unit: number
+        }
+        Returns: string
+      }
       update_route_template_checked: {
         Args: {
           p_driver_id: string
@@ -2606,6 +2659,7 @@ export type Database = {
     Enums: {
       app_role: "driver" | "tech" | "manager" | "ceo"
       client_reserve_snapshot_stage: "before_service" | "after_service"
+      inventory_business_type: "ocs" | "horeca"
       inventory_location_type:
         | "warehouse"
         | "driver"
@@ -2769,6 +2823,7 @@ export const Constants = {
     Enums: {
       app_role: ["driver", "tech", "manager", "ceo"],
       client_reserve_snapshot_stage: ["before_service", "after_service"],
+      inventory_business_type: ["ocs", "horeca"],
       inventory_location_type: [
         "warehouse",
         "driver",

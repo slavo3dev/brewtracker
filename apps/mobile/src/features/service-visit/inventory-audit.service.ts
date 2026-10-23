@@ -13,6 +13,7 @@ type ClientProductQueryRow = {
   par_level: number | string | null;
   product: {
     id: string;
+    is_active: boolean;
     sku: string | null;
     name: string;
     category: ClientInventoryProduct["category"];
@@ -144,6 +145,7 @@ export async function loadClientInventoryProducts(
       par_level,
       product:inventory_products!client_inventory_products_product_id_fkey (
         id,
+        is_active,
         sku,
         name,
         category,
@@ -178,7 +180,7 @@ export async function loadClientInventoryProducts(
   const rows = (data ?? []) as ClientProductQueryRow[];
 
   const products = rows.flatMap((row) => {
-    if (!row.product) {
+    if (!row.product || !row.product.is_active) {
       return [];
     }
 
