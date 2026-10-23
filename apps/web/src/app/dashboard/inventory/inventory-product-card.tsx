@@ -1,11 +1,13 @@
-import type { InventoryProduct } from "@/lib/inventory/inventory-service";
+import type { ManagedInventoryProduct } from "@/lib/inventory/inventory-product-management-service";
 
 type Props = {
-  product: InventoryProduct;
+  product: ManagedInventoryProduct;
+  onEdit: (product: ManagedInventoryProduct) => void;
 };
 
 export function InventoryProductCard({
   product,
+  onEdit,
 }: Props) {
   return (
     <article className="rounded-2xl border border-latte-200 bg-crema-0 p-5 shadow-sm">
@@ -34,9 +36,19 @@ export function InventoryProductCard({
           </p>
         </div>
 
-        <span className="w-fit rounded-full bg-latte-100 px-3 py-1 text-xs font-medium capitalize text-espresso-800">
-          {formatCategory(product.category)}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="w-fit rounded-full bg-latte-100 px-3 py-1 text-xs font-medium capitalize text-espresso-800">
+            {formatCategory(product.category)}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => onEdit(product)}
+            className="rounded-lg border border-latte-200 px-4 py-1.5 text-sm font-medium text-espresso-800 transition hover:border-copper-500 hover:text-copper-600"
+          >
+            Edit
+          </button>
+        </div>
       </div>
 
       <div className="mt-5 grid gap-4 border-t border-latte-200 pt-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -69,6 +81,14 @@ export function InventoryProductCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
+        {product.businessTypes.map((type) => (
+          <span
+            key={type}
+            className="rounded-full bg-latte-100 px-3 py-1 text-xs font-medium text-espresso-800"
+          >
+            {type.toUpperCase()}
+          </span>
+        ))}
         <BooleanBadge
           label="Loose units"
           enabled={product.allows_loose_units}

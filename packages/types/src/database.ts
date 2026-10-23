@@ -2356,6 +2356,24 @@ export type Database = {
         Args: { p_driver_id: string; p_items: Json; p_notes?: string }
         Returns: string
       }
+      create_inventory_product: {
+        Args: {
+          p_allows_loose_units?: boolean
+          p_allows_partial_base_unit?: boolean
+          p_base_unit: string
+          p_business_types: Database["public"]["Enums"]["inventory_business_type"][]
+          p_category: Database["public"]["Enums"]["inventory_product_category"]
+          p_is_active?: boolean
+          p_issue_unit: string
+          p_name: string
+          p_package_description?: string
+          p_sku?: string
+          p_sort_order?: number
+          p_unit_label: string
+          p_units_per_issue_unit: number
+        }
+        Returns: string
+      }
       current_user_has_client_stop: {
         Args: { target_client_id: string }
         Returns: boolean
@@ -2524,6 +2542,25 @@ export type Database = {
       set_route_template_active: {
         Args: { p_is_active: boolean; p_route_template_id: string }
         Returns: undefined
+      }
+      update_inventory_product: {
+        Args: {
+          p_allows_loose_units?: boolean
+          p_allows_partial_base_unit?: boolean
+          p_base_unit: string
+          p_business_types: Database["public"]["Enums"]["inventory_business_type"][]
+          p_category: Database["public"]["Enums"]["inventory_product_category"]
+          p_is_active?: boolean
+          p_issue_unit: string
+          p_name: string
+          p_package_description?: string
+          p_product_id: string
+          p_sku?: string
+          p_sort_order?: number
+          p_unit_label: string
+          p_units_per_issue_unit: number
+        }
+        Returns: string
       }
       update_route_template_checked: {
         Args: {

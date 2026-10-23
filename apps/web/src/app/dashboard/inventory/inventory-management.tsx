@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SearchIcon } from "@/components/ui/icons";
@@ -9,16 +10,20 @@ import type {
   InventoryLocation,
   InventoryMovementPage,
   InventoryMovementType,
-  InventoryProduct,
 } from "@/lib/inventory/inventory-service";
+
+import type {
+  ManagedInventoryProduct,
+} from "@/lib/inventory/inventory-product-management-service";
 
 import { InventoryLocationCard } from "./inventory-location-card";
 import { InventoryMovementCard } from "./inventory-movement-card";
 import { InventoryProductCard } from "./inventory-product-card";
 import { loadInventoryMovements } from "./actions";
+import { InventoryProductForm } from "./inventory-product-form";
 
 type Props = {
-  products: InventoryProduct[];
+  products: ManagedInventoryProduct[];
   locations: InventoryLocation[];
   initialMovements: InventoryMovementPage;
 };
@@ -328,7 +333,11 @@ function MovementSection({
   );
 }
 
-function ProductSection({ products }: { products: InventoryProduct[] }) {
+function ProductSection({ products }: { products: ManagedInventoryProduct[] }) {
+  const router = useRouter();
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingProduct, setEditingProduct] =
+    useState<ManagedInventoryProduct | null>(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [status, setStatus] = useState("");
@@ -384,16 +393,60 @@ function ProductSection({ products }: { products: InventoryProduct[] }) {
     setStatus("");
   }
 
+  function handleProductSaved(_productId: string) {
+    setShowAddForm(false);
+    setEditingProduct(null);
+
+    setSearch("");
+    setCategory("");
+    setStatus("");
+    setPage(1);
+
+    router.refresh();
+  }
+
+  function handleEditProduct(product: ManagedInventoryProduct) {
+    setShowAddForm(false);
+    setEditingProduct(product);
+  }
+
   return (
     <section>
-      <SectionHeader
-        title="Products"
-        count={filteredProducts.length}
-        total={products.length}
-        noun="products"
-        hasFilters={hasFilters}
-        onClear={clearFilters}
-      />
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+        <SectionHeader
+          title="Products"
+          count={filteredProducts.length}
+          total={products.length}
+          noun="products"
+          hasFilters={hasFilters}
+          onClear={clearFilters}
+        />
+
+        <button
+          type="button"
+          onClick={() => {
+            setEditingProduct(null);
+            setShowAddForm((previous) => !previous);
+          }}
+          className="rounded-full bg-copper-500 px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+        >
+          {showAddForm ? "Close form" : "+ Add Product"}
+        </button>
+      </div>
+
+      {(showAddForm || editingProduct) && (
+        <div className="mb-6" id="inventory-product-editor">
+          <InventoryProductForm
+            key={editingProduct?.id ?? "new"}
+            product={editingProduct ?? undefined}
+            onSaved={handleProductSaved}
+            onCancel={() => {
+              setShowAddForm(false);
+              setEditingProduct(null);
+            }}
+          />
+        </div>
+      )}
 
       <div className="mb-5 grid gap-3 rounded-2xl border border-latte-200 bg-crema-0 p-4 shadow-sm md:grid-cols-3">
         <label className="relative">
@@ -441,7 +494,11 @@ function ProductSection({ products }: { products: InventoryProduct[] }) {
       ) : (
         <div className="grid gap-4">
           {visibleProducts.map((product) => (
-            <InventoryProductCard key={product.id} product={product} />
+            <InventoryProductCard
+              key={product.id}
+              product={product}
+              onEdit={handleEditProduct}
+            />
           ))}
         </div>
       )}
