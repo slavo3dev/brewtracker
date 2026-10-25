@@ -63,14 +63,26 @@ function getInventoryAuditErrorMessage(
   error: unknown,
   fallbackMessage: string,
 ): string {
-  if (
-    error instanceof Error &&
-    error.message.toLowerCase().includes("network request failed")
-  ) {
-    return "Unable to sync inventory audit. Check your connection and try again.";
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+
+    if (message.includes("network request failed")) {
+      return "Unable to sync inventory audit. Check your connection and try again.";
+    }
+
+    if (message.includes("is not configured for this client")) {
+      return (
+        "A product in this inventory audit is no longer active " +
+        "or assigned to this client. Your recorded quantities " +
+        "have been saved. Contact your manager to resolve the " +
+        "product assignment, then retry synchronization."
+      );
+    }
+
+    return error.message;
   }
 
-  return error instanceof Error ? error.message : fallbackMessage;
+  return fallbackMessage;
 }
 
 export default function InventoryAuditStep() {
@@ -108,7 +120,22 @@ export default function InventoryAuditStep() {
          * fallback, so they can still be loaded offline
          * after they have previously been cached.
          */
-        const result = await loadClientInventoryProducts(clientId);
+        const savedAudit = activeVisit?.inventoryAudit;
+        const activeVisitId = activeVisit?.id;
+
+        const hasUnfinishedAudit =
+          savedAudit != null &&
+          activeVisitId != null &&
+          savedAudit.sourceVisitId === activeVisitId &&
+          savedAudit.syncStatus !== "synced";
+
+        const savedConfiguration =
+          hasUnfinishedAudit && savedAudit.configuredProducts?.length
+            ? savedAudit.configuredProducts
+            : null;
+
+        const result =
+          savedConfiguration ?? (await loadClientInventoryProducts(clientId));
 
         if (cancelled) {
           return;
@@ -123,16 +150,8 @@ export default function InventoryAuditStep() {
          * This allows an unfinished Inventory Audit to
          * survive an offline retry or app restoration.
          */
-        const savedAudit = activeVisit?.inventoryAudit;
 
-        const activeVisitId = activeVisit?.id;
-
-        if (
-          savedAudit &&
-          activeVisitId &&
-          savedAudit.sourceVisitId === activeVisitId &&
-          savedAudit.syncStatus !== "synced"
-        ) {
+        if (hasUnfinishedAudit && savedAudit) {
           const restoredCounts = Object.fromEntries(
             savedAudit.items.map((item) => [
               item.productId,

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { canManageUsers } from "@brewtracker/types";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { DASHBOARD_NAVIGATION } from "@/components/layout/navigation.config";
 
 export default async function DashboardPage() {
   const profile = await requireAdmin();
@@ -15,51 +15,26 @@ export default async function DashboardPage() {
         </p>
       </header>
 
-      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {canManageUsers(profile) && (
-          <DashboardCard
-            title="User management"
-            description="Manage drivers, managers and administrators."
-            href="/dashboard/users"
-          />
-        )}
+      <div className="space-y-10">
+        {DASHBOARD_NAVIGATION.map((group) => (
+          <section key={group.label}>
+            <h2 className="mb-5 text-xl font-semibold text-espresso-950">
+              {group.label}
+            </h2>
 
-        <DashboardCard
-          title="Routes"
-          description="Manage daily routes and assignments."
-          href="/dashboard/routes"
-        />
-
-        <DashboardCard
-          title="Warehouses"
-          description="Manage warehouse locations."
-          href="dashboard/inventory/warehouses"
-        />
-
-        <DashboardCard
-          title="Machines"
-          description="Manage customer machines."
-          href="/dashboard/inventory/machines"
-        />
-
-        <DashboardCard
-          title="Time Clock"
-          description="Manage employee attendance, reviews and time entries."
-          href="/dashboard/time-clock"
-        />
-
-        <DashboardCard
-          title="Reports"
-          description="View operational reports."
-          href="/dashboard/reports"
-        />
-
-        <DashboardCard
-          title="Live Fleet Map"
-          description="See active drivers and vans on a realtime map."
-          href="/dashboard/fleet"
-        />
-      </section>
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {group.links.map((link) => (
+                <DashboardCard
+                  key={link.href}
+                  title={link.label}
+                  description={link.description}
+                  href={link.href}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
     </main>
   );
 }
@@ -76,9 +51,9 @@ function DashboardCard({ title, description, href }: DashboardCardProps) {
       href={href}
       className="group rounded-2xl border border-latte-200 bg-crema-0 p-6 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg"
     >
-      <h2 className="text-lg font-semibold text-espresso-950 group-hover:text-copper-600">
+      <h3 className="text-lg font-semibold text-espresso-950 group-hover:text-copper-600">
         {title}
-      </h2>
+      </h3>
 
       <p className="mt-2 text-sm text-steam-400">{description}</p>
     </Link>

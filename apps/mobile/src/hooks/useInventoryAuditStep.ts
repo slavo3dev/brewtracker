@@ -1,8 +1,6 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 
-import {
-  saveClientReserveBefore,
-} from "../../src/features/service-visit/inventory-audit.service";
+import { saveClientReserveBefore } from "../../src/features/service-visit/inventory-audit.service";
 import { saveServiceVisit } from "../../src/features/service-visit/service-visit.storage";
 import {
   type CompleteInventoryAuditInput,
@@ -153,6 +151,12 @@ export function useInventoryAuditStep({
           countedAt: recordedAt,
 
           items,
+
+          // Preserve the configuration used for this audit.
+          configuredProducts: input.configuredProducts.map((product) => ({
+            ...product,
+            packaging: { ...product.packaging },
+          })),
 
           syncStatus: "pending_sync",
 

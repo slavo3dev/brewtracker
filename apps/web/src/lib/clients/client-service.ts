@@ -2,8 +2,23 @@ import type { Database } from "@brewtracker/types";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type Client =
-  Database["public"]["Tables"]["clients"]["Row"];
+export type Client = Database["public"]["Tables"]["clients"]["Row"];
+
+export type CreateClientInput = Pick<
+  Database["public"]["Tables"]["clients"]["Insert"],
+  | "name"
+  | "business_type"
+  | "address"
+  | "city"
+  | "region"
+  | "contact_name"
+  | "contact_email"
+  | "contact_phone"
+  | "service_email"
+  | "latitude"
+  | "longitude"
+  | "geofence_radius_meters"
+>;
 
 export type ClientInventoryAssignment =
   Database["public"]["Tables"]["client_inventory_products"]["Row"] & {
@@ -36,17 +51,13 @@ export async function getClients(): Promise<Client[]> {
     .order("name", { ascending: true });
 
   if (error) {
-    throw new Error(
-      `Unable to load clients: ${error.message}`,
-    );
+    throw new Error(`Unable to load clients: ${error.message}`);
   }
 
   return data ?? [];
 }
 
-export async function getClientById(
-  clientId: string,
-): Promise<Client | null> {
+export async function getClientById(clientId: string): Promise<Client | null> {
   const supabase = createAdminClient();
 
   const { data, error } = await supabase
@@ -62,6 +73,42 @@ export async function getClientById(
   return data;
 }
 
+export async function createClient(input: CreateClientInput): Promise<Client> {
+  const supabase = createAdminClient();
+
+  const { data, error } = await supabase
+    .from("clients")
+    .insert(input)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(`Unable to create client: ${error.message}`);
+  }
+
+  return data;
+}
+
+export async function updateClient(
+  clientId: string,
+  input: CreateClientInput,
+): Promise<Client> {
+  const adminSupabase = createAdminClient();
+
+  const { data, error } = await adminSupabase
+    .from("clients")
+    .update(input)
+    .eq("id", clientId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
+
 export async function getClientInventoryAssignments(
   clientId: string,
 ): Promise<ClientInventoryAssignment[]> {
@@ -69,7 +116,8 @@ export async function getClientInventoryAssignments(
 
   const { data, error } = await supabase
     .from("client_inventory_products")
-    .select(`
+    .select(
+      `
       *,
       product:inventory_products!client_inventory_products_product_id_fkey (
         id,
@@ -79,7 +127,8 @@ export async function getClientInventoryAssignments(
         issue_unit,
         units_per_issue_unit
       )
-    `)
+    `,
+    )
     .eq("client_id", clientId)
     .order("display_order", { ascending: true });
 
@@ -109,11 +158,10 @@ export async function getEligibleClientProducts(
     );
   }
 
-  const { data: availability, error: availabilityError } =
-    await supabase
-      .from("inventory_product_business_types")
-      .select("product_id")
-      .eq("business_type", client.business_type);
+  const { data: availability, error: availabilityError } = await supabase
+    .from("inventory_product_business_types")
+    .select("product_id")
+    .eq("business_type", client.business_type);
 
   if (availabilityError) {
     throw new Error(
@@ -121,9 +169,7 @@ export async function getEligibleClientProducts(
     );
   }
 
-  const productIds = (availability ?? []).map(
-    (item) => item.product_id,
-  );
+  const productIds = (availability ?? []).map((item) => item.product_id);
 
   if (productIds.length === 0) {
     return [];
@@ -131,7 +177,8 @@ export async function getEligibleClientProducts(
 
   const { data: products, error: productsError } = await supabase
     .from("inventory_products")
-    .select(`
+    .select(
+      `
       id,
       name,
       sku,
@@ -139,7 +186,8 @@ export async function getEligibleClientProducts(
       base_unit,
       issue_unit,
       units_per_issue_unit
-    `)
+    `,
+    )
     .eq("is_active", true)
     .in("id", productIds)
     .order("name", { ascending: true });
@@ -150,11 +198,10 @@ export async function getEligibleClientProducts(
     );
   }
 
-  const { data: assignments, error: assignmentsError } =
-    await supabase
-      .from("client_inventory_products")
-      .select("product_id")
-      .eq("client_id", clientId);
+  const { data: assignments, error: assignmentsError } = await supabase
+    .from("client_inventory_products")
+    .select("product_id")
+    .eq("client_id", clientId);
 
   if (assignmentsError) {
     throw new Error(

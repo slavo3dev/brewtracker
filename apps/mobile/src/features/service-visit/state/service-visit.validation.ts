@@ -327,6 +327,47 @@ export function validateRestoredVisit(
             Number.isFinite(item.reserveDecrease)),
       );
 
+    const configuredProducts = restoredInventoryAudit.configuredProducts;
+
+    const hasValidConfiguredProducts =
+      configuredProducts === undefined ||
+      (Array.isArray(configuredProducts) &&
+        configuredProducts.length > 0 &&
+        configuredProducts.every((product) => {
+          if (!product || typeof product !== "object") {
+            return false;
+          }
+
+          const packaging = product.packaging;
+
+          return (
+            typeof product.productId === "string" &&
+            product.productId.trim().length > 0 &&
+            (product.sku === null || typeof product.sku === "string") &&
+            typeof product.name === "string" &&
+            product.name.trim().length > 0 &&
+            typeof product.unitLabel === "string" &&
+            typeof product.isRequired === "boolean" &&
+            Number.isInteger(product.displayOrder) &&
+            (product.parLevel === null ||
+              (Number.isFinite(product.parLevel) && product.parLevel >= 0)) &&
+            packaging !== null &&
+            typeof packaging === "object" &&
+            typeof packaging.baseUnit === "string" &&
+            packaging.baseUnit.trim().length > 0 &&
+            typeof packaging.issueUnit === "string" &&
+            packaging.issueUnit.trim().length > 0 &&
+            Number.isFinite(packaging.unitsPerIssueUnit) &&
+            packaging.unitsPerIssueUnit > 0 &&
+            (packaging.packageDescription === null ||
+              typeof packaging.packageDescription === "string") &&
+            typeof packaging.allowsLooseUnits === "boolean" &&
+            typeof packaging.allowsPartialBaseUnit === "boolean"
+          );
+        }) &&
+        new Set(configuredProducts.map((product) => product.productId)).size ===
+          configuredProducts.length);
+
     const hasValidSyncStatus = ["pending_sync", "synced", "failed"].includes(
       restoredInventoryAudit.syncStatus,
     );
@@ -342,6 +383,7 @@ export function validateRestoredVisit(
 
     if (
       !hasValidDatabaseId ||
+      !hasValidConfiguredProducts ||
       typeof restoredInventoryAudit.sourceVisitId !== "string" ||
       restoredInventoryAudit.sourceVisitId.trim().length === 0 ||
       typeof restoredInventoryAudit.countedAt !== "string" ||
@@ -555,7 +597,7 @@ export function validateRestoredVisit(
     }
   }
 
-    /*
+  /*
    * FLOW-19:
    * Client Reserve After Service.
    *
@@ -605,23 +647,17 @@ export function validateRestoredVisit(
          * quantities may contain decimal values.
          */
         const expectedReserveAfter =
-          item.reserveBeforeQuantity +
-          item.deliveredQuantity;
+          item.reserveBeforeQuantity + item.deliveredQuantity;
 
         const hasValidReserveFormula =
-          Math.abs(
-            item.reserveAfterQuantity -
-              expectedReserveAfter,
-          ) < 0.001;
+          Math.abs(item.reserveAfterQuantity - expectedReserveAfter) < 0.001;
 
         return hasValidReserveFormula;
       });
 
-    const hasValidSyncStatus = [
-      "pending_sync",
-      "synced",
-      "failed",
-    ].includes(restoredReserveAfter.syncStatus);
+    const hasValidSyncStatus = ["pending_sync", "synced", "failed"].includes(
+      restoredReserveAfter.syncStatus,
+    );
 
     const hasValidDatabaseId =
       restoredReserveAfter.databaseId === null ||
@@ -641,9 +677,7 @@ export function validateRestoredVisit(
 
     const hasValidCalculatedAt =
       typeof restoredReserveAfter.calculatedAt === "string" &&
-      !Number.isNaN(
-        Date.parse(restoredReserveAfter.calculatedAt),
-      );
+      !Number.isNaN(Date.parse(restoredReserveAfter.calculatedAt));
 
     const hasValidSyncError =
       restoredReserveAfter.syncError === null ||
@@ -663,12 +697,12 @@ export function validateRestoredVisit(
   }
 
   /*
-  * FLOW-14:
-  * After Service contains one required photo.
-  *
-  * FLOW-20 client confirmation is stored separately
-  * from After Service.
-  */
+   * FLOW-14:
+   * After Service contains one required photo.
+   *
+   * FLOW-20 client confirmation is stored separately
+   * from After Service.
+   */
   const restoredAfterService = visit.afterService ?? {
     afterPhoto: null,
   };
@@ -691,38 +725,33 @@ export function validateRestoredVisit(
   }
 
   /*
-  * FLOW-20:
-  * Client / Manager Confirmation.
-  *
-  * The signature is intentionally stored separately
-  * from After Service. Older persisted visits created
-  * before FLOW-20 will not contain clientConfirmation,
-  * so normalize them to an empty confirmation.
-  */
-  const restoredClientConfirmation =
-    visit.clientConfirmation ?? {
-      signature: null,
-      confirmedAt: null,
-    };
+   * FLOW-20:
+   * Client / Manager Confirmation.
+   *
+   * The signature is intentionally stored separately
+   * from After Service. Older persisted visits created
+   * before FLOW-20 will not contain clientConfirmation,
+   * so normalize them to an empty confirmation.
+   */
+  const restoredClientConfirmation = visit.clientConfirmation ?? {
+    signature: null,
+    confirmedAt: null,
+  };
 
-  const restoredSignature =
-    restoredClientConfirmation.signature;
+  const restoredSignature = restoredClientConfirmation.signature;
 
   if (restoredSignature) {
     const hasValidLocalUri =
       typeof restoredSignature.localUri === "string" &&
       restoredSignature.localUri.trim().length > 0;
 
-    const hasValidUploadStatus =
-      validUploadStatuses.includes(
-        restoredSignature.uploadStatus,
-      );
+    const hasValidUploadStatus = validUploadStatuses.includes(
+      restoredSignature.uploadStatus,
+    );
 
     const hasValidSignedAt =
       typeof restoredSignature.signedAt === "string" &&
-      !Number.isNaN(
-        Date.parse(restoredSignature.signedAt),
-      );
+      !Number.isNaN(Date.parse(restoredSignature.signedAt));
 
     const hasValidStoragePath =
       restoredSignature.storagePath === null ||
@@ -741,9 +770,7 @@ export function validateRestoredVisit(
     const hasValidUploadedAt =
       restoredSignature.uploadedAt === null ||
       (typeof restoredSignature.uploadedAt === "string" &&
-        !Number.isNaN(
-          Date.parse(restoredSignature.uploadedAt),
-        ));
+        !Number.isNaN(Date.parse(restoredSignature.uploadedAt)));
 
     if (
       !hasValidLocalUri ||
@@ -758,40 +785,31 @@ export function validateRestoredVisit(
     }
 
     /*
-    * An uploaded signature must contain the
-    * persisted Storage and database references.
-    */
+     * An uploaded signature must contain the
+     * persisted Storage and database references.
+     */
     if (
       restoredSignature.uploadStatus === "uploaded" &&
-      (
-        restoredSignature.storagePath === null ||
+      (restoredSignature.storagePath === null ||
         restoredSignature.databaseId === null ||
-        restoredSignature.uploadedAt === null
-      )
+        restoredSignature.uploadedAt === null)
     ) {
       return null;
     }
   }
 
   /*
-  * FLOW-20 visit timing invariant:
-  *
-  * Arrival verification marks the beginning of the
-  * client visit and the client signature marks the end.
-  *
-  * A signature therefore cannot predate arrival.
-  */
-  if (
-    restoredSignature &&
-    visit.arrivalVerification
-  ) {
-    const arrivalVerifiedAt =
-      Date.parse(
-        visit.arrivalVerification.verifiedAt,
-      );
+   * FLOW-20 visit timing invariant:
+   *
+   * Arrival verification marks the beginning of the
+   * client visit and the client signature marks the end.
+   *
+   * A signature therefore cannot predate arrival.
+   */
+  if (restoredSignature && visit.arrivalVerification) {
+    const arrivalVerifiedAt = Date.parse(visit.arrivalVerification.verifiedAt);
 
-    const signatureSignedAt =
-      Date.parse(restoredSignature.signedAt);
+    const signatureSignedAt = Date.parse(restoredSignature.signedAt);
 
     if (
       Number.isNaN(arrivalVerifiedAt) ||
@@ -804,27 +822,20 @@ export function validateRestoredVisit(
   const hasValidConfirmedAt =
     restoredClientConfirmation.confirmedAt === null ||
     (typeof restoredClientConfirmation.confirmedAt === "string" &&
-      !Number.isNaN(
-        Date.parse(
-          restoredClientConfirmation.confirmedAt,
-        ),
-      ));
+      !Number.isNaN(Date.parse(restoredClientConfirmation.confirmedAt)));
 
   if (!hasValidConfirmedAt) {
     return null;
   }
 
   /*
-  * confirmedAt represents a successfully persisted
-  * client confirmation. It therefore cannot exist
-  * without an uploaded signature.
-  */
+   * confirmedAt represents a successfully persisted
+   * client confirmation. It therefore cannot exist
+   * without an uploaded signature.
+   */
   if (
     restoredClientConfirmation.confirmedAt !== null &&
-    (
-      !restoredSignature ||
-      restoredSignature.uploadStatus !== "uploaded"
-    )
+    (!restoredSignature || restoredSignature.uploadStatus !== "uploaded")
   ) {
     return null;
   }
@@ -863,8 +874,7 @@ export function validateRestoredVisit(
 
     afterService: restoredAfterService,
 
-    clientConfirmation:
-      restoredClientConfirmation,
+    clientConfirmation: restoredClientConfirmation,
 
     summary: restoredSummary,
   };

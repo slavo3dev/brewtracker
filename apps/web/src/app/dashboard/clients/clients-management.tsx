@@ -30,22 +30,28 @@ export function ClientsManagement({ clients }: Props) {
 
       return (
         (!query || searchable.includes(query)) &&
-        (!businessType ||
-          client.business_type === businessType)
+        (!businessType || client.business_type === businessType)
       );
     });
   }, [clients, search, businessType]);
 
   return (
     <section>
-      <div className="mb-8">
-        <h1 className="text-display text-3xl text-espresso-950">
-          Clients
-        </h1>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-display text-3xl text-espresso-950">Clients</h1>
 
-        <p className="mt-2 text-sm text-steam-400">
-          Manage client locations and inventory product assignments.
-        </p>
+          <p className="mt-2 text-sm text-steam-400">
+            Manage client locations and inventory product assignments.
+          </p>
+        </div>
+
+        <Link
+          href="/dashboard/clients/new"
+          className="inline-flex items-center justify-center rounded-xl bg-espresso-950 px-5 py-2.5 text-sm font-medium text-crema-50 transition-colors hover:bg-copper-600"
+        >
+          + Add Client
+        </Link>
       </div>
 
       <div className="mb-6 grid gap-3 rounded-2xl border border-latte-200 bg-crema-0 p-4 sm:grid-cols-2">
@@ -60,9 +66,7 @@ export function ClientsManagement({ clients }: Props) {
 
         <select
           value={businessType}
-          onChange={(event) =>
-            setBusinessType(event.target.value)
-          }
+          onChange={(event) => setBusinessType(event.target.value)}
           aria-label="Filter by business type"
           className="w-full rounded-xl border border-latte-200 bg-crema-0 px-4 py-2.5 text-sm text-espresso-950 outline-none focus:border-copper-500"
         >
@@ -96,9 +100,8 @@ export function ClientsManagement({ clients }: Props) {
                   </h2>
 
                   <p className="mt-1 text-sm text-steam-400">
-                    {[client.address, client.city]
-                      .filter(Boolean)
-                      .join(", ") || "Address not configured"}
+                    {[client.address, client.city].filter(Boolean).join(", ") ||
+                      "Address not configured"}
                   </p>
                   <Link
                     href={`/dashboard/clients/${client.id}`}
