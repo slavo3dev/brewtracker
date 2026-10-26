@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -91,6 +91,7 @@ export default function InventoryAuditStep() {
   const [products, setProducts] = useState<ClientInventoryProduct[]>([]);
 
   const [counts, setCounts] = useState<CountValues>({});
+  const restoredAuditKeyRef = useRef<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -102,6 +103,27 @@ export default function InventoryAuditStep() {
   >(new Map());
 
   const clientId = activeVisit?.clientId ?? null;
+
+  const savedAudit = activeVisit?.inventoryAudit;
+
+  const hasUnfinishedAudit =
+    savedAudit != null &&
+    savedAudit.sourceVisitId === activeVisit?.id &&
+    savedAudit.syncStatus !== "synced";
+
+  const hasLegacyAuditWithoutConfiguration =
+    hasUnfinishedAudit && !savedAudit.configuredProducts?.length;
+
+  const configuredProductIds = new Set(
+    products.map((product) => product.productId),
+  );
+
+  const hasMissingSavedProducts =
+    hasUnfinishedAudit &&
+    savedAudit.items.some((item) => !configuredProductIds.has(item.productId));
+
+  const hasUnsafeAuditRecovery =
+    hasLegacyAuditWithoutConfiguration || hasMissingSavedProducts;
 
   useEffect(() => {
     let cancelled = false;
@@ -163,9 +185,12 @@ export default function InventoryAuditStep() {
             ]),
           );
 
-          setCounts((current) =>
-            Object.keys(current).length > 0 ? current : restoredCounts,
-          );
+          const restorationKey = `${activeVisitId}:${savedAudit.countedAt}`;
+
+          if (restoredAuditKeyRef.current !== restorationKey) {
+            setCounts(restoredCounts);
+            restoredAuditKeyRef.current = restorationKey;
+          }
 
           /*
            * The previous balances used when this audit was
@@ -193,6 +218,9 @@ export default function InventoryAuditStep() {
          * Only a new audit needs the previous reserve
          * balances from the server.
          */
+        restoredAuditKeyRef.current = null;
+        setCounts({});
+
         const balances = await loadPreviousClientReserveBalances(
           clientId,
           result,
@@ -303,6 +331,7 @@ export default function InventoryAuditStep() {
   const canSubmit =
     !loading &&
     !submitting &&
+    !hasUnsafeAuditRecovery &&
     products.length > 0 &&
     missingRequiredCount === 0 &&
     !hasInvalidQuantity;
@@ -536,6 +565,17 @@ export default function InventoryAuditStep() {
           {missingRequiredCount === 1 ? "product" : "products"}. Enter 0 when
           none remains.
         </Text>
+      ) : null}
+
+      {hasUnsafeAuditRecovery ? (
+        <View style={styles.warningCard}>
+          <Text style={styles.warningText}>
+            This unfinished inventory audit cannot be safely synchronized
+            because its original product configuration is unavailable or
+            incomplete. Your previously recorded quantities are preserved.
+            Contact your manager before retrying.
+          </Text>
+        </View>
       ) : null}
 
       {errorMessage ? (

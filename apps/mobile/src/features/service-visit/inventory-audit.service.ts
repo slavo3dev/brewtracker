@@ -43,6 +43,7 @@ export type ClientReserveQuantityInput = {
   productId: string;
   issueQuantity: number;
   looseQuantity: number;
+  expectedPackaging: ClientInventoryProduct["packaging"];
 };
 
 export type ClientReservePreviousBalance = {
@@ -295,10 +296,17 @@ export async function saveClientReserveBefore(
 
       p_items: input.quantities.map((quantity) => ({
         product_id: quantity.productId,
-
         issue_quantity: quantity.issueQuantity,
-
         loose_quantity: quantity.looseQuantity,
+
+        expected_packaging: {
+          base_unit: quantity.expectedPackaging.baseUnit,
+          issue_unit: quantity.expectedPackaging.issueUnit,
+          units_per_issue_unit: quantity.expectedPackaging.unitsPerIssueUnit,
+          allows_loose_units: quantity.expectedPackaging.allowsLooseUnits,
+          allows_partial_base_unit:
+            quantity.expectedPackaging.allowsPartialBaseUnit,
+        },
       })),
     },
   );

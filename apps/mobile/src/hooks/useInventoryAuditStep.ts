@@ -73,6 +73,74 @@ export function useInventoryAuditStep({
         configuredProducts.map((product) => [product.productId, product]),
       );
 
+      // Protect an unfinished audit from losing previously saved products.
+      const savedAudit = activeVisit.inventoryAudit;
+
+      const hasUnfinishedAudit =
+        savedAudit != null &&
+        savedAudit.sourceVisitId === activeVisit.id &&
+        savedAudit.syncStatus !== "synced";
+
+      if (hasUnfinishedAudit) {
+        // Older audits may not have a packaging configuration snapshot.
+        // They cannot be safely recalculated using current product settings.
+        if (!savedAudit.configuredProducts?.length) {
+          throw new Error(
+            "This unfinished inventory audit was saved without its original " +
+              "product configuration. Contact your manager before retrying.",
+          );
+        }
+
+        const originalProductsById = new Map(
+          savedAudit.configuredProducts.map((product) => [
+            product.productId,
+            product,
+          ]),
+        );
+
+        for (const product of configuredProducts) {
+          const originalProduct = originalProductsById.get(product.productId);
+
+          if (!originalProduct) {
+            throw new Error(
+              "The inventory product configuration differs from the saved audit.",
+            );
+          }
+
+          const currentPackaging = product.packaging;
+          const originalPackaging = originalProduct.packaging;
+
+          const packagingChanged =
+            currentPackaging.baseUnit !== originalPackaging.baseUnit ||
+            currentPackaging.issueUnit !== originalPackaging.issueUnit ||
+            currentPackaging.unitsPerIssueUnit !==
+              originalPackaging.unitsPerIssueUnit ||
+            currentPackaging.allowsLooseUnits !==
+              originalPackaging.allowsLooseUnits ||
+            currentPackaging.allowsPartialBaseUnit !==
+              originalPackaging.allowsPartialBaseUnit;
+
+          if (packagingChanged) {
+            throw new Error(
+              "The original inventory packaging configuration must be preserved.",
+            );
+          }
+        }
+
+        const missingSavedProducts = savedAudit.items.filter(
+          (item) =>
+            !configuredById.has(item.productId) ||
+            !productIds.has(item.productId),
+        );
+
+        if (missingSavedProducts.length > 0) {
+          throw new Error(
+            "Some products from the unfinished inventory audit are missing. " +
+              "Restore the original product configuration before retrying.",
+          );
+        }
+      }
+
       const missingRequiredProduct = configuredProducts.some(
         (product) => product.isRequired && !productIds.has(product.productId),
       );
@@ -174,16 +242,24 @@ export function useInventoryAuditStep({
       try {
         const databaseId = await saveClientReserveBefore({
           sourceVisitId: activeVisit.id,
-
           clientId: activeVisit.clientId,
-
           stopId: activeVisit.stopId,
-
           machineId: activeVisit.machineId,
-
           recordedAt,
+          quantities: input.counts.map((count) => {
+            const product = configuredById.get(count.productId);
 
-          quantities: input.counts,
+            if (!product) {
+              throw new Error(
+                `Missing original packaging configuration for product ${count.productId}.`,
+              );
+            }
+
+            return {
+              ...count,
+              expectedPackaging: product.packaging,
+            };
+          }),
         });
 
         const syncedAt = new Date().toISOString();
