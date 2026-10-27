@@ -7,9 +7,23 @@ import { getClients } from
 import { ClientsManagement } from "./clients-management";
 
 export default async function ClientsPage() {
-  await requireInventoryManager();
+  const profile = await requireInventoryManager();
 
-  const clients = await getClients();
+  const managerRegion = profile.region?.trim().toLowerCase();
+
+  const clients = (await getClients()).filter((client) => {
+    if (profile.role === "ceo") {
+      return true;
+    }
+
+    const clientRegion = client.region?.trim().toLowerCase();
+
+    return Boolean(
+      managerRegion &&
+      clientRegion &&
+      managerRegion === clientRegion,
+    );
+  });
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
