@@ -17,7 +17,7 @@ type Props = {
 };
 
 export default async function ClientDetailsPage({ params }: Props) {
-  await requireInventoryManager();
+  const profile = await requireInventoryManager();
 
   const { clientId } = await params;
 
@@ -25,6 +25,15 @@ export default async function ClientDetailsPage({ params }: Props) {
 
   if (!client) {
     notFound();
+  }
+
+  if (profile.role === "manager") {
+    const managerRegion = profile.region?.trim().toLowerCase();
+    const clientRegion = client.region?.trim().toLowerCase();
+
+    if (!managerRegion || !clientRegion || managerRegion !== clientRegion) {
+      notFound();
+    }
   }
 
   const [assignments, eligibleProducts] = await Promise.all([
