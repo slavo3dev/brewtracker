@@ -336,15 +336,20 @@ export default function InventoryAuditStep() {
     !loading &&
     !submitting &&
     !hasUnsafeAuditRecovery &&
-    products.length > 0 &&
-    missingRequiredCount === 0 &&
-    !hasInvalidQuantity;
+    (hasUnfinishedAudit
+      ? savedAudit != null && savedAudit.items.length > 0
+      : products.length > 0 &&
+        missingRequiredCount === 0 &&
+        !hasInvalidQuantity);
 
   function updateCount(
     productId: string,
     field: "issueQuantity" | "looseQuantity",
     value: string,
   ): void {
+    if (hasUnfinishedAudit || submitting) {
+      return;
+    }
     const normalized =
       field === "issueQuantity"
         ? normalizeWholeQuantityInput(value)
@@ -383,7 +388,7 @@ export default function InventoryAuditStep() {
       return;
     }
 
-    if (missingRequiredCount > 0) {
+    if (!hasUnfinishedAudit && missingRequiredCount > 0) {
       setErrorMessage(
         `Enter a quantity for all ${missingRequiredCount} remaining required ${
           missingRequiredCount === 1 ? "product" : "products"
@@ -400,6 +405,11 @@ export default function InventoryAuditStep() {
     setErrorMessage(null);
 
     try {
+      if (hasUnfinishedAudit) {
+        await retryInventoryAuditSync();
+        return;
+      }
+
       await completeInventoryAudit({
         counts: answeredProducts.map((product) => {
           const count = counts[product.productId];
@@ -500,6 +510,7 @@ export default function InventoryAuditStep() {
                       placeholderTextColor="#a89c8f"
                       style={styles.compactQuantityInput}
                       value={count.issueQuantity}
+                      editable={!hasUnfinishedAudit && !submitting}
                     />
                   </View>
 
@@ -528,6 +539,7 @@ export default function InventoryAuditStep() {
                         placeholderTextColor="#a89c8f"
                         style={styles.compactQuantityInput}
                         value={count.looseQuantity}
+                        editable={!hasUnfinishedAudit && !submitting}
                       />
                     </View>
                   ) : null}
@@ -571,6 +583,16 @@ export default function InventoryAuditStep() {
         </Text>
       ) : null}
 
+      {hasUnfinishedAudit && !hasUnsafeAuditRecovery ? (
+        <View style={styles.warningCard}>
+          <Text style={styles.warningText}>
+            Your inventory quantities are saved locally and cannot
+            be edited. Synchronization is not complete.
+            Check your connection and retry to continue.
+          </Text>
+        </View>
+      ) : null}
+
       {hasUnsafeAuditRecovery ? (
         <View style={styles.warningCard}>
           <Text style={styles.warningText}>
@@ -604,7 +626,9 @@ export default function InventoryAuditStep() {
           <ActivityIndicator color="#ffffff" />
         ) : (
           <Text style={styles.primaryButtonText}>
-            Save Reserve and Continue
+            {hasUnfinishedAudit
+              ? "Retry Inventory Synchronization"
+              : "Save Reserve and Continue"}
           </Text>
         )}
       </Pressable>
