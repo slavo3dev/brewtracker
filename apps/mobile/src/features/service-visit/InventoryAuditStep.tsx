@@ -86,7 +86,11 @@ function getInventoryAuditErrorMessage(
 }
 
 export default function InventoryAuditStep() {
-  const { activeVisit, completeInventoryAudit } = useServiceVisit();
+  const {
+    activeVisit,
+    completeInventoryAudit,
+    retryInventoryAuditSync,
+  } = useServiceVisit();
 
   const [products, setProducts] = useState<ClientInventoryProduct[]>([]);
 

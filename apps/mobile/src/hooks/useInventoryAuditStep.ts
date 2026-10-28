@@ -82,63 +82,11 @@ export function useInventoryAuditStep({
         savedAudit.syncStatus !== "synced";
 
       if (hasUnfinishedAudit) {
-        // Older audits may not have a packaging configuration snapshot.
-        // They cannot be safely recalculated using current product settings.
-        if (!savedAudit.configuredProducts?.length) {
-          throw new Error(
-            "This unfinished inventory audit was saved without its original " +
-              "product configuration. Contact your manager before retrying.",
-          );
-        }
-
-        const originalProductsById = new Map(
-          savedAudit.configuredProducts.map((product) => [
-            product.productId,
-            product,
-          ]),
+        throw new Error(
+          "An unfinished inventory audit already exists. " +
+            "Retry synchronization or reconcile the saved audit " +
+            "instead of recording a new one.",
         );
-
-        for (const product of configuredProducts) {
-          const originalProduct = originalProductsById.get(product.productId);
-
-          if (!originalProduct) {
-            throw new Error(
-              "The inventory product configuration differs from the saved audit.",
-            );
-          }
-
-          const currentPackaging = product.packaging;
-          const originalPackaging = originalProduct.packaging;
-
-          const packagingChanged =
-            currentPackaging.baseUnit !== originalPackaging.baseUnit ||
-            currentPackaging.issueUnit !== originalPackaging.issueUnit ||
-            currentPackaging.unitsPerIssueUnit !==
-              originalPackaging.unitsPerIssueUnit ||
-            currentPackaging.allowsLooseUnits !==
-              originalPackaging.allowsLooseUnits ||
-            currentPackaging.allowsPartialBaseUnit !==
-              originalPackaging.allowsPartialBaseUnit;
-
-          if (packagingChanged) {
-            throw new Error(
-              "The original inventory packaging configuration must be preserved.",
-            );
-          }
-        }
-
-        const missingSavedProducts = savedAudit.items.filter(
-          (item) =>
-            !configuredById.has(item.productId) ||
-            !productIds.has(item.productId),
-        );
-
-        if (missingSavedProducts.length > 0) {
-          throw new Error(
-            "Some products from the unfinished inventory audit are missing. " +
-              "Restore the original product configuration before retrying.",
-          );
-        }
       }
 
       const missingRequiredProduct = configuredProducts.some(
@@ -325,7 +273,151 @@ export function useInventoryAuditStep({
     [activeVisit, setActiveVisit, setErrorMessage],
   );
 
+  const retryInventoryAuditSync = useCallback(
+    async (): Promise<ServiceVisit> => {
+      if (!activeVisit) {
+        throw new Error("There is no active service visit.");
+      }
+
+      if (activeVisit.currentStep !== "inventory_audit") {
+        throw new Error(
+          "Inventory audit synchronization is only available during Step 5.",
+        );
+      }
+
+      const savedAudit = activeVisit.inventoryAudit;
+
+      if (
+        !savedAudit ||
+        savedAudit.sourceVisitId !== activeVisit.id ||
+        savedAudit.syncStatus === "synced"
+      ) {
+        throw new Error("There is no unfinished inventory audit to retry.");
+      }
+
+      if (!savedAudit.configuredProducts?.length) {
+        throw new Error(
+          "The original inventory packaging configuration is unavailable. " +
+            "This audit requires reconciliation before synchronization.",
+        );
+      }
+
+      const productsById = new Map(
+        savedAudit.configuredProducts.map((product) => [
+          product.productId,
+          product,
+        ]),
+      );
+
+      if (savedAudit.items.length === 0) {
+        throw new Error("The saved inventory audit contains no products.");
+      }
+
+      const productIds = new Set<string>();
+
+      const quantities = savedAudit.items.map((item) => {
+        if (productIds.has(item.productId)) {
+          throw new Error("The saved inventory audit contains duplicate products.");
+        }
+
+        productIds.add(item.productId);
+
+        const product = productsById.get(item.productId);
+
+        if (!product) {
+          throw new Error(
+            `Original packaging is missing for product ${item.productId}.`,
+          );
+        }
+
+        const prepared = prepareClientReserveQuantity({
+          productId: item.productId,
+          packaging: product.packaging,
+          quantity: {
+            issueUnits: item.issueQuantity,
+            looseBaseUnits: item.looseQuantity,
+          },
+        });
+
+        if (
+          prepared.normalizedQuantity !== item.normalizedQuantity ||
+          prepared.normalizedUnit !== item.normalizedUnit
+        ) {
+          throw new Error(
+            `Saved inventory quantities do not match original packaging for product ${item.productId}.`,
+          );
+        }
+
+        return {
+          productId: item.productId,
+          issueQuantity: item.issueQuantity,
+          looseQuantity: item.looseQuantity,
+          expectedPackaging: product.packaging,
+        };
+      });
+
+      try {
+        const databaseId = await saveClientReserveBefore({
+          sourceVisitId: savedAudit.sourceVisitId,
+          clientId: activeVisit.clientId,
+          stopId: activeVisit.stopId,
+          machineId: activeVisit.machineId,
+          recordedAt: savedAudit.countedAt,
+          quantities,
+        });
+
+        const syncedAt = new Date().toISOString();
+
+        const syncedVisit: ServiceVisit = {
+          ...activeVisit,
+          inventoryAudit: {
+            ...savedAudit,
+            databaseId,
+            syncStatus: "synced",
+            syncError: null,
+          },
+          updatedAt: syncedAt,
+        };
+
+        const updatedVisit = transitionToNextStep(
+          syncedVisit,
+          "inventory_audit",
+          syncedAt,
+        );
+
+        await saveServiceVisit(updatedVisit);
+        setActiveVisit(updatedVisit);
+        setErrorMessage(null);
+
+        return updatedVisit;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to synchronize the saved inventory audit.";
+
+        const failedVisit: ServiceVisit = {
+          ...activeVisit,
+          inventoryAudit: {
+            ...savedAudit,
+            syncStatus: "failed",
+            syncError: message,
+          },
+          updatedAt: new Date().toISOString(),
+        };
+
+        await saveServiceVisit(failedVisit);
+        setActiveVisit(failedVisit);
+        setErrorMessage(message);
+
+        throw new Error(message);
+      }
+    },
+    [activeVisit, setActiveVisit, setErrorMessage],
+  );
+
   return {
     completeInventoryAudit,
+    retryInventoryAuditSync,
   };
 }

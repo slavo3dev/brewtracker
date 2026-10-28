@@ -82,6 +82,8 @@ type ServiceVisitContextValue = {
     input: CompleteInventoryAuditInput,
   ) => Promise<ServiceVisit>;
 
+  retryInventoryAuditSync: () => Promise<ServiceVisit>;
+
   completeRestockDrop: (
     input: CompleteRestockDropInput,
   ) => Promise<ServiceVisit>;
@@ -206,11 +208,12 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   /*
    * Step 5 - Inventory audit
    */
-  const { completeInventoryAudit } = useInventoryAuditStep({
-    activeVisit,
-    setActiveVisit,
-    setErrorMessage,
-  });
+  const { completeInventoryAudit, retryInventoryAuditSync } =
+    useInventoryAuditStep({
+      activeVisit,
+      setActiveVisit,
+      setErrorMessage,
+    });
 
   /*
    * Step 6 - Restock / drop
@@ -691,6 +694,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       completeDrinkCount,
 
       completeInventoryAudit,
+      retryInventoryAuditSync,
 
       completeRestockDrop,
       completeMachineRefill,
@@ -734,6 +738,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       completeDrinkCount,
 
       completeInventoryAudit,
+      retryInventoryAuditSync,
 
       completeRestockDrop,
       completeMachineRefill,
