@@ -46,6 +46,14 @@ const BUSINESS_TYPES: BusinessType[] = [
   "horeca",
 ];
 
+function hasSupportedQuantityPrecision(value: number): boolean {
+  return (
+    Number.isFinite(value) &&
+    value > 0 &&
+    Math.abs(value * 1000 - Math.round(value * 1000)) < 1e-8
+  );
+}
+
 export async function createInventoryProduct(
   input: CreateProductInput,
 ): Promise<string> {
@@ -87,6 +95,12 @@ export async function createInventoryProduct(
   ) {
     throw new Error(
       "Units per issue unit must be greater than zero.",
+    );
+  }
+
+  if (!hasSupportedQuantityPrecision(input.unitsPerIssueUnit)) {
+    throw new Error(
+      "Units per issue unit must use no more than 3 decimal places.",
     );
   }
 
@@ -224,6 +238,12 @@ export async function updateInventoryProduct(
   ) {
     throw new Error(
       "Units per issue unit must be greater than zero.",
+    );
+  }
+
+  if (!hasSupportedQuantityPrecision(input.unitsPerIssueUnit)) {
+    throw new Error(
+      "Units per issue unit must use no more than 3 decimal places.",
     );
   }
 

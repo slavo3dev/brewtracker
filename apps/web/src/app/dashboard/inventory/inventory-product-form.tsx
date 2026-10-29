@@ -257,8 +257,8 @@ export function InventoryProductForm({
               className={inputClass}
               type="number"
               required
-              min={form.allowsPartialBaseUnit ? "0.000001" : "1"}
-              step={form.allowsPartialBaseUnit ? "any" : "1"}
+              min={form.allowsPartialBaseUnit ? "0.001" : "1"}
+              step={form.allowsPartialBaseUnit ? "0.001" : "1"}
               value={form.unitsPerIssueUnit}
               onChange={(event) =>
                 update(
