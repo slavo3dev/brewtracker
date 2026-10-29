@@ -33,10 +33,11 @@ export function AssignProductForm({ clientId, products }: Props) {
     const parsedParLevel = parLevel.trim() === "" ? null : Number(parLevel);
 
     if (
-      parsedParLevel !== null &&
-      (!Number.isFinite(parsedParLevel) || parsedParLevel < 0)
+      parsedParLevel === null ||
+      !Number.isFinite(parsedParLevel) ||
+      parsedParLevel < 0
     ) {
-      setError("Par level must be a non-negative number.");
+      setError("Enter a non-negative par level.");
       return;
     }
 
@@ -119,10 +120,11 @@ export function AssignProductForm({ clientId, products }: Props) {
           type="number"
           min="0"
           step="any"
+          required
           value={parLevel}
           onChange={(event) => setParLevel(event.target.value)}
           disabled={isPending}
-          placeholder="Optional"
+          placeholder="Required"
           className="w-full rounded-xl border border-latte-200 bg-crema-0 px-4 py-2.5 text-sm"
         />
       </div>

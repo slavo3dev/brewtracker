@@ -31,10 +31,13 @@ export async function assignClientProduct(
   }
 
   if (
-    input.parLevel !== null &&
-    (!Number.isFinite(input.parLevel) || input.parLevel < 0)
+    input.parLevel === null ||
+    !Number.isFinite(input.parLevel) ||
+    input.parLevel < 0
   ) {
-    throw new Error("Par level must be a non-negative number.");
+    throw new Error(
+      "An active client product must have a non-negative par level.",
+    );
   }
 
   const supabase = await createClient();
@@ -97,10 +100,13 @@ export async function updateClientProduct(
   }
 
   if (
-    input.parLevel !== null &&
-    (!Number.isFinite(input.parLevel) || input.parLevel < 0)
+    (input.isActive && input.parLevel === null) ||
+    (input.parLevel !== null &&
+      (!Number.isFinite(input.parLevel) || input.parLevel < 0))
   ) {
-    throw new Error("Par level must be a non-negative number.");
+    throw new Error(
+      "Active assignments require a non-negative par level.",
+    );
   }
 
   if (!Number.isSafeInteger(input.displayOrder) || input.displayOrder < 0) {

@@ -44,10 +44,13 @@ export function EditProductAssignmentForm({
     const parsedDisplayOrder = Number(displayOrder);
 
     if (
-      parsedParLevel !== null &&
-      (!Number.isFinite(parsedParLevel) || parsedParLevel < 0)
+      (isActive && parsedParLevel === null) ||
+      (parsedParLevel !== null &&
+        (!Number.isFinite(parsedParLevel) || parsedParLevel < 0))
     ) {
-      setError("Par level must be a non-negative number.");
+      setError(
+        "Active assignments require a non-negative par level.",
+      );
       return;
     }
 
@@ -101,6 +104,7 @@ export function EditProductAssignmentForm({
           type="number"
           min="0"
           step="any"
+          required={isActive}
           value={parLevel}
           onChange={(event) => setParLevel(event.target.value)}
           disabled={isPending}
