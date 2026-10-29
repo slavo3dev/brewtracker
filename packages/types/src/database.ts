@@ -2393,6 +2393,10 @@ export type Database = {
         }
         Returns: string
       }
+      assert_inventory_quantity_precision: {
+        Args: { p_field_name: string; p_quantity: number }
+        Returns: undefined
+      }
       assert_route_template_has_no_conflicts: {
         Args: { p_route_template_id: string }
         Returns: undefined
@@ -2563,6 +2567,17 @@ export type Database = {
         Returns: string
       }
       save_client_reserve_before_service: {
+        Args: {
+          p_client_id: string
+          p_items: Json
+          p_machine_id: string
+          p_recorded_at: string
+          p_source_visit_id: string
+          p_stop_id: string
+        }
+        Returns: string
+      }
+      save_client_reserve_before_service_v2: {
         Args: {
           p_client_id: string
           p_items: Json

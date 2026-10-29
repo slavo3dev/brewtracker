@@ -282,7 +282,7 @@ export async function saveClientReserveBefore(
   }
 
   const { data, error } = await supabase.rpc(
-    "save_client_reserve_before_service",
+    "save_client_reserve_before_service_v2",
     {
       p_source_visit_id: input.sourceVisitId,
 
