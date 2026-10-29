@@ -1,6 +1,11 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 
-import { saveClientReserveBefore } from "../../src/features/service-visit/inventory-audit.service";
+import {
+  loadClientInventoryProducts,
+  saveClientReserveBefore,
+} from "../../src/features/service-visit/inventory-audit.service";
+import { recoverLegacyAuditConfiguration } from
+  "../../src/features/service-visit/inventory-audit-recovery";
 import { saveServiceVisit } from "../../src/features/service-visit/service-visit.storage";
 import {
   type CompleteInventoryAuditInput,
@@ -295,15 +300,38 @@ export function useInventoryAuditStep({
         throw new Error("There is no unfinished inventory audit to retry.");
       }
 
+      
+      let auditForRetry = savedAudit;
+
       if (!savedAudit.configuredProducts?.length) {
-        throw new Error(
-          "The original inventory packaging configuration is unavailable. " +
-            "This audit requires reconciliation before synchronization.",
+        const availableProducts = await loadClientInventoryProducts(
+          activeVisit.clientId,
         );
+
+        const recoveredProducts = recoverLegacyAuditConfiguration(
+          savedAudit,
+          availableProducts,
+        );
+
+        auditForRetry = {
+          ...savedAudit,
+          configuredProducts: recoveredProducts,
+        };
+
+        // Persist recovery before attempting network synchronization.
+        // Keep all original audit items and their countedAt timestamp.
+        const recoveredVisit: ServiceVisit = {
+          ...activeVisit,
+          inventoryAudit: auditForRetry,
+          updatedAt: new Date().toISOString(),
+        };
+
+        await saveServiceVisit(recoveredVisit);
+        setActiveVisit(recoveredVisit);
       }
 
       const productsById = new Map(
-        savedAudit.configuredProducts.map((product) => [
+        auditForRetry.configuredProducts!.map((product) => [
           product.productId,
           product,
         ]),
@@ -371,7 +399,7 @@ export function useInventoryAuditStep({
         const syncedVisit: ServiceVisit = {
           ...activeVisit,
           inventoryAudit: {
-            ...savedAudit,
+            ...auditForRetry,
             databaseId,
             syncStatus: "synced",
             syncError: null,
@@ -399,7 +427,7 @@ export function useInventoryAuditStep({
         const failedVisit: ServiceVisit = {
           ...activeVisit,
           inventoryAudit: {
-            ...savedAudit,
+            ...auditForRetry,
             syncStatus: "failed",
             syncError: message,
           },

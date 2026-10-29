@@ -126,8 +126,10 @@ export default function InventoryAuditStep() {
     hasUnfinishedAudit &&
     savedAudit.items.some((item) => !configuredProductIds.has(item.productId));
 
+  // A legacy audit may attempt validated recovery.
+  // A snapshot-bearing audit with missing products remains protected.
   const hasUnsafeAuditRecovery =
-    hasLegacyAuditWithoutConfiguration || hasMissingSavedProducts;
+    !hasLegacyAuditWithoutConfiguration && hasMissingSavedProducts;
 
   useEffect(() => {
     let cancelled = false;
@@ -589,6 +591,21 @@ export default function InventoryAuditStep() {
             Your inventory quantities are saved locally and cannot
             be edited. Synchronization is not complete.
             Check your connection and retry to continue.
+          </Text>
+        </View>
+      ) : null}
+
+      {hasLegacyAuditWithoutConfiguration ? (
+        <View style={styles.warningCard}>
+          <Text style={styles.warningText}>
+            This audit was saved by an older app version.
+            Your original quantities are preserved.
+
+            Retry will check whether the saved quantities
+            match the available product packaging.
+
+            If verification fails, manager reconciliation
+            will be required.
           </Text>
         </View>
       ) : null}
