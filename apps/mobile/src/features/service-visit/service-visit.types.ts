@@ -266,7 +266,20 @@ export type InventoryAuditRecord = {
   databaseId: string | null;
   sourceVisitId: string;
   countedAt: string;
+
   items: InventoryAuditItemRecord[];
+
+  /**
+   * Product configuration used when this audit was submitted.
+   *
+   * Preserved so unfinished audits can restore their original
+   * product list, packaging and required-product settings,
+   * even if an Admin subsequently changes assignments.
+   *
+   * Optional for compatibility with previously saved visits.
+   */
+  configuredProducts?: ClientInventoryProduct[];
+
   syncStatus: InventoryAuditSyncStatus;
   syncError: string | null;
 };
@@ -445,10 +458,7 @@ export type ClientReserveAfterItemRecord = {
   normalizedUnit: string;
 };
 
-export type ClientReserveAfterSyncStatus =
-  | "pending_sync"
-  | "synced"
-  | "failed";
+export type ClientReserveAfterSyncStatus = "pending_sync" | "synced" | "failed";
 
 export type ClientReserveAfterRecord = {
   databaseId: string | null;

@@ -1,13 +1,8 @@
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import { getCurrentUserProfile } from "@/lib/auth/get-current-user";
-
-const NAV_LINKS = [
-  { label: "Routes", href: "/dashboard/routes" },
-  { label: "Service", href: "/dashboard/service" },
-  { label: "Inventory", href: "/dashboard/inventory" },
-  { label: "Reports", href: "/dashboard/reports" },
-];
+import { DashboardNavigation } from "./dashboard-navigation";
+import { canAccessAdminApp } from "@brewtracker/types";
 
 export async function SiteHeader() {
   const profile = await getCurrentUserProfile();
@@ -23,18 +18,7 @@ export async function SiteHeader() {
           BrewTracker
         </Link>
 
-        <ul className="hidden items-center gap-8 text-[13px] font-medium text-espresso-800 md:flex">
-          {NAV_LINKS.map((link) => (
-            <li key={link.label}>
-              <Link
-                href={link.href}
-                className="transition-colors hover:text-copper-600"
-              >
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {canAccessAdminApp(profile) && <DashboardNavigation />}
 
         <div className="flex items-center gap-4">
           {profile ? (

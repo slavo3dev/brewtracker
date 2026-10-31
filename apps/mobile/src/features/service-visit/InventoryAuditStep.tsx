@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -63,22 +63,39 @@ function getInventoryAuditErrorMessage(
   error: unknown,
   fallbackMessage: string,
 ): string {
-  if (
-    error instanceof Error &&
-    error.message.toLowerCase().includes("network request failed")
-  ) {
-    return "Unable to sync inventory audit. Check your connection and try again.";
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+
+    if (message.includes("network request failed")) {
+      return "Unable to sync inventory audit. Check your connection and try again.";
+    }
+
+    if (message.includes("is not configured for this client")) {
+      return (
+        "A product in this inventory audit is no longer active " +
+        "or assigned to this client. Your recorded quantities " +
+        "have been saved. Contact your manager to resolve the " +
+        "product assignment, then retry synchronization."
+      );
+    }
+
+    return error.message;
   }
 
-  return error instanceof Error ? error.message : fallbackMessage;
+  return fallbackMessage;
 }
 
 export default function InventoryAuditStep() {
-  const { activeVisit, completeInventoryAudit } = useServiceVisit();
+  const {
+    activeVisit,
+    completeInventoryAudit,
+    retryInventoryAuditSync,
+  } = useServiceVisit();
 
   const [products, setProducts] = useState<ClientInventoryProduct[]>([]);
 
   const [counts, setCounts] = useState<CountValues>({});
+  const restoredAuditKeyRef = useRef<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -90,6 +107,29 @@ export default function InventoryAuditStep() {
   >(new Map());
 
   const clientId = activeVisit?.clientId ?? null;
+
+  const savedAudit = activeVisit?.inventoryAudit;
+
+  const hasUnfinishedAudit =
+    savedAudit != null &&
+    savedAudit.sourceVisitId === activeVisit?.id &&
+    savedAudit.syncStatus !== "synced";
+
+  const hasLegacyAuditWithoutConfiguration =
+    hasUnfinishedAudit && !savedAudit.configuredProducts?.length;
+
+  const configuredProductIds = new Set(
+    products.map((product) => product.productId),
+  );
+
+  const hasMissingSavedProducts =
+    hasUnfinishedAudit &&
+    savedAudit.items.some((item) => !configuredProductIds.has(item.productId));
+
+  // A legacy audit may attempt validated recovery.
+  // A snapshot-bearing audit with missing products remains protected.
+  const hasUnsafeAuditRecovery =
+    !hasLegacyAuditWithoutConfiguration && hasMissingSavedProducts;
 
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +148,22 @@ export default function InventoryAuditStep() {
          * fallback, so they can still be loaded offline
          * after they have previously been cached.
          */
-        const result = await loadClientInventoryProducts(clientId);
+        const savedAudit = activeVisit?.inventoryAudit;
+        const activeVisitId = activeVisit?.id;
+
+        const hasUnfinishedAudit =
+          savedAudit != null &&
+          activeVisitId != null &&
+          savedAudit.sourceVisitId === activeVisitId &&
+          savedAudit.syncStatus !== "synced";
+
+        const savedConfiguration =
+          hasUnfinishedAudit && savedAudit.configuredProducts?.length
+            ? savedAudit.configuredProducts
+            : null;
+
+        const result =
+          savedConfiguration ?? (await loadClientInventoryProducts(clientId));
 
         if (cancelled) {
           return;
@@ -123,16 +178,8 @@ export default function InventoryAuditStep() {
          * This allows an unfinished Inventory Audit to
          * survive an offline retry or app restoration.
          */
-        const savedAudit = activeVisit?.inventoryAudit;
 
-        const activeVisitId = activeVisit?.id;
-
-        if (
-          savedAudit &&
-          activeVisitId &&
-          savedAudit.sourceVisitId === activeVisitId &&
-          savedAudit.syncStatus !== "synced"
-        ) {
+        if (hasUnfinishedAudit && savedAudit) {
           const restoredCounts = Object.fromEntries(
             savedAudit.items.map((item) => [
               item.productId,
@@ -144,9 +191,12 @@ export default function InventoryAuditStep() {
             ]),
           );
 
-          setCounts((current) =>
-            Object.keys(current).length > 0 ? current : restoredCounts,
-          );
+          const restorationKey = `${activeVisitId}:${savedAudit.countedAt}`;
+
+          if (restoredAuditKeyRef.current !== restorationKey) {
+            setCounts(restoredCounts);
+            restoredAuditKeyRef.current = restorationKey;
+          }
 
           /*
            * The previous balances used when this audit was
@@ -174,6 +224,9 @@ export default function InventoryAuditStep() {
          * Only a new audit needs the previous reserve
          * balances from the server.
          */
+        restoredAuditKeyRef.current = null;
+        setCounts({});
+
         const balances = await loadPreviousClientReserveBalances(
           clientId,
           result,
@@ -284,15 +337,21 @@ export default function InventoryAuditStep() {
   const canSubmit =
     !loading &&
     !submitting &&
-    products.length > 0 &&
-    missingRequiredCount === 0 &&
-    !hasInvalidQuantity;
+    !hasUnsafeAuditRecovery &&
+    (hasUnfinishedAudit
+      ? savedAudit != null && savedAudit.items.length > 0
+      : products.length > 0 &&
+        missingRequiredCount === 0 &&
+        !hasInvalidQuantity);
 
   function updateCount(
     productId: string,
     field: "issueQuantity" | "looseQuantity",
     value: string,
   ): void {
+    if (hasUnfinishedAudit || submitting) {
+      return;
+    }
     const normalized =
       field === "issueQuantity"
         ? normalizeWholeQuantityInput(value)
@@ -331,7 +390,7 @@ export default function InventoryAuditStep() {
       return;
     }
 
-    if (missingRequiredCount > 0) {
+    if (!hasUnfinishedAudit && missingRequiredCount > 0) {
       setErrorMessage(
         `Enter a quantity for all ${missingRequiredCount} remaining required ${
           missingRequiredCount === 1 ? "product" : "products"
@@ -348,6 +407,11 @@ export default function InventoryAuditStep() {
     setErrorMessage(null);
 
     try {
+      if (hasUnfinishedAudit) {
+        await retryInventoryAuditSync();
+        return;
+      }
+
       await completeInventoryAudit({
         counts: answeredProducts.map((product) => {
           const count = counts[product.productId];
@@ -448,6 +512,7 @@ export default function InventoryAuditStep() {
                       placeholderTextColor="#a89c8f"
                       style={styles.compactQuantityInput}
                       value={count.issueQuantity}
+                      editable={!hasUnfinishedAudit && !submitting}
                     />
                   </View>
 
@@ -476,6 +541,7 @@ export default function InventoryAuditStep() {
                         placeholderTextColor="#a89c8f"
                         style={styles.compactQuantityInput}
                         value={count.looseQuantity}
+                        editable={!hasUnfinishedAudit && !submitting}
                       />
                     </View>
                   ) : null}
@@ -519,6 +585,42 @@ export default function InventoryAuditStep() {
         </Text>
       ) : null}
 
+      {hasUnfinishedAudit && !hasUnsafeAuditRecovery ? (
+        <View style={styles.warningCard}>
+          <Text style={styles.warningText}>
+            Your inventory quantities are saved locally and cannot
+            be edited. Synchronization is not complete.
+            Check your connection and retry to continue.
+          </Text>
+        </View>
+      ) : null}
+
+      {hasLegacyAuditWithoutConfiguration ? (
+        <View style={styles.warningCard}>
+          <Text style={styles.warningText}>
+            This audit was saved by an older app version.
+            Your original quantities are preserved.
+
+            Retry will check whether the saved quantities
+            match the available product packaging.
+
+            If verification fails, manager reconciliation
+            will be required.
+          </Text>
+        </View>
+      ) : null}
+
+      {hasUnsafeAuditRecovery ? (
+        <View style={styles.warningCard}>
+          <Text style={styles.warningText}>
+            This unfinished inventory audit cannot be safely synchronized
+            because its original product configuration is unavailable or
+            incomplete. Your previously recorded quantities are preserved.
+            Contact your manager before retrying.
+          </Text>
+        </View>
+      ) : null}
+
       {errorMessage ? (
         <View style={styles.errorCard}>
           <Text style={styles.errorText}>{errorMessage}</Text>
@@ -541,7 +643,9 @@ export default function InventoryAuditStep() {
           <ActivityIndicator color="#ffffff" />
         ) : (
           <Text style={styles.primaryButtonText}>
-            Save Reserve and Continue
+            {hasUnfinishedAudit
+              ? "Retry Inventory Synchronization"
+              : "Save Reserve and Continue"}
           </Text>
         )}
       </Pressable>
