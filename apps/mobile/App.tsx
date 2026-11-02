@@ -149,10 +149,19 @@ function AppContent() {
 
   useEffect(() => {
     if (
-      status === "authenticated" &&
-      !restoringVisit &&
-      activeVisit?.status === "in_progress"
+      status !== "authenticated" ||
+      restoringVisit ||
+      !activeVisit
     ) {
+      return;
+    }
+
+    const shouldResumeVisit =
+      activeVisit.status === "in_progress" ||
+      (activeVisit.status === "completed" &&
+        activeVisit.summary.syncStatus !== "synced");
+
+    if (shouldResumeVisit) {
       setScreen("serviceVisit");
     }
   }, [activeVisit, restoringVisit, status]);

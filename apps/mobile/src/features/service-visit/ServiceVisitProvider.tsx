@@ -334,6 +334,21 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         throw new Error("You must be signed in to start a service visit.");
       }
 
+      if (restoringVisit || restoreErrorMessage) {
+        throw new Error(
+          "Restore the saved service visit before starting service.",
+        );
+      }
+
+      if (
+        activeVisit?.status === "completed" &&
+        activeVisit.summary.syncStatus !== "synced"
+      ) {
+        throw new Error(
+          "Sync the completed service visit before starting another service. Open the saved visit and tap Retry Sync.",
+        );
+      }
+
       if (activeVisit?.status === "in_progress") {
         if (activeVisit.stopId === input.stopId) {
           return activeVisit;
@@ -440,7 +455,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
       return visit;
     },
-    [activeVisit, userId],
+    [activeVisit, userId, restoringVisit, restoreErrorMessage],
   );
 
   /*
@@ -621,6 +636,15 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       return;
     }
 
+    if (
+      activeVisit.status === "completed" &&
+      activeVisit.summary.syncStatus !== "synced"
+    ) {
+      throw new Error(
+        "Sync the completed service visit before cancelling it.",
+      );
+    }
+
     const now = new Date().toISOString();
 
     const cancelledVisit: ServiceVisit = {
@@ -669,8 +693,17 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   }, [activeVisit, userId]);
 
   const isVisitForStop = useCallback(
-    (stopId: string): boolean =>
-      activeVisit?.status === "in_progress" && activeVisit.stopId === stopId,
+    (stopId: string): boolean => {
+      if (!activeVisit || activeVisit.stopId !== stopId) {
+        return false;
+      }
+
+      return (
+        activeVisit.status === "in_progress" ||
+        (activeVisit.status === "completed" &&
+          activeVisit.summary.syncStatus !== "synced")
+      );
+    },
     [activeVisit],
   );
 
