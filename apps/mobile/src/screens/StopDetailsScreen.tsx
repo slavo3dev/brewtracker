@@ -85,14 +85,16 @@ export default function StopDetailsScreen({
   const hasDifferentActiveVisit =
     activeVisit !== null &&
     activeVisit.stopId !== stop.id &&
-    (activeVisit.status === "in_progress" ||
-      hasUnsyncedCompletedVisit);
+    (activeVisit.status === "in_progress" || hasUnsyncedCompletedVisit);
 
   const isCompletedStop = stop.status === "completed";
   const isSkippedStop = stop.status === "skipped";
 
+  const canRetrySyncForThisStop =
+    hasVisitForThisStop && hasUnsyncedCompletedVisit;
+
   const cannotStartService =
-    !hasVisitForThisStop && (isCompletedStop || isSkippedStop);
+    !canRetrySyncForThisStop && (isCompletedStop || isSkippedStop);
 
   const [openingNavigation, setOpeningNavigation] = useState(false);
   const [navigationError, setNavigationError] = useState<string | null>(null);
@@ -148,7 +150,7 @@ export default function StopDetailsScreen({
       return;
     }
 
-    if (hasVisitForThisStop) {
+    if (canRetrySyncForThisStop) {
       onServiceStarted();
       return;
     }
@@ -163,10 +165,13 @@ export default function StopDetailsScreen({
       return;
     }
 
+    if (hasVisitForThisStop) {
+      onServiceStarted();
+      return;
+    }
+
     if (!stop.machine) {
-      setServiceError(
-        "No machine is assigned to this service stop.",
-      );
+      setServiceError("No machine is assigned to this service stop.");
       return;
     }
 
@@ -408,15 +413,15 @@ export default function StopDetailsScreen({
               <ActivityIndicator color="#ffffff" />
             ) : (
               <Text style={styles.serviceButtonText}>
-                {hasVisitForThisStop
-                  ? hasUnsyncedCompletedVisit
-                    ? "Retry Sync"
-                    : "Resume Service"
+                {canRetrySyncForThisStop
+                  ? "Retry Sync"
                   : isCompletedStop
                     ? "Service Completed"
                     : isSkippedStop
                       ? "Stop Skipped"
-                      : "Start Service"}
+                      : hasVisitForThisStop
+                        ? "Resume Service"
+                        : "Start Service"}
               </Text>
             )}
           </Pressable>
