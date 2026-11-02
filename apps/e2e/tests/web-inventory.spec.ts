@@ -183,3 +183,89 @@ test('WEB-INVM-01: Machines stranica pokazuje "coming soon" stub bez funkcionaln
   await expect(page.getByRole('heading', { name: 'Machines' })).toBeVisible();
   await expect(page.getByText('Machine management module coming soon.')).toBeVisible();
 });
+
+// NOVA FUNKCIONALNOST (app update, dev grana) — Inventory Product CRUD ("+ Add Product" /
+// "Edit" na Products tabu). NAPOMENA: u trenutku pisanja ovih testova, NI app kod NI DB
+// migracije nisu deployed/primenjeni na ovaj QA projekat — testovi ispod će pasti dok se
+// oba koraka ne završe. Pisano prema izvornom kodu kao priprema za kad bude gotovo.
+
+test('WEB-INVP-01: "+ Add Product" forma kreira novi proizvod', async ({ page }) => {
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+  await page.goto('/dashboard/inventory');
+  await page.getByRole('button', { name: '+ Add Product' }).click();
+
+  const name = `QA INVP-01 Test Product ${Date.now()}`;
+  await page.getByLabel('Product name *').fill(name);
+  await page.getByLabel('Display unit label *').fill('bags');
+  await page.getByLabel('Base unit *').fill('bag');
+  await page.getByLabel('Issue unit *').fill('case');
+  await page.getByLabel('Base units per issue unit *').fill('6');
+  await page.getByLabel('OCS').check();
+  await page.getByRole('button', { name: 'Create Product' }).click();
+
+  await expect(page.getByText(name)).toBeVisible();
+});
+
+test('WEB-INVP-02: Kreiranje proizvoda je blokirano bez izabranog business type-a', async ({ page }) => {
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+  await page.goto('/dashboard/inventory');
+  await page.getByRole('button', { name: '+ Add Product' }).click();
+
+  await page.getByLabel('Product name *').fill(`QA INVP-02 ${Date.now()}`);
+  await page.getByLabel('Display unit label *').fill('bags');
+  await page.getByLabel('Base unit *').fill('bag');
+  await page.getByLabel('Issue unit *').fill('case');
+  await page.getByLabel('Base units per issue unit *').fill('6');
+  // OCS je defaultno čekiran — isključi ga da nijedan business type ne ostane izabran.
+  await page.getByLabel('OCS').uncheck();
+  await page.getByRole('button', { name: 'Create Product' }).click();
+
+  await expect(page.getByText('Select at least one business type.')).toBeVisible();
+});
+
+test('WEB-INVP-03: "Edit" dugme na kartici otvara formu sa postojećim podacima i čuva izmenu', async ({ page }) => {
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+  await page.goto('/dashboard/inventory');
+  await page.getByRole('button', { name: '+ Add Product' }).click();
+
+  const originalName = `QA INVP-03 Original ${Date.now()}`;
+  await page.getByLabel('Product name *').fill(originalName);
+  await page.getByLabel('Display unit label *').fill('bags');
+  await page.getByLabel('Base unit *').fill('bag');
+  await page.getByLabel('Issue unit *').fill('case');
+  await page.getByLabel('Base units per issue unit *').fill('6');
+  await page.getByLabel('OCS').check();
+  await page.getByRole('button', { name: 'Create Product' }).click();
+  await expect(page.getByText(originalName)).toBeVisible();
+
+  const card = page.locator('article').filter({ hasText: originalName });
+  await card.getByRole('button', { name: 'Edit' }).click();
+
+  await expect(page.getByLabel('Product name *')).toHaveValue(originalName);
+
+  const updatedName = `QA INVP-03 Updated ${Date.now()}`;
+  await page.getByLabel('Product name *').fill(updatedName);
+  await page.getByRole('button', { name: 'Save Changes' }).click();
+
+  await expect(page.getByText(updatedName)).toBeVisible();
+  await expect(page.getByText(originalName)).toHaveCount(0);
+});
+
+test('WEB-INVP-04: Non-manager/CEO ne može da upravlja inventory proizvodima', async ({ page }) => {
+  // requireInventoryManager() odbija svakog ko nije manager/CEO sa specifičnom porukom —
+  // razlikuje se od generičkog requireAdmin() koji se koristi za ostatak Inventory stranice.
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_DRIVER_EMAIL!, process.env.QA_DRIVER_PASSWORD!);
+  await page.goto('/dashboard/inventory');
+  await expect(page).toHaveURL(/\/login/);
+});

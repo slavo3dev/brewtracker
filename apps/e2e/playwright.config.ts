@@ -8,7 +8,9 @@ export default defineConfig({
   reporter: 'html',
 
   use: {
-    baseURL: 'https://brewtracker-web.vercel.app',
+    // Lokalni dev server (npm run dev:web) — pokreni GA PRE testova. Korisnik pokreće
+    // ovo ručno u svom terminalu; ovde samo ciljamo na njega.
+    baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

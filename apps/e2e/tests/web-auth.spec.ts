@@ -3,7 +3,7 @@ import { LoginPage } from '../pages/LoginPage';
 import { createTestUser, createUserWithoutProfile, deleteTestUser } from '../helpers/userSeed';
 import { generateRecoveryActionLink } from '../helpers/authSeed';
 
-const BASE_URL = 'https://brewtracker-web.vercel.app';
+const BASE_URL = 'http://localhost:3000';
 
 test('WEB-AUTH-01: Admin (manager/CEO) se uspešno prijavljuje', async ({ page }) => {
   const login = new LoginPage(page);
@@ -182,7 +182,13 @@ test('WEB-AUTH-11: Nepoklapanje potvrde lozinke je odbijeno', async ({ page }) =
   await expect(page.getByText('Passwords do not match.')).toBeVisible();
 });
 
-test('WEB-AUTH-09: Reset link rutira kroz /auth/callback na /reset-password/update', async ({ page }) => {
+test('WEB-AUTH-09: Reset link rutira kroz /auth/recovery na /reset-password/update', async ({ page }) => {
+  // AŽURIRANO (app update): redirectTo za recovery link promenjen sa
+  // /auth/callback?next=/reset-password/update na /auth/recovery — nova ruta čita
+  // token_hash iz query stringa, upisuje ga u HttpOnly kolačić, i redirektuje na
+  // /reset-password/update (vidi apps/web/src/app/auth/recovery/route.ts).
+  // NAPOMENA: ova ruta još NIJE deployed na produkciju u trenutku pisanja ovog testa —
+  // vraća 404 dok se dev grana ne deployuje.
   const email = `qa-auth-09-${Date.now()}@brewtracker.com`;
   const userId = await createTestUser({
     email,
@@ -193,10 +199,7 @@ test('WEB-AUTH-09: Reset link rutira kroz /auth/callback na /reset-password/upda
   });
 
   try {
-    const actionLink = await generateRecoveryActionLink(
-      email,
-      `${BASE_URL}/auth/callback?next=/reset-password/update`,
-    );
+    const actionLink = await generateRecoveryActionLink(email, `${BASE_URL}/auth/recovery`);
     await page.goto(actionLink);
 
     await expect(page).toHaveURL(/\/reset-password\/update/);
@@ -205,20 +208,14 @@ test('WEB-AUTH-09: Reset link rutira kroz /auth/callback na /reset-password/upda
   }
 });
 
-test('WEB-AUTH-12: Uspešan reset lozinke odjavljuje korisnika i vraća na login', async ({ page }) => {
-  // Poznat, aktivan defekt (otkriven tokom automatizacije): Supabase recovery link stiže sa
-  // sesijskim tokenima u URL HASH fragmentu (implicit flow), ali ni /reset-password/update
-  // ni bilo koja globalna komponenta ne inicijalizuje browser Supabase klijent koji bi taj
-  // hash pročitao i upisao sesiju u kolačić. Server akcija zato uvek vrati "Unable to update
-  // password. Try the reset link again." — ovo pogađa i STVARNOG korisnika koji klikne pravi
-  // email link za reset lozinke, ne samo test okruženje. Test ispod ne koristi test.fail() —
-  // namerno PADA (crveno) dok god je ovaj defekt prisutan u aplikaciji.
-  test.info().annotations.push({
-    type: 'note',
-    description:
-      'POZNAT DEFEKT u aplikaciji: recovery link nosi sesiju u URL hash-u, ali ništa u app-i ne obrađuje taj hash — password reset posle klika na pravi email link ne radi ni za stvarnog korisnika. Treba popraviti: inicijalizovati browser Supabase klijent na /reset-password/update da pročita sesiju iz hash-a.',
-  });
-
+test('WEB-AUTH-12: Uspešan reset lozinke prikazuje potvrdu i nova lozinka radi za sledeći login', async ({ page }) => {
+  // AŽURIRANO (app update): ceo recovery mehanizam je prepravljen — token_hash sada stiže
+  // kao query parametar (ne URL hash fragment) preko /auth/recovery, čuva se u HttpOnly
+  // kolačiću, i server akcija ga razmenjuje za sesiju preko verifyOtp() — STARI poznati
+  // defekt (hash fragment se nikad nije obrađivao) je ovim rešen u korenu. Redirect posle
+  // uspešnog čuvanja lozinke je takođe promenjen: sa /login na /reset-password/success.
+  // NAPOMENA: još NIJE deployed na produkciju u trenutku pisanja ovog testa — 404 dok se
+  // dev grana ne deployuje; verifikovati empirijski čim bude dostupno.
   const email = `qa-auth-12-${Date.now()}@brewtracker.com`;
   const userId = await createTestUser({
     email,
@@ -229,10 +226,7 @@ test('WEB-AUTH-12: Uspešan reset lozinke odjavljuje korisnika i vraća na login
   });
 
   try {
-    const actionLink = await generateRecoveryActionLink(
-      email,
-      `${BASE_URL}/auth/callback?next=/reset-password/update`,
-    );
+    const actionLink = await generateRecoveryActionLink(email, `${BASE_URL}/auth/recovery`);
     await page.goto(actionLink);
     await expect(page).toHaveURL(/\/reset-password\/update/);
 
@@ -240,10 +234,13 @@ test('WEB-AUTH-12: Uspešan reset lozinke odjavljuje korisnika i vraća na login
     await page.locator('input[name="confirmPassword"]').fill('NewValidPass123');
     await page.getByRole('button', { name: 'Update password' }).click();
 
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/reset-password\/success/);
+    await expect(page.getByText('Password saved')).toBeVisible();
 
-    // Nova lozinka stvarno radi za sledeći login (i korisnik je odjavljen, ne i dalje ulogovan).
+    // Nova lozinka stvarno radi za sledeći login (i korisnik je odjavljen, ne i dalje ulogovan
+    // u staroj sesiji — recovery sesija se eksplicitno gasi sa signOut({scope:'local'})).
     const login = new LoginPage(page);
+    await login.goto();
     await login.login(email, 'NewValidPass123');
     await login.expectLoggedInOnDashboard();
   } finally {

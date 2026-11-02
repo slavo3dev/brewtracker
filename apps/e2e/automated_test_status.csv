@@ -9,14 +9,22 @@ WEB-AUTH-05,Driver/tech nalog ne može da pristupi web dashboard-u,tests/web-aut
 WEB-AUTH-06,"Dugme prikazuje ""Signing in…"" dok je zahtev u toku",tests/web-marketing.spec.ts,Pass,
 WEB-AUTH-07,Forgot password šalje reset email za validnu adresu,tests/web-auth.spec.ts,Pass*,"NIJE app defekt - zavisi od deljene Supabase email kvote; ako padne, prvo proveri kvotu pre provere koda (isti uzrok kao USR-01/USR-10)."
 WEB-AUTH-08,Forgot password je blokiran sa praznim email-om,tests/web-auth.spec.ts,Pass,
-WEB-AUTH-09,Reset link rutira kroz /auth/callback na /reset-password/update,tests/web-auth.spec.ts,Pass,
+WEB-AUTH-09,Reset link rutira kroz /auth/recovery na /reset-password/update,tests/web-auth.spec.ts,Pending Deploy,AZURIRAN test (app update): redirectTo promenjen na /auth/recovery (sa /auth/callback). Jos NIJE deployed na produkciju - 404. Verifikovati kad dev grana bude deployed.
 WEB-AUTH-10,Nova lozinka kraća od 8 karaktera je odbijena,tests/web-auth.spec.ts,Pass,
 WEB-AUTH-11,Nepoklapanje potvrde lozinke je odbijeno,tests/web-auth.spec.ts,Pass,
-WEB-AUTH-12,Uspešan reset lozinke odjavljuje korisnika i vraća na login,tests/web-auth.spec.ts,Fail,"POZNAT DEFEKT (novootkriven): recovery link nosi sesiju u URL hash-u, ali nista u app-i ne obradjuje taj hash - reset lozinke ne radi ni za stvarnog korisnika. Test namerno pada crveno dok defekt postoji."
+WEB-AUTH-12,Uspešan reset lozinke prikazuje potvrdu i nova lozinka radi za sledeći login,tests/web-auth.spec.ts,Pending Deploy,"AZURIRAN test (app update): ceo recovery flow prepravljen (token_hash + cookie + verifyOtp), redirect sa /login na /reset-password/success. STARI poznati defekt (URL hash se ne obradjuje) izgleda RESEN ovim rewrite-om. Jos NIJE deployed - verifikovati empirijski kad bude."
 WEB-AUTH-13,Neulogovan korisnik na /dashboard/* ruti se preusmerava na /login,tests/web-auth.spec.ts,Pass,
 WEB-AUTH-14,Aktivan manager pristupa /dashboard/users,tests/web-auth.spec.ts,Pass,
 WEB-AUTH-15,Neaktivan admin nalog je blokiran sa dashboard-a,tests/web-auth.spec.ts,Pass,
 WEB-AUTH-16,/api/users endpointi odbijaju non-user-manager naloge,tests/web-auth.spec.ts,Pass,
+WEB-CLI-01,/dashboard/clients zahteva inventory manager pristup (manager/CEO),tests/web-clients.spec.ts,Pending Deploy,NOVA funkcionalnost (/dashboard/clients) - jos NIJE deployed NITI su DB migracije (clients.business_type kolona) primenjene na ovaj QA projekat.
+WEB-CLI-02,Kreiranje klijenta sa obaveznim poljima uspeva i vodi na detalj stranicu,tests/web-clients.spec.ts,Pending Deploy,NOVA funkcionalnost - vidi WEB-CLI-01 napomenu (app kod + DB migracije oba nedostaju).
+WEB-CLI-03,Kreiranje klijenta je blokirano bez imena,tests/web-clients.spec.ts,Pending Deploy,NOVA funkcionalnost - vidi WEB-CLI-01 napomenu (app kod + DB migracije oba nedostaju).
+WEB-CLI-04,Pretraga i filter po business type sužavaju listu klijenata,tests/web-clients.spec.ts,Pending Deploy,NOVA funkcionalnost - vidi WEB-CLI-01 napomenu (app kod + DB migracije oba nedostaju).
+WEB-CLI-05,"Manager vidi samo klijente svog regiona, CEO vidi sve",tests/web-clients.spec.ts,Pending Deploy,"NOVA funkcionalnost - vidi WEB-CLI-01 napomenu. Testira region-scoping (manager vidi samo svoj region, CEO sve) - namerno, eksplicitno uradjeno u kodu ovaj put."
+WEB-CLI-06,Manager ne može direktno (URL) da otvori detalj klijenta iz drugog regiona,tests/web-clients.spec.ts,Pending Deploy,NOVA funkcionalnost - vidi WEB-CLI-01 napomenu. Testira server-side notFound() zastitu za direktan URL pristup van regiona.
+WEB-CLI-07,Izmena klijenta se perzistira,tests/web-clients.spec.ts,Pending Deploy,NOVA funkcionalnost - vidi WEB-CLI-01 napomenu (app kod + DB migracije oba nedostaju).
+WEB-CLI-08,Prazno stanje kad nema klijenata koji odgovaraju filterima,tests/web-clients.spec.ts,Pending Deploy,NOVA funkcionalnost - vidi WEB-CLI-01 napomenu (app kod + DB migracije oba nedostaju).
 WEB-FLEET-01,Fleet mapa prikazuje markere za nedavno aktivne vozače,tests/web-fleet.spec.ts,Pass,
 WEB-FLEET-02,Prazno stanje kada nema aktivnih vozača,tests/web-fleet.spec.ts,Pass,
 WEB-FLEET-03,"Manager vidi samo svoj region, CEO vidi sve regione",tests/web-fleet.spec.ts,Pass,
@@ -26,9 +34,9 @@ WEB-FLEET-06,Prazno stanje ne montira kartu uopšte,tests/web-fleet.spec.ts,Pass
 WEB-FLEET-07,Fleet stranica preusmerava non-admin naloge,tests/web-fleet.spec.ts,Pass,
 WEB-FLEET-08,Mapa se učitava client-side sa loading fallback-om,tests/web-fleet.spec.ts,Pass,
 WEB-HOME-01,Dashboard pozdravlja ulogovanog admina po imenu,tests/web-marketing.spec.ts,Pass,
-WEB-HOME-02,"""User management"" kartica je prikazana korisniku sa canManageUsers",tests/web-dashboard-home.spec.ts,Pass,
-WEB-HOME-03,Sve dashboard navigacione kartice vode na ispravne stranice,tests/web-dashboard-home.spec.ts,Pass,
-WEB-HOME-04,"""Warehouses"" kartica (relativni href) se ispravno razrešava",tests/web-dashboard-home.spec.ts,Pass,
+WEB-HOME-02,"""Users"" kartica je prikazana korisniku sa canManageUsers",tests/web-dashboard-home.spec.ts,Pending Deploy,"AZURIRAN test (app update): ""User management"" kartica preimenovana u ""Users"", sada pod ""Management"" grupom. Jos NIJE deployed."
+WEB-HOME-03,Sve dashboard navigacione kartice (grupisane) vode na ispravne stranice,tests/web-dashboard-home.spec.ts,Pending Deploy,"AZURIRAN test (app update): dashboard home prepravljen - kartice grupisane u 4 sekcije (Operations/Inventory/Management/Reports), dodate nove kartice (Service, Inventory Overview, Clients). Jos NIJE deployed."
+WEB-HOME-04,"""Warehouses"" kartica vodi na ispravnu stranicu",tests/web-dashboard-home.spec.ts,Pass,
 WEB-INV-01,Movement history lista paginirane rezultate po defaultu,tests/web-inventory.spec.ts,Pass,
 WEB-INV-02,Filtriranje po tipu pokreta sužava rezultate,tests/web-inventory.spec.ts,Pass,
 WEB-INV-03,Pretraga po visit ID ili unit substring radi,tests/web-inventory.spec.ts,Pass,
@@ -41,6 +49,10 @@ WEB-INV-09,Header akcije vode na ispravne inventory podstranice,tests/web-invent
 WEB-INV-10,Non-admin ne može da pristupi nijednoj /dashboard/inventory/* stranici,tests/web-inventory.spec.ts,Pass,
 WEB-INVM-01,"Machines stranica pokazuje ""coming soon"" stub bez funkcionalnog UI-ja",tests/web-inventory.spec.ts,Pass,
 WEB-INVM-02,Machines stub stranica i dalje sprovodi admin auth,tests/web-inventory.spec.ts,Pass,
+WEB-INVP-01,"""+ Add Product"" forma kreira novi proizvod",tests/web-inventory.spec.ts,Pending Deploy,NOVA funkcionalnost (Inventory Product CRUD) - jos NIJE deployed niti su DB migracije primenjene.
+WEB-INVP-02,Kreiranje proizvoda je blokirano bez izabranog business type-a,tests/web-inventory.spec.ts,Pending Deploy,NOVA funkcionalnost - vidi WEB-INVP-01 napomenu.
+WEB-INVP-03,"""Edit"" dugme na kartici otvara formu sa postojećim podacima i čuva izmenu",tests/web-inventory.spec.ts,Pending Deploy,NOVA funkcionalnost - vidi WEB-INVP-01 napomenu.
+WEB-INVP-04,Non-manager/CEO ne može da upravlja inventory proizvodima,tests/web-inventory.spec.ts,Pending Deploy,NOVA funkcionalnost - auth guard (requireInventoryManager) - vidi WEB-INVP-01 napomenu.
 WEB-MKT-01,Home stranica prikazuje hero i CTA dugmad,tests/web-marketing.spec.ts,Pass,
 WEB-MKT-02,Feature grid kartice vode na ispravne destinacije,tests/web-marketing.spec.ts,Pass,
 WEB-MKT-03,"""Get started"" stranica je statični mockup bez signup forme",tests/web-marketing.spec.ts,Pass,
