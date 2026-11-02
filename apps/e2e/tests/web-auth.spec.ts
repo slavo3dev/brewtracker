@@ -1,0 +1,252 @@
+import { test, expect } from '../fixtures/test';
+import { LoginPage } from '../pages/LoginPage';
+import { createTestUser, createUserWithoutProfile, deleteTestUser } from '../helpers/userSeed';
+import { generateRecoveryActionLink } from '../helpers/authSeed';
+
+const BASE_URL = 'https://brewtracker-web.vercel.app';
+
+test('WEB-AUTH-01: Admin (manager/CEO) se uspešno prijavljuje', async ({ page }) => {
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+  await login.expectLoggedInOnDashboard();
+});
+
+test('WEB-AUTH-05: Driver/tech nalog ne može da pristupi web dashboard-u', async ({ page }) => {
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_DRIVER_EMAIL!, process.env.QA_DRIVER_PASSWORD!);
+
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByText('This dashboard is only for managers and CEOs.')).toBeVisible();
+});
+
+test('WEB-AUTH-13: Neulogovan korisnik na /dashboard/* ruti se preusmerava na /login', async ({ page }) => {
+  await page.goto('/dashboard/users');
+  await expect(page).toHaveURL(/\/login/);
+});
+
+test('WEB-AUTH-03: Login blokiran sa pogrešnim kredencijalima', async ({ page }) => {
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_MANAGER_EMAIL!, 'wrongpassword123');
+
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByText("That email or password isn't right. Try again.")).toBeVisible();
+});
+
+test('WEB-AUTH-15: Neaktivan admin nalog je blokiran sa dashboard-a', async ({ page }) => {
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_INACTIVE_MANAGER_EMAIL!, process.env.QA_INACTIVE_MANAGER_PASSWORD!);
+
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByText('This dashboard is only for managers and CEOs.')).toBeVisible();
+});
+
+test('WEB-AUTH-02: Login je blokiran sa praznim poljima', async ({ page }) => {
+  const login = new LoginPage(page);
+  await login.goto();
+  await page.getByRole('button', { name: 'Sign in' }).click();
+
+  // "email"/"password" imaju HTML required atribut — browser blokira submit pre nego
+  // što ikada stigne do servera (ista "Select a warehouse."-tipa provera kao na drugim formama).
+  await expect(page.locator('#email')).toHaveJSProperty('validity.valid', false);
+  await expect(page).toHaveURL(/\/login/);
+});
+
+test('WEB-AUTH-04: Login je blokiran za nalog bez users profila', async ({ page }) => {
+  const email = `qa-auth-04-${Date.now()}@brewtracker.com`;
+  const password = 'TestPass123!';
+  const userId = await createUserWithoutProfile({ email, password });
+
+  try {
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login(email, password);
+
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.getByText('Your user profile is missing. Contact your manager.')).toBeVisible();
+  } finally {
+    await deleteTestUser(userId);
+  }
+});
+
+test('WEB-AUTH-08: Forgot password je blokiran sa praznim email-om', async ({ page }) => {
+  await page.goto('/forgot-password');
+  const emailField = page.locator('input[type="email"]');
+  await page.getByRole('button', { name: 'Send reset link' }).click();
+
+  // "email" ima HTML required atribut — ista client-side blokada kao na login formi.
+  await expect(emailField).toHaveJSProperty('validity.valid', false);
+});
+
+test('WEB-AUTH-14: Aktivan manager pristupa /dashboard/users', async ({ page }) => {
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+  await page.goto('/dashboard/users');
+  await expect(page).toHaveURL(/\/dashboard\/users/);
+  await expect(page.getByRole('heading', { name: 'User management' })).toBeVisible();
+});
+
+test('WEB-AIQ-02: /ai-quality je dostupan bez autentikacije', async ({ page }) => {
+  await page.goto('/ai-quality');
+  await expect(page).not.toHaveURL(/\/login/);
+});
+
+test('WEB-AIQ-01: /ai-quality prikazuje statične kartice bez funkcionalnog queue-a', async ({ page }) => {
+  await page.goto('/ai-quality');
+
+  for (const title of ['Photo Review Queue', 'AI Cleanliness Scoring', 'Object Detection', 'Quality Analytics']) {
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+  }
+});
+
+test('WEB-AUTH-16: /api/users endpointi odbijaju non-user-manager naloge', async ({ page }) => {
+  // Driver: pokušaj logina ga odjavljuje (ne može na web dashboard uopšte), pa je ovo i test
+  // da poziv bez validne admin sesije ne vraća korisničke podatke.
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_DRIVER_EMAIL!, process.env.QA_DRIVER_PASSWORD!);
+
+  const deniedResponse = await page.request.get('/api/users');
+  expect(deniedResponse.headers()['content-type']).not.toContain('application/json');
+  expect(deniedResponse.url()).toContain('/login');
+
+  // Kontrola: manager ISTIM pozivom dobija prave JSON podatke.
+  await login.goto();
+  await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+  const allowedResponse = await page.request.get('/api/users');
+  expect(allowedResponse.headers()['content-type']).toContain('application/json');
+  const body = await allowedResponse.json();
+  expect(Array.isArray(body.users)).toBe(true);
+});
+
+test('WEB-NA-01: /api/warehouses endpoint ne postoji (UI koristi server akcije)', async ({ page }) => {
+  const getResponse = await page.request.get('/api/warehouses');
+  expect(getResponse.status()).toBe(404);
+});
+
+test('WEB-NA-02: Ne postoji admin UI za podešavanje Google review URL-a (dokumentovan gap)', async ({ page }) => {
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+  // Jedina "settings"-tipa administrativna stranica u čitavom dashboard-u je Clock Rules
+  // (/dashboard/time-clock/settings) — nigde u kodu (grep po celom apps/web/src) ne postoji
+  // UI komponenta koja referenciše app_settings.google_review_url, samo read-only
+  // getGoogleReviewUrl() na javnoj survey stranici. Vrednost se trenutno menja isključivo
+  // direktno u Supabase-u.
+  await page.goto('/dashboard/time-clock/settings');
+  await expect(page.getByText(/google review/i)).toHaveCount(0);
+});
+
+test('WEB-AUTH-07: Forgot password šalje reset email za validnu adresu', async ({ page }) => {
+  // Napomena: resetPasswordForEmail() stvarno šalje email, pa podleže istom Supabase
+  // rate-limitu na ovom deljenom QA projektu kao WEB-USR-01 — povremeno može pasti sa
+  // "Unable to send reset email." čak i kad je kod ispravan (regresioni plan ovo vodi
+  // kao Pass, za razliku od WEB-USR-01 koji je dokumentovan kao stvaran defekt).
+  test.info().annotations.push({
+    type: 'note',
+    description:
+      'NIJE app defekt: ovaj test zavisi od deljene Supabase email kvote na QA projektu — ako padne, pre provere koda prvo proveri da li je kvota trenutno potrošena (isti uzrok kao WEB-USR-01/USR-10).',
+  });
+
+  await page.goto('/forgot-password');
+  await page.locator('input[type="email"]').fill(process.env.QA_MANAGER_EMAIL!);
+  await page.getByRole('button', { name: 'Send reset link' }).click();
+
+  await expect(page.getByText('Check your email for a password reset link.')).toBeVisible({ timeout: 10000 });
+});
+
+test('WEB-AUTH-10: Nova lozinka kraća od 8 karaktera je odbijena', async ({ page }) => {
+  // Validacija dužine se dešava u server akciji PRE bilo kakvog Supabase auth poziva — forma
+  // je dostupna i bez aktivne recovery sesije, pa ne treba pravi reset link za ovaj slučaj.
+  await page.goto('/reset-password/update');
+  await page.locator('input[name="password"]').fill('short1');
+  await page.locator('input[name="confirmPassword"]').fill('short1');
+  await page.getByRole('button', { name: 'Update password' }).click();
+
+  await expect(page.getByText('Password must be at least 8 characters.')).toBeVisible();
+});
+
+test('WEB-AUTH-11: Nepoklapanje potvrde lozinke je odbijeno', async ({ page }) => {
+  await page.goto('/reset-password/update');
+  await page.locator('input[name="password"]').fill('ValidPass123');
+  await page.locator('input[name="confirmPassword"]').fill('DifferentPass123');
+  await page.getByRole('button', { name: 'Update password' }).click();
+
+  await expect(page.getByText('Passwords do not match.')).toBeVisible();
+});
+
+test('WEB-AUTH-09: Reset link rutira kroz /auth/callback na /reset-password/update', async ({ page }) => {
+  const email = `qa-auth-09-${Date.now()}@brewtracker.com`;
+  const userId = await createTestUser({
+    email,
+    password: 'OldPass123!',
+    fullName: 'QA AUTH-09 Test Manager',
+    role: 'manager',
+    isActive: true,
+  });
+
+  try {
+    const actionLink = await generateRecoveryActionLink(
+      email,
+      `${BASE_URL}/auth/callback?next=/reset-password/update`,
+    );
+    await page.goto(actionLink);
+
+    await expect(page).toHaveURL(/\/reset-password\/update/);
+  } finally {
+    await deleteTestUser(userId);
+  }
+});
+
+test('WEB-AUTH-12: Uspešan reset lozinke odjavljuje korisnika i vraća na login', async ({ page }) => {
+  // Poznat, aktivan defekt (otkriven tokom automatizacije): Supabase recovery link stiže sa
+  // sesijskim tokenima u URL HASH fragmentu (implicit flow), ali ni /reset-password/update
+  // ni bilo koja globalna komponenta ne inicijalizuje browser Supabase klijent koji bi taj
+  // hash pročitao i upisao sesiju u kolačić. Server akcija zato uvek vrati "Unable to update
+  // password. Try the reset link again." — ovo pogađa i STVARNOG korisnika koji klikne pravi
+  // email link za reset lozinke, ne samo test okruženje. Test ispod ne koristi test.fail() —
+  // namerno PADA (crveno) dok god je ovaj defekt prisutan u aplikaciji.
+  test.info().annotations.push({
+    type: 'note',
+    description:
+      'POZNAT DEFEKT u aplikaciji: recovery link nosi sesiju u URL hash-u, ali ništa u app-i ne obrađuje taj hash — password reset posle klika na pravi email link ne radi ni za stvarnog korisnika. Treba popraviti: inicijalizovati browser Supabase klijent na /reset-password/update da pročita sesiju iz hash-a.',
+  });
+
+  const email = `qa-auth-12-${Date.now()}@brewtracker.com`;
+  const userId = await createTestUser({
+    email,
+    password: 'OldPass123!',
+    fullName: 'QA AUTH-12 Test Manager',
+    role: 'manager',
+    isActive: true,
+  });
+
+  try {
+    const actionLink = await generateRecoveryActionLink(
+      email,
+      `${BASE_URL}/auth/callback?next=/reset-password/update`,
+    );
+    await page.goto(actionLink);
+    await expect(page).toHaveURL(/\/reset-password\/update/);
+
+    await page.locator('input[name="password"]').fill('NewValidPass123');
+    await page.locator('input[name="confirmPassword"]').fill('NewValidPass123');
+    await page.getByRole('button', { name: 'Update password' }).click();
+
+    await expect(page).toHaveURL(/\/login/);
+
+    // Nova lozinka stvarno radi za sledeći login (i korisnik je odjavljen, ne i dalje ulogovan).
+    const login = new LoginPage(page);
+    await login.login(email, 'NewValidPass123');
+    await login.expectLoggedInOnDashboard();
+  } finally {
+    await deleteTestUser(userId);
+  }
+});
