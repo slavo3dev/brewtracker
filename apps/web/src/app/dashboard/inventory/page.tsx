@@ -6,20 +6,20 @@ import {
 } from "@/lib/inventory/inventory-service";
 
 import { InventoryManagement } from "./inventory-management";
+import { getManagedInventoryProducts } from
+  "@/lib/inventory/inventory-product-management-service";
 
 export default async function InventoryPage() {
   await requireAdmin();
 
   const [
-    { products, locations },
+    { locations },
+    products,
     initialMovements,
   ] = await Promise.all([
     getInventoryAdminData(),
-
-    getInventoryMovements({
-      page: 1,
-      pageSize: 10,
-    }),
+    getManagedInventoryProducts(),
+    getInventoryMovements({ page: 1, pageSize: 10 }),
   ]);
 
   return (

@@ -13,6 +13,7 @@ type ClientProductQueryRow = {
   par_level: number | string | null;
   product: {
     id: string;
+    is_active: boolean;
     sku: string | null;
     name: string;
     category: ClientInventoryProduct["category"];
@@ -42,6 +43,7 @@ export type ClientReserveQuantityInput = {
   productId: string;
   issueQuantity: number;
   looseQuantity: number;
+  expectedPackaging: ClientInventoryProduct["packaging"];
 };
 
 export type ClientReservePreviousBalance = {
@@ -144,6 +146,7 @@ export async function loadClientInventoryProducts(
       par_level,
       product:inventory_products!client_inventory_products_product_id_fkey (
         id,
+        is_active,
         sku,
         name,
         category,
@@ -178,7 +181,7 @@ export async function loadClientInventoryProducts(
   const rows = (data ?? []) as ClientProductQueryRow[];
 
   const products = rows.flatMap((row) => {
-    if (!row.product) {
+    if (!row.product || !row.product.is_active) {
       return [];
     }
 
@@ -279,7 +282,7 @@ export async function saveClientReserveBefore(
   }
 
   const { data, error } = await supabase.rpc(
-    "save_client_reserve_before_service",
+    "save_client_reserve_before_service_v2",
     {
       p_source_visit_id: input.sourceVisitId,
 
@@ -293,10 +296,17 @@ export async function saveClientReserveBefore(
 
       p_items: input.quantities.map((quantity) => ({
         product_id: quantity.productId,
-
         issue_quantity: quantity.issueQuantity,
-
         loose_quantity: quantity.looseQuantity,
+
+        expected_packaging: {
+          base_unit: quantity.expectedPackaging.baseUnit,
+          issue_unit: quantity.expectedPackaging.issueUnit,
+          units_per_issue_unit: quantity.expectedPackaging.unitsPerIssueUnit,
+          allows_loose_units: quantity.expectedPackaging.allowsLooseUnits,
+          allows_partial_base_unit:
+            quantity.expectedPackaging.allowsPartialBaseUnit,
+        },
       })),
     },
   );

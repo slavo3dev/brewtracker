@@ -1,15 +1,21 @@
 {
   "expo": {
-    "name": "BrewTracker",
+    "name": "BrewTracker Beta",
     "slug": "brewtracker",
     "version": "1.0.1",
     "orientation": "portrait",
     "ios": {
+      "bundleIdentifier": "com.brewtracker.beta",
+      "buildNumber": "1",
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "BrewTracker uses your location for clock-in, service visits, and live route tracking.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "BrewTracker uses your location while you are clocked in so dispatch can see your current route position.",
-        "UIBackgroundModes": ["location"]
+        "UIBackgroundModes": [
+          "location",
+          "location"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -18,7 +24,12 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
+        "FOREGROUND_SERVICE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "plugins": [
@@ -32,6 +43,12 @@
           "isAndroidForegroundServiceEnabled": true
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b496cbfd-02de-4a8a-9887-eb5a0d68b4cd"
+      }
+    },
+    "owner": "zikasd"
   }
 }

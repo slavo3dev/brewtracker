@@ -1,7 +1,8 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
 export type UpdatePasswordResult = {
   error: string | null;
@@ -22,17 +23,59 @@ export async function updatePassword(
     return { error: "Passwords do not match." };
   }
 
-  const supabase = await createClient();
+  const cookieStore = await cookies();
+  const tokenHash = cookieStore.get("password-recovery-token")?.value;
 
-  const { error } = await supabase.auth.updateUser({
+  if (!tokenHash) {
+    return {
+      error: "Open a fresh password setup or reset link from your email.",
+    };
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !anonKey) {
+    return { error: "Password setup is unavailable. Contact your manager." };
+  }
+
+  // Isolated client: never reads the browser's admin session.
+  const recoverySupabase = createClient(supabaseUrl, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+
+  const { data: recovery, error: recoveryError } =
+    await recoverySupabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: "recovery",
+    });
+
+  cookieStore.delete("password-recovery-token");
+
+  if (recoveryError || !recovery.user || !recovery.session) {
+    return {
+      error: "This link is invalid or expired. Request a fresh reset link.",
+    };
+  }
+
+  // This client now holds only the session returned by verification.
+  const { error: updateError } = await recoverySupabase.auth.updateUser({
     password,
   });
 
-  if (error) {
-    return { error: "Unable to update password. Try the reset link again." };
+  // End the temporary recovery session, preserving other sessions.
+  await recoverySupabase.auth.signOut({ scope: "local" });
+
+  if (updateError) {
+    return {
+      error:
+        "Password could not be updated. Request a fresh link and try again.",
+    };
   }
 
-  await supabase.auth.signOut();
-
-  redirect("/login");
+  redirect("/reset-password/success");
 }

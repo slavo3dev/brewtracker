@@ -19,6 +19,12 @@ export async function signInWithEmailAndPassword({
   });
 
   if (error) {
+    console.error("Supabase login failed", {
+      code: error.code,
+      status: error.status,
+      message: error.message,
+    });
+
     throw error;
   }
 }

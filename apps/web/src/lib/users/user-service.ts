@@ -100,7 +100,7 @@ export async function sendAppUserPasswordReset(email: string, origin: string) {
   const adminSupabase = createAdminClient();
 
   const { error } = await adminSupabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?next=/reset-password/update`,
+    redirectTo: `${origin}/auth/recovery`,
   });
 
   if (error) {
