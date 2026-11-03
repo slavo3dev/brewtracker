@@ -2,6 +2,7 @@ import { decode } from "base64-arraybuffer";
 import * as FileSystem from "expo-file-system/legacy";
 import { prepareSelfie } from "./prepare-selfie";
 import { supabase } from "../../lib/supabase";
+import { getOpenTimeEntry } from "./time-clock.service";
 
 const SELFIE_BUCKET = "time-entry-selfies";
 
@@ -200,6 +201,15 @@ export async function uploadClockInSelfie({
   } catch (error) {
     await removeUploadedFile(storagePath);
     throw error;
+  }
+
+  try {
+    await getOpenTimeEntry();
+  } catch (error) {
+    console.warn(
+      "Selfie saved, but the cached shift could not be refreshed:",
+      error,
+    );
   }
 
   return {

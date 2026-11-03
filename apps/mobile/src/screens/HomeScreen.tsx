@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -13,10 +13,8 @@ import { useAuth } from "../features/auth/AuthProvider";
 import TodayRouteCard from "../features/routes/TodayRouteCard";
 import type { TodayRouteStop } from "../features/routes/route.types";
 import { useTodayRoute } from "../features/routes/useTodayRoute";
-import {
-  clockOut,
-  getOpenTimeEntry,
-} from "../features/time-clock/time-clock.service";
+import { clockOut } from "../features/time-clock/time-clock.service";
+import { useOpenShift } from "../hooks/useOpenShift";
 import {
   hasCompletedClockInSelfie,
   requiresClockInSelfie,
@@ -51,10 +49,18 @@ export default function HomeScreen({
   refreshKey,
   onStopPress,
 }: Props) {
-  const { profile, signOut } = useAuth();
+  const { profile, session, signOut } = useAuth();
 
-  const [openEntry, setOpenEntry] = useState<TimeEntry | null>(null);
-  const [loadingEntry, setLoadingEntry] = useState(true);
+  const {
+    openEntry,
+    loadingEntry,
+    shiftKnown,
+    shiftStale,
+    shiftError,
+    refresh: loadOpenEntry,
+    markClockedOut,
+  } = useOpenShift(session?.user.id ?? null, refreshKey);
+
   const [clockingOut, setClockingOut] = useState(false);
   const [timeClockError, setTimeClockError] = useState<string | null>(null);
 
@@ -69,31 +75,6 @@ export default function HomeScreen({
     refresh: refreshRoute,
   } = useTodayRoute(refreshKey);
 
-  const loadOpenEntry = useCallback(async (): Promise<void> => {
-    setLoadingEntry(true);
-    setTimeClockError(null);
-
-    try {
-      const entry = await getOpenTimeEntry();
-      setOpenEntry(entry);
-    } catch (error) {
-      if (isNetworkError(error)) {
-        return;
-      }
-
-      setTimeClockError(
-        error instanceof Error
-          ? error.message
-          : "Unable to load your current shift.",
-      );
-    } finally {
-      setLoadingEntry(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadOpenEntry();
-  }, [loadOpenEntry, refreshKey]);
 
   const requiresSelfie = openEntry !== null && requiresClockInSelfie(openEntry);
 
@@ -110,6 +91,9 @@ export default function HomeScreen({
 
     try {
       await clockOut(openEntry.id);
+
+      markClockedOut();
+
       await stopLocationTracking();
       await loadOpenEntry();
       await refreshRoute();
@@ -156,6 +140,18 @@ export default function HomeScreen({
             <Text style={styles.logout}>Log out</Text>
           </Pressable>
         </View>
+
+        {shiftError ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{shiftError}</Text>
+          </View>
+        ) : shiftStale && shiftKnown ? (
+          <View style={styles.routeAccessNotice}>
+            <Text style={styles.routeAccessNoticeText}>
+              Showing your last saved shift state while checking for updates.
+            </Text>
+          </View>
+        ) : null}
 
         {timeClockError ? (
           <View style={styles.errorCard}>
@@ -228,6 +224,13 @@ export default function HomeScreen({
               </Pressable>
             </View>
           )
+        ) : !shiftKnown || shiftStale ? (
+          <View style={styles.loadingCard}>
+            <Text style={styles.loadingText}>
+              Connect to the internet to confirm whether you have an open shift.
+              The app will retry automatically.
+            </Text>
+          </View>
         ) : (
           <Pressable
             style={({ pressed }) => [
@@ -244,7 +247,10 @@ export default function HomeScreen({
           </Pressable>
         )}
 
-        {!loadingEntry && !canAccessRouteStops ? (
+        {!loadingEntry &&
+        shiftKnown &&
+        !shiftStale &&
+        !canAccessRouteStops ? (
           <View style={styles.routeAccessNotice}>
             <Text style={styles.routeAccessNoticeTitle}>Route preview</Text>
 
