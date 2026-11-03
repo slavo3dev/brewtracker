@@ -208,6 +208,11 @@ test('WEB-INVP-01: "+ Add Product" forma kreira novi proizvod', async ({ page })
   await page.getByLabel('OCS').check();
   await page.getByRole('button', { name: 'Create Product' }).click();
 
+  // Deljeni katalog je narastao dovoljno (50+ proizvoda) da nov proizvod ne mora pasti
+  // na prvu stranicu (10 po strani) — sačekaj da se forma zatvori (handleProductSaved
+  // već resetovao search na "") pre upisa, pa pretraži po imenu da izbegnemo tu zavisnost.
+  await expect(page.getByLabel('Product name *')).toHaveCount(0);
+  await page.getByPlaceholder('Search products').fill(name);
   await expect(page.getByText(name)).toBeVisible();
 });
 
