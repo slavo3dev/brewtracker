@@ -250,6 +250,11 @@ test('WEB-INVP-03: "Edit" dugme na kartici otvara formu sa postojećim podacima 
   await page.getByLabel('OCS').check();
   await page.getByRole('button', { name: 'Create Product' }).click();
 
+  // handleProductSaved() u app kodu BRIŠE search polje na "" posle SVAKOG uspešnog
+  // create/edit (i zatvara formu) — moramo sačekati da se forma stvarno zatvori (taj
+  // reset se već desio) PRE nego što upišemo search, inače app sam obriše ono što upišemo.
+  await expect(page.getByLabel('Product name *')).toHaveCount(0);
+
   // Deljeni katalog je dovoljno veliki da nov proizvod (alfabetski posle mnogih
   // postojećih "C.../I.../M..." imena) ne mora pasti na prvu stranicu (10 po strani) —
   // pretraga po imenu izbegava tu zavisnost od paginacije.
