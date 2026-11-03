@@ -16,7 +16,7 @@ const QA_DRIVER_ID = process.env.QA_DRIVER_ID!;
 // "prvi" red), pa rade jedan za drugim.
 test.describe.configure({ mode: 'serial' });
 
-test('WEB-RT-02: Kreiranje jednokratne rute sa svim obaveznim poljima', async ({ page }) => {
+test('WEB-RT-02: Creating a one-off route with all required fields', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -31,7 +31,7 @@ test('WEB-RT-02: Kreiranje jednokratne rute sa svim obaveznim poljima', async ({
   await routes.expectRouteCountIncreasedBy(before, 1);
 });
 
-test("WEB-RT-01: Metric kartice odražavaju tačan broj ruta za danas", async ({ page }) => {
+test('WEB-RT-01: Metric cards reflect the correct route count for today', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -53,7 +53,7 @@ test("WEB-RT-01: Metric kartice odražavaju tačan broj ruta za danas", async ({
   expect(scheduled + completed).toBeLessThanOrEqual(routesToday);
 });
 
-test('WEB-RT-03: Kreiranje rute je blokirano bez vozača/magacina', async ({ page }) => {
+test('WEB-RT-03: Creating a route is blocked without a driver/warehouse', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -69,7 +69,7 @@ test('WEB-RT-03: Kreiranje rute je blokirano bez vozača/magacina', async ({ pag
   await expect(page.getByText(`of ${before} routes`)).toBeVisible();
 });
 
-test('WEB-RT-05: Pretraga filtrira rute po vozaču/magacinu/napomenama', async ({ page }) => {
+test('WEB-RT-05: Search filters routes by driver/warehouse/notes', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -82,7 +82,7 @@ test('WEB-RT-05: Pretraga filtrira rute po vozaču/magacinu/napomenama', async (
   await routes.expectAllVisibleCardsContain('Milano');
 });
 
-test('WEB-RT-07: "Reset to today" link se pojavljuje kad se datum promeni', async ({ page }) => {
+test('WEB-RT-07: "Reset to today" link appears when the date changes', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -98,7 +98,7 @@ test('WEB-RT-07: "Reset to today" link se pojavljuje kad se datum promeni', asyn
   await expect(page.locator('input[type="date"]')).toHaveValue(today);
 });
 
-test('WEB-RT-08: Prazan rezultat filtriranja prikazuje ispravno prazno stanje', async ({ page }) => {
+test('WEB-RT-08: Empty filter result shows the correct empty state', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -111,7 +111,7 @@ test('WEB-RT-08: Prazan rezultat filtriranja prikazuje ispravno prazno stanje', 
   await routes.expectEmptyState();
 });
 
-test('WEB-RT-09: Paginacija prikazuje 10 ruta po strani sa Prev/Next', async ({ page }) => {
+test('WEB-RT-09: Pagination shows 10 routes per page with Prev/Next', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -129,7 +129,7 @@ test('WEB-RT-09: Paginacija prikazuje 10 ruta po strani sa Prev/Next', async ({ 
   expect(label).toMatch(/Page 2 of \d+/);
 });
 
-test('WEB-RT-10: Recurring vs One-off bedž se ispravno prikazuje', async ({ page }) => {
+test('WEB-RT-10: Recurring vs one-off badge displays correctly', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -164,7 +164,7 @@ test('WEB-RT-10: Recurring vs One-off bedž se ispravno prikazuje', async ({ pag
   }
 });
 
-test('WEB-RT-11: Map preview zahteva 2+ geokodirane stanice', async ({ page }) => {
+test('WEB-RT-11: Map preview requires 2+ geocoded stops', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -184,7 +184,7 @@ test('WEB-RT-11: Map preview zahteva 2+ geokodirane stanice', async ({ page }) =
   await routes.expectMapPreviewMissingMessage();
 });
 
-test('WEB-RT-14: Uklanjanje stanice zahteva potvrdu dijaloga', async ({ page }) => {
+test('WEB-RT-14: Removing a stop requires dialog confirmation', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -217,7 +217,7 @@ test('WEB-RT-14: Uklanjanje stanice zahteva potvrdu dijaloga', async ({ page }) 
   expect(await routes.getStopCountInExpandedCard()).toBe(0);
 });
 
-test('WEB-RT-15: Otkazivanje zakazane rute', async ({ page }) => {
+test('WEB-RT-15: Cancelling a scheduled route', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -240,7 +240,7 @@ test('WEB-RT-15: Otkazivanje zakazane rute', async ({ page }) => {
   await expect(routes.expandedRouteCard().getByText('cancelled', { exact: true })).toBeVisible();
 });
 
-test('WEB-RT-17: Ruta u toku ili završena ne može da se otkaže', async ({ page }) => {
+test('WEB-RT-17: A route in progress or completed cannot be cancelled', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -258,7 +258,7 @@ test('WEB-RT-17: Ruta u toku ili završena ne može da se otkaže', async ({ pag
   await routes.expectNoCancelButtonOnFirstRoute();
 });
 
-test('WEB-RT-18: Zakazana ruta sa započetom stanicom je odbijena od servera', async ({ page }) => {
+test('WEB-RT-18: A scheduled route with a started stop is rejected by the server', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -299,7 +299,7 @@ test('WEB-RT-18: Zakazana ruta sa započetom stanicom je odbijena od servera', a
   );
 });
 
-test('WEB-RT-19: Otkazana ruta ne dozvoljava upravljanje stanicama', async ({ page }) => {
+test('WEB-RT-19: A cancelled route does not allow managing stops', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -327,7 +327,7 @@ test('WEB-RT-19: Otkazana ruta ne dozvoljava upravljanje stanicama', async ({ pa
   await routes.expectStopControlsDisabledFor('Italija');
 });
 
-test('WEB-RT-20: Ruta u toku ne dozvoljava upravljanje stanicama', async ({ page }) => {
+test('WEB-RT-20: A route in progress does not allow managing stops', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -360,7 +360,7 @@ test('WEB-RT-20: Ruta u toku ne dozvoljava upravljanje stanicama', async ({ page
   }
 });
 
-test('WEB-RT-21: Ažuriranje redosleda stanice', async ({ page }) => {
+test('WEB-RT-21: Updating stop order', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -391,7 +391,7 @@ test('WEB-RT-21: Ažuriranje redosleda stanice', async ({ page }) => {
   expect(await routes.getStopClientNamesInOrder()).toEqual(['Milano Coffee', 'Italija']);
 });
 
-test('WEB-RT-04: "Create one-off route" toggle dugme menja oznaku i sakriva formu', async ({ page }) => {
+test('WEB-RT-04: "Create one-off route" toggle button changes label and hides the form', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -411,7 +411,7 @@ test('WEB-RT-04: "Create one-off route" toggle dugme menja oznaku i sakriva form
   await expect(page.locator('select[name="driverId"]')).toHaveCount(0);
 });
 
-test('WEB-RT-06: Opcije status filtera odražavaju stvarne statuse u podacima', async ({ page }) => {
+test('WEB-RT-06: Status filter options reflect the real statuses in the data', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -431,7 +431,7 @@ test('WEB-RT-06: Opcije status filtera odražavaju stvarne statuse u podacima', 
   expect(options).toEqual([...options].sort());
 });
 
-test('WEB-RT-12: "Open in Google Maps" otvara ispravan directions URL', async ({ page }) => {
+test('WEB-RT-12: "Open in Google Maps" generates the correct directions URL', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -463,7 +463,7 @@ test('WEB-RT-12: "Open in Google Maps" otvara ispravan directions URL', async ({
   expect(href).toMatch(/origin=[\d.]+%2C[\d.]+|origin=[\d.]+,[\d.]+/);
 });
 
-test('WEB-RT-16: Odbacivanje cancel dijaloga ne menja ništa', async ({ page }) => {
+test('WEB-RT-16: Dismissing the cancel dialog changes nothing', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);

@@ -22,14 +22,14 @@ const TEMPLATE_NAME = 'QA Conflict E';
 // potvrđeno izolovanim ponavljanjem). Isti obrazac kao web-fleet/web-recon/web-routes/web-survey.
 test.describe.configure({ mode: 'serial' });
 
-test('WEB-TPL-04: Prazno stanje kad nema nijednog template-a', async () => {
+test('WEB-TPL-04: Empty state when there are no templates', async () => {
   test.skip(
     true,
-    'PRESKOČENO (bezbednosni razlog, ne propust): da bi se ovo testiralo, trebalo bi obrisati SVIH 180+ postojećih route template-a iz deljene baze, uključujući i aktivne koje koriste drugi test fajlovi. Potrebna izolovana test baza da bi se ovo bezbedno automatizovalo.',
+    'Skipped (safety, not a gap): would require deleting all 180+ existing route templates in the shared database, including active ones other test files rely on. Needs an isolated test database.',
   );
 });
 
-test('WEB-TPL-07: Template se uspešno aktivira kada je validan', async ({ page }) => {
+test('WEB-TPL-07: Template activates successfully when valid', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -46,7 +46,7 @@ test('WEB-TPL-07: Template se uspešno aktivira kada je validan', async ({ page 
   await templates.expectActive(TEMPLATE_NAME);
 });
 
-test('WEB-STOPEX-01: Dodavanje one-off stop izuzetka za konkretan datum', async ({ page }) => {
+test('WEB-STOPEX-01: Adding a one-off stop exception for a specific date', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -62,7 +62,7 @@ test('WEB-STOPEX-01: Dodavanje one-off stop izuzetka za konkretan datum', async 
   await templates.expectStopExceptionListed(TEMPLATE_NAME, 'Dec 15, 2026');
 });
 
-test('WEB-STOPEX-02: Uklanjanje recurring stanice za konkretan datum', async ({ page }) => {
+test('WEB-STOPEX-02: Removing a recurring stop for a specific date', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -78,7 +78,7 @@ test('WEB-STOPEX-02: Uklanjanje recurring stanice za konkretan datum', async ({ 
   await templates.expectRecurringStopRemovedListed(TEMPLATE_NAME, 'Dec 22, 2026');
 });
 
-test('WEB-STOPEX-03: Remove-recurring-stop mod je onemogućen kad template nema stanica', async ({ page }) => {
+test('WEB-STOPEX-03: Remove-recurring-stop mode is disabled when the template has no stops', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -93,7 +93,7 @@ test('WEB-STOPEX-03: Remove-recurring-stop mod je onemogućen kad template nema 
   await templates.expectRemoveRecurringStopDisabledEmpty(name);
 });
 
-test('WEB-TPLEX-01: "Skip route" izuzetak sprečava generisanje za taj datum', async ({ page }) => {
+test('WEB-TPLEX-01: "Skip route" exception prevents generation for that date', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -105,7 +105,7 @@ test('WEB-TPLEX-01: "Skip route" izuzetak sprečava generisanje za taj datum', a
   await templates.expectExceptionRowVisible(TEMPLATE_NAME, 'Jan 10, 2027', 'Route skipped');
 });
 
-test('WEB-TPLEX-02: "Replace driver" izuzetak zahteva zamenskog vozača', async ({ page }) => {
+test('WEB-TPLEX-02: "Replace driver" exception requires a replacement driver', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -121,7 +121,7 @@ test('WEB-TPLEX-02: "Replace driver" izuzetak zahteva zamenskog vozača', async 
   await expect(templates.exceptionRow(TEMPLATE_NAME, 'Jan 24, 2027', 'Driver override')).toHaveCount(0);
 });
 
-test('WEB-TPLEX-03: "Replace driver" izuzetak se ispravno primenjuje za taj datum', async ({ page }) => {
+test('WEB-TPLEX-03: "Replace driver" exception correctly applies for that date', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -133,7 +133,7 @@ test('WEB-TPLEX-03: "Replace driver" izuzetak se ispravno primenjuje za taj datu
   await templates.expectExceptionRowVisible(TEMPLATE_NAME, 'Jan 17, 2027', 'Driver override');
 });
 
-test('WEB-TPL-01: Novi template se uvek kreira kao neaktivan', async ({ page }) => {
+test('WEB-TPL-01: A new template is always created inactive', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -146,7 +146,7 @@ test('WEB-TPL-01: Novi template se uvek kreira kao neaktivan', async ({ page }) 
   await templates.expectInactive(name);
 });
 
-test('WEB-TPL-05: Aktivacija je blokirana bez izabranog radnog dana', async ({ page }) => {
+test('WEB-TPL-05: Activation is blocked with no service day selected', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -163,7 +163,7 @@ test('WEB-TPL-05: Aktivacija je blokirana bez izabranog radnog dana', async ({ p
   );
 });
 
-test('WEB-TPL-06: Aktivacija je blokirana bez ijedne stanice', async ({ page }) => {
+test('WEB-TPL-06: Activation is blocked with no stops', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -180,7 +180,7 @@ test('WEB-TPL-06: Aktivacija je blokirana bez ijedne stanice', async ({ page }) 
   );
 });
 
-test('WEB-TPL-09: Uklanjanje poslednje stanice aktivnog template-a je blokirano', async ({ page }) => {
+test('WEB-TPL-09: Removing the last stop of an active template is blocked', async ({ page }) => {
   const name = `QA TPL-09 ${Date.now()}`;
 
   try {
@@ -208,7 +208,7 @@ test('WEB-TPL-09: Uklanjanje poslednje stanice aktivnog template-a je blokirano'
   }
 });
 
-test('WEB-TPL-11: Brisanje neaktivnog template-a', async ({ page }) => {
+test('WEB-TPL-11: Deleting an inactive template', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -223,7 +223,7 @@ test('WEB-TPL-11: Brisanje neaktivnog template-a', async ({ page }) => {
   await templates.expectTemplateNotListed(name);
 });
 
-test('WEB-TPL-12: Aktivan template ne može da se obriše', async ({ page }) => {
+test('WEB-TPL-12: An active template cannot be deleted', async ({ page }) => {
   const name = `QA TPL-12 ${Date.now()}`;
 
   try {
@@ -245,7 +245,7 @@ test('WEB-TPL-12: Aktivan template ne može da se obriše', async ({ page }) => 
   }
 });
 
-test('WEB-TPL-13: Aktivacija je blokirana kada je ista mašina već zakazana tom vozaču tog dana', async ({ page }) => {
+test('WEB-TPL-13: Activation is blocked when the same machine is already scheduled for that driver that day', async ({ page }) => {
   const nameA = `QA TPL-13-A ${Date.now()}`;
   const nameB = `QA TPL-13-B ${Date.now()}`;
 
@@ -279,7 +279,7 @@ test('WEB-TPL-13: Aktivacija je blokirana kada je ista mašina već zakazana tom
   }
 });
 
-test('WEB-TPL-16: Dodavanje konfliktne stanice na aktivan template je blokirano', async ({ page }) => {
+test('WEB-TPL-16: Adding a conflicting stop to an active template is blocked', async ({ page }) => {
   const nameA = `QA TPL-16-A ${Date.now()}`;
   const nameB = `QA TPL-16-B ${Date.now()}`;
 
@@ -312,7 +312,7 @@ test('WEB-TPL-16: Dodavanje konfliktne stanice na aktivan template je blokirano'
   }
 });
 
-test('WEB-TPL-02: Template metrike (Templates/Active/Inactive) odgovaraju stvarnom stanju', async ({ page }) => {
+test('WEB-TPL-02: Template metrics (Templates/Active/Inactive) match the real state', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -331,7 +331,7 @@ test('WEB-TPL-02: Template metrike (Templates/Active/Inactive) odgovaraju stvarn
   expect(inactiveBadgeCount - 1).toBe(inactive);
 });
 
-test('WEB-TPL-08: Aktivan template se slobodno deaktivira', async ({ page }) => {
+test('WEB-TPL-08: An active template can be freely deactivated', async ({ page }) => {
   const name = `QA TPL-08 ${Date.now()}`;
 
   try {
@@ -355,7 +355,7 @@ test('WEB-TPL-08: Aktivan template se slobodno deaktivira', async ({ page }) => 
   }
 });
 
-test('WEB-TPL-10: Uklanjanje stanice koja nije poslednja (ili bilo koje na neaktivnom) uspeva', async ({ page }) => {
+test('WEB-TPL-10: Removing a stop that is not the last (or any stop on an inactive template) succeeds', async ({ page }) => {
   const name = `QA TPL-10 ${Date.now()}`;
 
   try {
@@ -377,7 +377,7 @@ test('WEB-TPL-10: Uklanjanje stanice koja nije poslednja (ili bilo koje na neakt
   }
 });
 
-test('WEB-TPL-14: Provera konflikta pada nazad na klijenta kad stanice nemaju mašinu', async ({ page }) => {
+test('WEB-TPL-14: Conflict check falls back to the client when stops have no machine', async ({ page }) => {
   const nameA = `QA TPL-14-A ${Date.now()}`;
   const nameB = `QA TPL-14-B ${Date.now()}`;
 
@@ -408,7 +408,7 @@ test('WEB-TPL-14: Provera konflikta pada nazad na klijenta kad stanice nemaju ma
   }
 });
 
-test('WEB-TPL-15: Nema konflikta za različite dane (bez preklapanja)', async ({ page }) => {
+test('WEB-TPL-15: No conflict for different days (no overlap)', async ({ page }) => {
   const nameA = `QA TPL-15-A ${Date.now()}`;
   const nameB = `QA TPL-15-B ${Date.now()}`;
 
@@ -434,7 +434,7 @@ test('WEB-TPL-15: Nema konflikta za različite dane (bez preklapanja)', async ({
   }
 });
 
-test('WEB-TPL-17: Izmena aktivnog template-a u konflikt je blokirana', async ({ page }) => {
+test('WEB-TPL-17: Editing an active template into a conflict is blocked', async ({ page }) => {
   const nameA = `QA TPL-17-A ${Date.now()}`;
   const nameB = `QA TPL-17-B ${Date.now()}`;
 
@@ -468,7 +468,7 @@ test('WEB-TPL-17: Izmena aktivnog template-a u konflikt je blokirana', async ({ 
   }
 });
 
-test('WEB-TPL-18: Validacija stanice — kraj pre početka je odbijen, mašine ograničene na klijenta', async ({ page }) => {
+test('WEB-TPL-18: Stop validation — end before start is rejected, machines are limited to the client', async ({ page }) => {
   const name = `QA TPL-18 ${Date.now()}`;
 
   try {
@@ -499,7 +499,7 @@ test('WEB-TPL-18: Validacija stanice — kraj pre početka je odbijen, mašine o
   }
 });
 
-test('WEB-TPL-19: Aktivan template mora zadržati bar jedan radni dan', async ({ page }) => {
+test('WEB-TPL-19: An active template must keep at least one service day', async ({ page }) => {
   const name = `QA TPL-19 ${Date.now()}`;
 
   try {
@@ -523,7 +523,7 @@ test('WEB-TPL-19: Aktivan template mora zadržati bar jedan radni dan', async ({
   }
 });
 
-test('WEB-TPL-20: Dnevna generacija preskače okurenciju koja je u konfliktu sa postojećom rutom', async ({ page }) => {
+test('WEB-TPL-20: Daily generation skips an occurrence that conflicts with an existing route', async ({ page }) => {
   const name = `QA TPL-20 ${Date.now()}`;
   const todayIso = new Date().toISOString().slice(0, 10);
   const weekdayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -576,7 +576,7 @@ test('WEB-TPL-20: Dnevna generacija preskače okurenciju koja je u konfliktu sa 
   }
 });
 
-test('WEB-TPLEX-04: Uklanjanje postojećeg izuzetka', async ({ page }) => {
+test('WEB-TPLEX-04: Removing an existing exception', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -591,7 +591,7 @@ test('WEB-TPLEX-04: Uklanjanje postojećeg izuzetka', async ({ page }) => {
   await templates.expectExceptionRowNotVisible(TEMPLATE_NAME, 'Feb 5, 2027', 'Route skipped');
 });
 
-test('WEB-TPL-03: Weekday chipovi se nezavisno toggluju u create formi', async ({ page }) => {
+test('WEB-TPL-03: Weekday chips toggle independently in the create form', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -617,7 +617,7 @@ test('WEB-TPL-03: Weekday chipovi se nezavisno toggluju u create formi', async (
   expect(await wednesday.isChecked()).toBe(true);
 });
 
-test('WEB-STOPEX-04: Stop exception redovi nemaju Remove kontrolu (dokumentovan gap)', async ({ page }) => {
+test('WEB-STOPEX-04: Stop exception rows have no Remove control (documented gap)', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);

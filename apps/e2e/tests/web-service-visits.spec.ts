@@ -12,14 +12,14 @@ const DRIVER_NAME = 'QA Driver Fixture';
 // i polomilo lociranje "tačno jedne" kartice.
 test.describe.configure({ mode: 'serial' });
 
-test('WEB-SV-05: Prazno stanje kad nema nijedne service posete', async () => {
+test('WEB-SV-05: Empty state when there are no service visits', async () => {
   test.skip(
     true,
-    'PRESKOČENO (bezbednosni razlog, ne propust): da bi se ovo testiralo, trebalo bi obrisati SVIH 100+ postojećih stanica sa zabeleženim dolaskom iz cele deljene baze (ne samo za jednog vozača/klijenta) — stvarna/simulirana aktivnost drugih korisnika projekta. Potrebna izolovana test baza da bi se ovo bezbedno automatizovalo.',
+    'Skipped (safety, not a gap): testing this would require deleting all 100+ existing service-visit records (arrived_at set) across the whole shared database, not just for one driver/client — this is real/simulated activity from other project users. Needs an isolated test database to automate safely.',
   );
 });
 
-test('WEB-SV-01: Lista prikazuje samo stanice sa zabeleženim dolaskom', async ({ page }) => {
+test('WEB-SV-01: List shows only stops with a recorded arrival', async ({ page }) => {
   const arrivedRoute = await createServiceVisitStop({
     driverId: QA_DRIVER_ID,
     arrivedAt: new Date(),
@@ -42,7 +42,7 @@ test('WEB-SV-01: Lista prikazuje samo stanice sa zabeleženim dolaskom', async (
   }
 });
 
-test('WEB-SV-02: "Time on location" tačno računa trajanje za završenu posetu', async ({ page }) => {
+test('WEB-SV-02: "Time on location" correctly computes duration for a completed visit', async ({ page }) => {
   const arrivedAt = new Date(Date.now() - (1 * 3600 + 5 * 60 + 20) * 1000); // -1h 5m 20s
   const completedAt = new Date();
 
@@ -68,7 +68,7 @@ test('WEB-SV-02: "Time on location" tačno računa trajanje za završenu posetu'
   }
 });
 
-test('WEB-SV-03: Poseta u toku prikazuje "In progress" umesto fiksnog trajanja', async ({ page }) => {
+test('WEB-SV-03: A visit in progress shows "In progress" instead of a fixed duration', async ({ page }) => {
   const route = await createServiceVisitStop({
     driverId: QA_DRIVER_ID,
     arrivedAt: new Date(Date.now() - 10 * 60 * 1000),
@@ -91,7 +91,7 @@ test('WEB-SV-03: Poseta u toku prikazuje "In progress" umesto fiksnog trajanja',
   }
 });
 
-test('WEB-SV-04: Metrika (Recent/In Progress/Completed) odgovara listi', async ({ page }) => {
+test('WEB-SV-04: Metrics (Recent/In Progress/Completed) match the list', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -115,7 +115,7 @@ test('WEB-SV-04: Metrika (Recent/In Progress/Completed) odgovara listi', async (
   expect(counts.completed).toBe(completedCards);
 });
 
-test('WEB-SV-06: Lista poseta ne izlaže foto/potpis/drink-count detalje (dokumentovan gap)', async ({ page }) => {
+test('WEB-SV-06: List does not expose photo/signature/drink-count details (documented gap)', async ({ page }) => {
   const route = await createServiceVisitStop({
     driverId: QA_DRIVER_ID,
     arrivedAt: new Date(),
@@ -141,7 +141,7 @@ test('WEB-SV-06: Lista poseta ne izlaže foto/potpis/drink-count detalje (dokume
   }
 });
 
-test('WEB-SV-07: Poseta se ne prikazuje menadžeru ako skladište rute nema podešen region (dokumentovano region-scoping ponašanje)', async ({ page }) => {
+test('WEB-SV-07: A visit is not shown to the manager when the route\'s warehouse has no region set', async ({ page }) => {
   // Regresiona tabela (napomena uz WEB-TT-10) eksplicitno potvrđuje ovo kao OČEKIVANO
   // ponašanje, ne kao defekt: "The other 8 are hidden by region rules because the route's
   // warehouse is outside Italy (...QA Test Warehouse - MOB-CLK-02 with region 'N/A'...)."

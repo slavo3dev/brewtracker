@@ -3,7 +3,7 @@ import { LoginPage } from '../pages/LoginPage';
 import { UsersPage } from '../pages/UsersPage';
 import { createTestUser, deleteTestUser, setUserEmailToNull } from '../helpers/userSeed';
 
-test('WEB-USR-01: Kreiranje korisnika sa svim poljima uspeva i šalje setup email', async ({ page }) => {
+test('WEB-USR-01: Creating a user with all fields succeeds and sends the setup email', async ({ page }) => {
   // Dokumentovan, već potvrđen defekt (regresioni plan, Critical Fail): createUserAction()
   // poziva sendAppUserPasswordReset() ODMAH posle createAppUser(), u ISTOM try bloku — kad taj
   // poziv udari u Supabase rate-limit za reset-password email (uobičajeno u ovom deljenom QA
@@ -12,7 +12,7 @@ test('WEB-USR-01: Kreiranje korisnika sa svim poljima uspeva i šalje setup emai
   test.info().annotations.push({
     type: 'note',
     description:
-      'POZNAT DEFEKT u aplikaciji (Critical): kreiranje korisnika i slanje setup email-a dele isti try blok — kad slanje email-a udari u Supabase rate limit, cela akcija vrati grešku iako je korisnik već kreiran u bazi. NAPOMENA: ovaj test zavisi od TRENUTNOG stanja Supabase email kvote — ako povremeno prođe zeleno, to NE znači da je bug popravljen, samo da kvota tog trenutka nije bila potrošena. Treba popraviti: razdvojiti kreiranje korisnika od slanja email-a u odvojene try blokove.',
+      'Known app defect (Critical): user creation and sending the setup email share the same try block — when the email send hits the Supabase rate limit, the whole action returns an error even though the user was already created in the database. NOTE: this test depends on the CURRENT state of the Supabase email quota — an occasional green pass does NOT mean the bug is fixed, only that the quota was not exhausted at that moment. Fix: split user creation and the email send into separate try blocks.',
   });
 
   const login = new LoginPage(page);
@@ -36,7 +36,7 @@ test('WEB-USR-01: Kreiranje korisnika sa svim poljima uspeva i šalje setup emai
   await users.expectUserCreatedAndEmailSent();
 });
 
-test('WEB-USR-02: Role select u Add user formi defaultuje na Driver', async ({ page }) => {
+test('WEB-USR-02: Role select in the Add user form defaults to Driver', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -48,7 +48,7 @@ test('WEB-USR-02: Role select u Add user formi defaultuje na Driver', async ({ p
   expect(await users.getAddFormRoleDefault()).toBe('driver');
 });
 
-test('WEB-USR-06: Prazno stanje kad kombinacija filtera ne pogađa nikoga', async ({ page }) => {
+test('WEB-USR-06: Empty state when the filter combination matches nobody', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -64,7 +64,7 @@ test('WEB-USR-06: Prazno stanje kad kombinacija filtera ne pogađa nikoga', asyn
   expect(await users.getVisibleUserCount()).toBe(0);
 });
 
-test('WEB-USR-07: Paginacija prikazuje 10 korisnika po strani', async ({ page }) => {
+test('WEB-USR-07: Pagination shows 10 users per page', async ({ page }) => {
   // Test SAM seeduje dovoljno korisnika (umesto da se oslanja na ambijentalni broj u
   // deljenoj bazi) — garantuje bar 2 pune strane bez obzira koliko trenutno ima korisnika.
   const stamp = Date.now();
@@ -102,7 +102,7 @@ test('WEB-USR-07: Paginacija prikazuje 10 korisnika po strani', async ({ page })
   }
 });
 
-test('WEB-USR-11: "Send password reset" je onemogućeno za korisnika bez email-a', async ({ page }) => {
+test('WEB-USR-11: "Send password reset" is disabled for a user with no email', async ({ page }) => {
   const fullName = `QA USR-11 Test User ${Date.now()}`;
   const userId = await createTestUser({
     email: `qa-usr-11-${Date.now()}@brewtracker.com`,
@@ -127,7 +127,7 @@ test('WEB-USR-11: "Send password reset" je onemogućeno za korisnika bez email-a
   }
 });
 
-test('WEB-USR-03: Kreiranje korisnika je blokirano bez punog imena', async ({ page }) => {
+test('WEB-USR-03: Creating a user is blocked without a full name', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -144,7 +144,7 @@ test('WEB-USR-03: Kreiranje korisnika je blokirano bez punog imena', async ({ pa
   await expect(page.getByText('User created and password setup email sent.')).toHaveCount(0);
 });
 
-test('WEB-USR-12: Activate/Deactivate menja is_active uz potvrdu', async ({ page }) => {
+test('WEB-USR-12: Activate/Deactivate changes is_active with confirmation', async ({ page }) => {
   const fullName = `QA USR-12 Test User ${Date.now()}`;
   const email = `qa-usr-12-${Date.now()}@brewtracker.com`;
   const userId = await createTestUser({
@@ -173,7 +173,7 @@ test('WEB-USR-12: Activate/Deactivate menja is_active uz potvrdu', async ({ page
   }
 });
 
-test('WEB-USR-08: Izmena i čuvanje korisničkih podataka se perzistira', async ({ page }) => {
+test('WEB-USR-08: Editing and saving user data persists', async ({ page }) => {
   const email = `qa-usr-08-${Date.now()}@brewtracker.com`;
   const userId = await createTestUser({
     email,
@@ -215,7 +215,7 @@ test('WEB-USR-08: Izmena i čuvanje korisničkih podataka se perzistira', async 
   }
 });
 
-test('WEB-USR-04: Pretraga filtrira po delu broja telefona', async ({ page }) => {
+test('WEB-USR-04: Search filters by part of the phone number', async ({ page }) => {
   const stamp = Date.now();
   const uniquePhone = `+381699${String(stamp).slice(-6)}`;
   const email = `qa-usr-04-${stamp}@brewtracker.com`;
@@ -244,7 +244,7 @@ test('WEB-USR-04: Pretraga filtrira po delu broja telefona', async ({ page }) =>
   }
 });
 
-test('WEB-USR-05: Role/Status/Region filteri se kombinuju (AND)', async ({ page }) => {
+test('WEB-USR-05: Role/Status/Region filters combine with AND', async ({ page }) => {
   const stamp = Date.now();
   const uniqueRegion = `QA-USR-05-Region-${stamp}`;
   const email = `qa-usr-05-${stamp}@brewtracker.com`;
@@ -282,7 +282,7 @@ test('WEB-USR-05: Role/Status/Region filteri se kombinuju (AND)', async ({ page 
   }
 });
 
-test('WEB-USR-09: Puno ime je obavezno pri čuvanju izmena', async ({ page }) => {
+test('WEB-USR-09: Full name is required when saving an edit', async ({ page }) => {
   const email = `qa-usr-09-${Date.now()}@brewtracker.com`;
   const userId = await createTestUser({
     email,
@@ -311,14 +311,14 @@ test('WEB-USR-09: Puno ime je obavezno pri čuvanju izmena', async ({ page }) =>
   }
 });
 
-test('WEB-USR-10: "Send password reset" traži potvrdu i email na nalogu', async ({ page }) => {
+test('WEB-USR-10: "Send password reset" asks for confirmation and requires an email on the account', async ({ page }) => {
   // Napomena: sendAppUserPasswordReset() podleže istom Supabase rate-limitu kao WEB-USR-01/
   // WEB-AUTH-07 na ovom deljenom QA projektu — povremeno može pasti sa generičkom greškom
   // umesto "Password reset email sent." čak i kad je kod ispravan.
   test.info().annotations.push({
     type: 'note',
     description:
-      'NIJE app defekt: ovaj test zavisi od deljene Supabase email kvote na QA projektu — ako padne, pre provere koda prvo proveri da li je kvota trenutno potrošena (isti uzrok kao WEB-USR-01/AUTH-07).',
+      'Not an app defect: this test depends on the shared Supabase email quota on the QA project — if it fails, check whether the quota is currently exhausted before investigating the code (same root cause as WEB-USR-01/AUTH-07).',
   });
 
   const email = `qa-usr-10-${Date.now()}@brewtracker.com`;
@@ -347,7 +347,7 @@ test('WEB-USR-10: "Send password reset" traži potvrdu i email na nalogu', async
   }
 });
 
-test('WEB-USR-14: /dashboard/users je nedostupan non-user-manager nalozima', async ({ page }) => {
+test('WEB-USR-14: /dashboard/users is unreachable for non-user-manager accounts', async ({ page }) => {
   // canManageUsers() dozvoljava svakom aktivnom admin-u (manager/CEO) — u ovom kodu ne
   // postoji "admin bez te dozvole". Driver/tech nalozi se uopšte ne mogu ulogovati na web
   // dashboard (vidi WEB-AUTH-05), pa je requireUserManager()-ov redirect("/dashboard")

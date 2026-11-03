@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 
-test('WEB-RECH-01: History lista potvrđene rekonsilijacije, najnovije prvo', async ({ page }) => {
+test('WEB-RECH-01: History lists confirmed reconciliations, newest first', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -16,7 +16,7 @@ test('WEB-RECH-01: History lista potvrđene rekonsilijacije, najnovije prvo', as
   expect(dates).toEqual(sortedDescending);
 });
 
-test('WEB-RECH-02: Filtriranje po vozaču i opsegu datuma ažurira URL i rezultate', async ({ page }) => {
+test('WEB-RECH-02: Filtering by driver and date range updates the URL and results', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -37,7 +37,7 @@ test('WEB-RECH-02: Filtriranje po vozaču i opsegu datuma ažurira URL i rezulta
   await expect(page).toHaveURL(/\/dashboard\/inventory\/reconciliation\/history$/);
 });
 
-test('WEB-RECH-04: Otvaranje kartice prikazuje pun detalj brojanja', async ({ page }) => {
+test('WEB-RECH-04: Opening a card shows the full count detail', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -59,7 +59,7 @@ test('WEB-RECH-04: Otvaranje kartice prikazuje pun detalj brojanja', async ({ pa
   await expect(firstCard.getByText('Reason').first()).toBeVisible();
 });
 
-test('WEB-RECH-05: Discrepancy bedž i ukupni brojevi odražavaju varijanse', async ({ page }) => {
+test('WEB-RECH-05: Discrepancy badge and summary totals reflect the variances', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -84,7 +84,7 @@ test('WEB-RECH-05: Discrepancy bedž i ukupni brojevi odražavaju varijanse', as
   await expect(page.getByText('No discrepancies').first()).toBeVisible();
 });
 
-test('WEB-RECH-03: Prazno stanje kad filteri ne pogađaju ništa', async ({ page }) => {
+test('WEB-RECH-03: Empty state when filters match nothing', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -103,7 +103,7 @@ test('WEB-RECH-03: Prazno stanje kad filteri ne pogađaju ništa', async ({ page
   ).toBeVisible();
 });
 
-test('WEB-RECH-06: History stranica sprovodi admin auth i navigacioni link radi', async ({ page }) => {
+test('WEB-RECH-06: History page enforces admin auth and the nav link works', async ({ page }) => {
   await page.goto('/dashboard/inventory/reconciliation/history');
   await expect(page).toHaveURL(/\/login/);
 

@@ -11,14 +11,14 @@ import {
 // trku oko istog "jedan otvoren unos po vozaču" reda.
 test.describe.configure({ mode: 'serial' });
 
-test('WEB-TCENT-03: Prazno stanje kad nema nijednog time entry-ja', async () => {
+test('WEB-TCENT-03: Empty state when there are no time entries', async () => {
   test.skip(
     true,
-    'PRESKOČENO (bezbednosni razlog, ne propust): da bi se ovo testiralo, trebalo bi obrisati SVIH 800+ postojećih time entries iz deljene baze — stvarna/simulirana istorija mobilne aktivnosti drugih vozača na projektu. Potrebna izolovana test baza da bi se ovo bezbedno automatizovalo.',
+    'Skipped (safety, not a gap): testing this would require deleting all 800+ existing time entries in the shared database — real/simulated mobile activity history from other drivers on the project. Needs an isolated test database to automate safely.',
   );
 });
 
-test('WEB-TCENT-01: Lista unosa prikazuje sva polja korektno', async ({ page }) => {
+test('WEB-TCENT-01: Entry list shows all fields correctly', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
@@ -37,7 +37,7 @@ test('WEB-TCENT-01: Lista unosa prikazuje sva polja korektno', async ({ page }) 
   await entries.expectFieldsPopulated(card);
 });
 
-test('WEB-TCENT-02: Otvoren unos prikazuje "Still open" za clock out', async ({ page }) => {
+test('WEB-TCENT-02: Open entry shows "Still open" for clock out', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
@@ -56,7 +56,7 @@ test('WEB-TCENT-02: Otvoren unos prikazuje "Still open" za clock out', async ({ 
   expect(clockOut).toBe('Still open');
 });
 
-test('WEB-TCENT-04: Reason kolona prolazi kroz ispravan lanac fallback-a', async ({ page }) => {
+test('WEB-TCENT-04: Reason column goes through the correct fallback chain', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
   const login = new LoginPage(page);
@@ -99,7 +99,7 @@ test('WEB-TCENT-04: Reason kolona prolazi kroz ispravan lanac fallback-a', async
   expect(await entries.getReasonValue(entries.cardForDriverEmail(driverEmail))).toBe('—');
 });
 
-test('WEB-TCENT-05: Entries stranica sprovodi admin auth', async ({ page }) => {
+test('WEB-TCENT-05: Entries page enforces admin auth', async ({ page }) => {
   const entries = new TimeClockEntriesPage(page);
   await entries.goto();
   await expect(page).toHaveURL(/\/login/);
@@ -110,7 +110,7 @@ test('WEB-TCENT-05: Entries stranica sprovodi admin auth', async ({ page }) => {
   await expect(page).toHaveURL(/\/login/);
 });
 
-test('WEB-TCENT-06: Kartica unosa prikazuje clock-in selfie kad postoji', async ({ page }) => {
+test('WEB-TCENT-06: Entry card shows the clock-in selfie when one exists', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
@@ -132,7 +132,7 @@ test('WEB-TCENT-06: Kartica unosa prikazuje clock-in selfie kad postoji', async 
   await entries.expectSelfieImageVisible(card);
 });
 
-test('WEB-TCENT-07: Fallback poruke za selfie na Entries stranici (nema selfie / ne može da se potpiše)', async ({ page }) => {
+test('WEB-TCENT-07: Fallback messages for the selfie on the Entries page (no selfie / cannot be signed)', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
   const login = new LoginPage(page);

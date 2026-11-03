@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 
-test('WEB-RPT-01: Reports stranica prikazuje samo placeholder tekst', async ({ page }) => {
+test('WEB-RPT-01: Reports page shows placeholder text only', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -15,7 +15,7 @@ test('WEB-RPT-01: Reports stranica prikazuje samo placeholder tekst', async ({ p
   ).toBeVisible();
 });
 
-test('WEB-RPT-02: Reports stranica sprovodi admin auth', async ({ page }) => {
+test('WEB-RPT-02: Reports page enforces admin auth', async ({ page }) => {
   await page.goto('/dashboard/reports');
   await expect(page).toHaveURL(/\/login/);
 

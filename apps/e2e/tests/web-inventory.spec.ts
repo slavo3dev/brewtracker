@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 
-test('WEB-INV-01: Movement history lista paginirane rezultate po defaultu', async ({ page }) => {
+test('WEB-INV-01: Movement history shows paginated results by default', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -12,7 +12,7 @@ test('WEB-INV-01: Movement history lista paginirane rezultate po defaultu', asyn
   await expect(page.getByText(/^\d+ movements · Showing 1–10$/)).toBeVisible();
 });
 
-test('WEB-INV-02: Filtriranje po tipu pokreta sužava rezultate', async ({ page }) => {
+test('WEB-INV-02: Filtering by movement type narrows the results', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -30,7 +30,7 @@ test('WEB-INV-02: Filtriranje po tipu pokreta sužava rezultate', async ({ page 
   }
 });
 
-test('WEB-INV-03: Pretraga po visit ID ili unit substring radi', async ({ page }) => {
+test('WEB-INV-03: Search by visit ID or unit substring works', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -45,7 +45,7 @@ test('WEB-INV-03: Pretraga po visit ID ili unit substring radi', async ({ page }
   await expect(page.getByText(/Visit:/).first()).toBeVisible();
 });
 
-test('WEB-INV-05: Greška pri učitavanju prikazuje error banner', async ({ page }) => {
+test('WEB-INV-05: A loading error shows an error banner', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -66,7 +66,7 @@ test('WEB-INV-05: Greška pri učitavanju prikazuje error banner', async ({ page
   await expect(page.locator('.border-red-200')).toBeVisible();
 });
 
-test('WEB-INV-06: Products tab filtrira po search/category/status', async ({ page }) => {
+test('WEB-INV-06: Products tab filters by search/category/status', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -86,7 +86,7 @@ test('WEB-INV-06: Products tab filtrira po search/category/status', async ({ pag
   }
 });
 
-test('WEB-INV-07: Product kartica prikazuje konverziju jedinica i detalje paketa', async ({ page }) => {
+test('WEB-INV-07: Product card shows unit conversion and package details', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -101,7 +101,7 @@ test('WEB-INV-07: Product kartica prikazuje konverziju jedinica i detalje paketa
   await expect(firstCard.getByText('Partial base unit:', { exact: false })).toBeVisible();
 });
 
-test('WEB-INV-08: Locations tab filtrira po tipu lokacije', async ({ page }) => {
+test('WEB-INV-08: Locations tab filters by location type', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -119,12 +119,12 @@ test('WEB-INV-08: Locations tab filtrira po tipu lokacije', async ({ page }) => 
   }
 });
 
-test('WEB-INVM-02: Machines stub stranica i dalje sprovodi admin auth', async ({ page }) => {
+test('WEB-INVM-02: Machines stub page still enforces admin auth', async ({ page }) => {
   await page.goto('/dashboard/inventory/machines');
   await expect(page).toHaveURL(/\/login/);
 });
 
-test('WEB-INV-10: Non-admin ne može da pristupi nijednoj /dashboard/inventory/* stranici', async ({ page }) => {
+test('WEB-INV-10: Non-admin cannot access any /dashboard/inventory/* page', async ({ page }) => {
   const paths = [
     '/dashboard/inventory',
     '/dashboard/inventory/reconciliation',
@@ -137,7 +137,7 @@ test('WEB-INV-10: Non-admin ne može da pristupi nijednoj /dashboard/inventory/*
   }
 });
 
-test('WEB-INV-04: "Clear filters" resetuje sve filtere pokreta', async ({ page }) => {
+test('WEB-INV-04: "Clear filters" resets all movement filters', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -155,7 +155,7 @@ test('WEB-INV-04: "Clear filters" resetuje sve filtere pokreta', async ({ page }
   await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
 });
 
-test('WEB-INV-09: Header akcije vode na ispravne inventory podstranice', async ({ page }) => {
+test('WEB-INV-09: Header actions link to the correct inventory subpages', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -175,7 +175,7 @@ test('WEB-INV-09: Header akcije vode na ispravne inventory podstranice', async (
   }
 });
 
-test('WEB-INVM-01: Machines stranica pokazuje "coming soon" stub bez funkcionalnog UI-ja', async ({ page }) => {
+test('WEB-INVM-01: Machines page shows a "coming soon" stub with no functional UI', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -190,7 +190,7 @@ test('WEB-INVM-01: Machines stranica pokazuje "coming soon" stub bez funkcionaln
 // migracije nisu deployed/primenjeni na ovaj QA projekat — testovi ispod će pasti dok se
 // oba koraka ne završe. Pisano prema izvornom kodu kao priprema za kad bude gotovo.
 
-test('WEB-INVP-01: "+ Add Product" forma kreira novi proizvod', async ({ page }) => {
+test('WEB-INVP-01: "+ Add Product" form creates a new product', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -216,7 +216,7 @@ test('WEB-INVP-01: "+ Add Product" forma kreira novi proizvod', async ({ page })
   await expect(page.getByText(name)).toBeVisible();
 });
 
-test('WEB-INVP-02: Kreiranje proizvoda je blokirano bez izabranog business type-a', async ({ page }) => {
+test('WEB-INVP-02: Creating a product is blocked without a selected business type', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -237,7 +237,7 @@ test('WEB-INVP-02: Kreiranje proizvoda je blokirano bez izabranog business type-
   await expect(page.getByText('Select at least one business type.')).toBeVisible();
 });
 
-test('WEB-INVP-03: "Edit" dugme na kartici otvara formu sa postojećim podacima i čuva izmenu', async ({ page }) => {
+test('WEB-INVP-03: "Edit" button on a card opens a form with existing data and saves the change', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -285,7 +285,7 @@ test('WEB-INVP-03: "Edit" dugme na kartici otvara formu sa postojećim podacima 
   await expect(page.getByText(originalName)).toHaveCount(0);
 });
 
-test('WEB-INVP-04: Non-manager/CEO ne može da upravlja inventory proizvodima', async ({ page }) => {
+test('WEB-INVP-04: Non-manager/CEO cannot manage inventory products', async ({ page }) => {
   // requireInventoryManager() odbija svakog ko nije manager/CEO sa specifičnom porukom —
   // razlikuje se od generičkog requireAdmin() koji se koristi za ostatak Inventory stranice.
   const login = new LoginPage(page);

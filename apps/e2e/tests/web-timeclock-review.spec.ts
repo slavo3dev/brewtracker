@@ -7,14 +7,14 @@ import {
   getReviewOutcome,
 } from '../helpers/timeClockSeed';
 
-test('WEB-TCREV-02: Prazno stanje kad nema nijednog pending unosa', async () => {
+test('WEB-TCREV-02: Empty state when there are no pending entries', async () => {
   test.skip(
     true,
-    'PRESKOČENO (bezbednosni razlog, ne propust): da bi se ovo testiralo, trebalo bi rešiti/obrisati SVE pending unose u celom projektu (ne samo jednog regiona) — queue trenutno NIJE region-scoped (vidi WEB-TCREV-01 defekt), pa "prazno" znači prazno za ceo sistem. Potrebna izolovana test baza da bi se ovo bezbedno automatizovalo.',
+    'Skipped (safety, not a gap): would require resolving/deleting every pending time entry project-wide, not just one region — the review queue is currently NOT region-scoped (see the WEB-TCREV-01 defect), so "empty" means empty for the whole system. Needs an isolated test database.',
   );
 });
 
-test('WEB-TCREV-01: Review queue lista samo review_status=pending unose svog regiona', async ({ page }) => {
+test('WEB-TCREV-01: Review queue lists only review_status=pending entries for its own region', async ({ page }) => {
   // Poznat, već dokumentovan nalaz u regression tabeli (status: Fail): queue nije
   // region-scoped jer getTimeEntryReviewQueue() koristi service-role klijent bez
   // region filtera — manager vidi pending unose SVIH regiona, ne samo svog. Test ispod ne
@@ -24,7 +24,7 @@ test('WEB-TCREV-01: Review queue lista samo review_status=pending unose svog reg
   test.info().annotations.push({
     type: 'note',
     description:
-      'POZNAT DEFEKT u aplikaciji: review queue koristi service-role klijent bez region filtera — menadžer vidi i može da odobri/odbije pending clock-in unose vozača iz SVIH regiona, ne samo svog. Treba popraviti: getTimeEntryReviewQueue() da filtrira po regionu ulogovanog menadžera.',
+      'Known app defect: the review queue uses a service-role client with no region filter — a manager sees and can approve/reject pending clock-in entries from drivers in every region, not just their own. Fix: getTimeEntryReviewQueue() should filter by the logged-in manager\'s region.',
   });
 
   // QA_MANAGER je u regionu Italy; driver1@brewtracker.demo je u regionu Florida —
@@ -56,7 +56,7 @@ test('WEB-TCREV-01: Review queue lista samo review_status=pending unose svog reg
 test.describe(() => {
   test.describe.configure({ mode: 'serial' });
 
-test('WEB-TCREV-03: Kartica prikazuje tačnu geofence distancu i status', async ({ page }) => {
+test('WEB-TCREV-03: Card shows the correct geofence distance and status', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
@@ -86,7 +86,7 @@ test('WEB-TCREV-03: Kartica prikazuje tačnu geofence distancu i status', async 
 // bazi (pouzdano, bez trke), a kroz UI se potvrđuje samo krajnji, stabilan rezultat —
 // da kartica nestaje iz pending queue-a.
 
-test('WEB-TCREV-07: Approve akcija postavlja status i reviewer metapodatke', async ({ page }) => {
+test('WEB-TCREV-07: Approve action sets status and reviewer metadata', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
@@ -116,7 +116,7 @@ test('WEB-TCREV-07: Approve akcija postavlja status i reviewer metapodatke', asy
   await review.expectDriverCardNotVisible(driverEmail);
 });
 
-test('WEB-TCREV-08: Flag akcija prihvata razlog i ažurira status', async ({ page }) => {
+test('WEB-TCREV-08: Flag action accepts a reason and updates status', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
@@ -143,7 +143,7 @@ test('WEB-TCREV-08: Flag akcija prihvata razlog i ažurira status', async ({ pag
   await review.expectDriverCardNotVisible(driverEmail);
 });
 
-test('WEB-TCREV-09: Reject akcija prihvata razlog i ažurira status', async ({ page }) => {
+test('WEB-TCREV-09: Reject action accepts a reason and updates status', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
@@ -170,7 +170,7 @@ test('WEB-TCREV-09: Reject akcija prihvata razlog i ažurira status', async ({ p
   await review.expectDriverCardNotVisible(driverEmail);
 });
 
-test('WEB-TCREV-11: Non-reviewer uloga je blokirana za review queue', async ({ page }) => {
+test('WEB-TCREV-11: Non-reviewer role is blocked from the review queue', async ({ page }) => {
   // canReviewClockIns() dozvoljava svakom aktivnom admin-u (manager/CEO) — u ovom kodu ne
   // postoji "admin bez te dozvole". Driver/tech nalozi se uopšte ne mogu ulogovati na web
   // dashboard (vidi WEB-AUTH-05 — vraćaju se na /login pre nego što ikada stignu do
@@ -186,13 +186,13 @@ test('WEB-TCREV-11: Non-reviewer uloga je blokirana za review queue', async ({ p
   await expect(page).toHaveURL(/\/login/);
 });
 
-test('WEB-TCREV-11b: Izlogovan korisnik je preusmeren na /login', async ({ page }) => {
+test('WEB-TCREV-11b: Logged-out user is redirected to /login', async ({ page }) => {
   const review = new TimeClockReviewPage(page);
   await review.goto();
   await expect(page).toHaveURL(/\/login/);
 });
 
-test('WEB-TCREV-12: Clock-in van geofence-a je vidljiv revieweru i akcionabilan', async ({ page }) => {
+test('WEB-TCREV-12: A clock-in outside the geofence is visible and actionable to the reviewer', async ({ page }) => {
   // PR #85: clock-in van geofence-a NIJE blokiran, samo se beleži — entry se pojavljuje
   // u queue-u kao pending sa statusom "Outside by N m" i manager i dalje može da ga reši.
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
@@ -219,7 +219,7 @@ test('WEB-TCREV-12: Clock-in van geofence-a je vidljiv revieweru i akcionabilan'
   }).toPass({ timeout: 10000 });
 });
 
-test('WEB-TCREV-04: Selfie se prikazuje kad postoji validan potpisiv URL', async ({ page }) => {
+test('WEB-TCREV-04: Selfie is shown when a valid signable URL exists', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
@@ -241,7 +241,7 @@ test('WEB-TCREV-04: Selfie se prikazuje kad postoji validan potpisiv URL', async
   await review.expectSelfieImageVisible(card);
 });
 
-test('WEB-TCREV-05: Poruka o grešci učitavanja kad selfie putanja postoji ali potpisivanje ne uspeva', async ({ page }) => {
+test('WEB-TCREV-05: Loading error message when the selfie path exists but signing fails', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
@@ -263,7 +263,7 @@ test('WEB-TCREV-05: Poruka o grešci učitavanja kad selfie putanja postoji ali 
   await review.expectSelfieLoadError(card);
 });
 
-test('WEB-TCREV-06: Poruka "No clock-in selfie" kad selfie nije poslat', async ({ page }) => {
+test('WEB-TCREV-06: "No clock-in selfie" message when no selfie was submitted', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
@@ -281,7 +281,7 @@ test('WEB-TCREV-06: Poruka "No clock-in selfie" kad selfie nije poslat', async (
   await review.expectNoSelfieMessage(card);
 });
 
-test('WEB-TCREV-10: Rešen unos nestaje iz pending queue-a posle osvežavanja', async ({ page }) => {
+test('WEB-TCREV-10: A resolved entry disappears from the pending queue after refresh', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 

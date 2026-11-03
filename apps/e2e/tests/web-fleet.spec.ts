@@ -11,7 +11,7 @@ import {
 // bi dovelo do toga da jedan test menja markere dok drugi broji/klikće na njih.
 test.describe.configure({ mode: 'serial' });
 
-test('WEB-FLEET-02: Prazno stanje kada nema aktivnih vozača', async ({ page }) => {
+test('WEB-FLEET-02: Empty state when there are no active drivers', async ({ page }) => {
   // Mora da radi PRE FLEET-01/03/04 (koji čine vozače "živim" i ostavljaju ih tako) —
   // serial mod garantuje redosled unutar fajla. Eksplicitno uklanjamo SVA 3 fixture vozača
   // za determinizam bez obzira na to da li je prethodni run ostavio nekog "živog".
@@ -28,7 +28,7 @@ test('WEB-FLEET-02: Prazno stanje kada nema aktivnih vozača', async ({ page }) 
   await fleet.expectEmptyState();
 });
 
-test('WEB-FLEET-01: Fleet mapa prikazuje markere za nedavno aktivne vozače', async ({ page }) => {
+test('WEB-FLEET-01: Fleet map shows markers for recently active drivers', async ({ page }) => {
   await ensureDriverIsLiveOnFleetMap(process.env.QA_DRIVER_EMAIL!);
 
   const login = new LoginPage(page);
@@ -40,7 +40,7 @@ test('WEB-FLEET-01: Fleet mapa prikazuje markere za nedavno aktivne vozače', as
   await fleet.expectAtLeastOneDriverMarker();
 });
 
-test('WEB-FLEET-03: Manager vidi samo svoj region, CEO vidi sve regione', async () => {
+test('WEB-FLEET-03: Manager sees only their own region, CEO sees all regions', async () => {
   // QA_DRIVER_EMAIL je u regionu Italy (isto kao QA menadžer); QA_DRIVER_OTHER_REGION_EMAIL je u Florida.
   await ensureDriverIsLiveOnFleetMap(process.env.QA_DRIVER_EMAIL!);
   await ensureDriverIsLiveOnFleetMap(process.env.QA_DRIVER_OTHER_REGION_EMAIL!);
@@ -62,7 +62,7 @@ test('WEB-FLEET-03: Manager vidi samo svoj region, CEO vidi sve regione', async 
   expect(ceoEmails).toContain(process.env.QA_DRIVER_OTHER_REGION_EMAIL);
 });
 
-test('WEB-FLEET-04: Mapa se automatski osvežava skoro uživo na novu lokaciju', async ({ page }) => {
+test('WEB-FLEET-04: Map auto-refreshes near-live on a new location ping', async ({ page }) => {
   const login = new LoginPage(page);
   const fleet = new FleetMapPage(page);
 
@@ -86,7 +86,7 @@ test('WEB-FLEET-04: Mapa se automatski osvežava skoro uživo na novu lokaciju',
     .toBeGreaterThan(before);
 });
 
-test('WEB-FLEET-05: Mapa pada nazad na 60s polling kad realtime kanal nije dostupan', async ({ page }) => {
+test('WEB-FLEET-05: Map falls back to 60s polling when the realtime channel is unavailable', async ({ page }) => {
   test.setTimeout(90000); // treba da sačekamo FLEET_REFRESH_INTERVAL_MS (60s) polling fallback
 
   const login = new LoginPage(page);
@@ -115,12 +115,12 @@ test('WEB-FLEET-05: Mapa pada nazad na 60s polling kad realtime kanal nije dostu
     .toBeGreaterThan(before);
 });
 
-test('WEB-FLEET-07: Fleet stranica preusmerava non-admin naloge', async ({ page }) => {
+test('WEB-FLEET-07: Fleet page redirects non-admin accounts', async ({ page }) => {
   await page.goto('/dashboard/fleet');
   await expect(page).toHaveURL(/\/login/);
 });
 
-test('WEB-FLEET-06: Prazno stanje ne montira kartu uopšte', async ({ page }) => {
+test('WEB-FLEET-06: Empty state does not mount the map at all', async ({ page }) => {
   // Ukloni SVE vozače koje prethodni testovi u ovom serial lancu mogu ostaviti "živim"
   // (FLEET-01/03 koriste QA_DRIVER_EMAIL i OTHER_REGION, FLEET-04 koristi REFRESH_TEST).
   await removeDriverFromFleetMap(process.env.QA_DRIVER_EMAIL!);
@@ -139,7 +139,7 @@ test('WEB-FLEET-06: Prazno stanje ne montira kartu uopšte', async ({ page }) =>
   await fleet.expectMapNotMounted();
 });
 
-test('WEB-FLEET-08: Mapa se učitava client-side sa loading fallback-om', async ({ page }) => {
+test('WEB-FLEET-08: Map loads client-side with a loading fallback', async ({ page }) => {
   await ensureDriverIsLiveOnFleetMap(process.env.QA_DRIVER_EMAIL!);
 
   const login = new LoginPage(page);

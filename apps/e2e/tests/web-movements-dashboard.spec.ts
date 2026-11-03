@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 
-test('WEB-MVMT-01: Filteri (magacin/vozač/datum) ažuriraju URL i rezultate', async ({ page }) => {
+test('WEB-MVMT-01: Filters (warehouse/driver/date) update the URL and results', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);

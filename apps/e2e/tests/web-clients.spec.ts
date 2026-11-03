@@ -7,7 +7,7 @@ import { createTestClient, deleteTestClient } from '../helpers/clientSeed';
 // "You can only create/edit clients in your assigned region") — svi fixture-i koje manager
 // treba da vidi/menja moraju imati region='Italy' (isti kao QA_MANAGER).
 
-test('WEB-CLI-01: /dashboard/clients zahteva inventory manager pristup (manager/CEO)', async ({ page }) => {
+test('WEB-CLI-01: /dashboard/clients requires inventory manager access (manager/CEO)', async ({ page }) => {
   await page.goto('/dashboard/clients');
   await expect(page).toHaveURL(/\/login/);
 
@@ -18,7 +18,7 @@ test('WEB-CLI-01: /dashboard/clients zahteva inventory manager pristup (manager/
   await expect(page).toHaveURL(/\/login|\/dashboard$/);
 });
 
-test('WEB-CLI-02: Kreiranje klijenta sa obaveznim poljima uspeva i vodi na detalj stranicu', async ({ page }) => {
+test('WEB-CLI-02: Creating a client with required fields succeeds and goes to the detail page', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -35,7 +35,7 @@ test('WEB-CLI-02: Kreiranje klijenta sa obaveznim poljima uspeva i vodi na detal
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
 });
 
-test('WEB-CLI-03: Kreiranje klijenta je blokirano bez imena', async ({ page }) => {
+test('WEB-CLI-03: Creating a client is blocked without a name', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -48,7 +48,7 @@ test('WEB-CLI-03: Kreiranje klijenta je blokirano bez imena', async ({ page }) =
   await expect(page).toHaveURL(/\/dashboard\/clients\/new$/);
 });
 
-test('WEB-CLI-04: Pretraga i filter po business type sužavaju listu klijenata', async ({ page }) => {
+test('WEB-CLI-04: Search and business-type filter narrow the client list', async ({ page }) => {
   const stamp = Date.now();
   const clientId = await createTestClient({
     name: `QA CLI-04 Unique Client ${stamp}`,
@@ -74,7 +74,7 @@ test('WEB-CLI-04: Pretraga i filter po business type sužavaju listu klijenata',
   }
 });
 
-test('WEB-CLI-05: Manager vidi samo klijente svog regiona, CEO vidi sve', async ({ page }) => {
+test('WEB-CLI-05: Manager sees only clients in their own region, CEO sees all', async ({ page }) => {
   const stamp = Date.now();
   const otherRegionClientId = await createTestClient({
     name: `QA CLI-05 Other Region ${stamp}`,
@@ -101,7 +101,7 @@ test('WEB-CLI-05: Manager vidi samo klijente svog regiona, CEO vidi sve', async 
   }
 });
 
-test('WEB-CLI-06: Manager ne može direktno (URL) da otvori detalj klijenta iz drugog regiona', async ({ page }) => {
+test('WEB-CLI-06: Manager cannot open a client detail page from another region directly via URL', async ({ page }) => {
   const otherRegionClientId = await createTestClient({
     name: `QA CLI-06 Other Region ${Date.now()}`,
     region: 'Florida',
@@ -121,7 +121,7 @@ test('WEB-CLI-06: Manager ne može direktno (URL) da otvori detalj klijenta iz d
   }
 });
 
-test('WEB-CLI-07: Izmena klijenta se perzistira', async ({ page }) => {
+test('WEB-CLI-07: Editing a client persists', async ({ page }) => {
   const clientId = await createTestClient({ name: `QA CLI-07 Original ${Date.now()}`, region: 'Italy' });
 
   try {
@@ -141,7 +141,7 @@ test('WEB-CLI-07: Izmena klijenta se perzistira', async ({ page }) => {
   }
 });
 
-test('WEB-CLI-08: Prazno stanje kad nema klijenata koji odgovaraju filterima', async ({ page }) => {
+test('WEB-CLI-08: Empty state when no clients match the filters', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);

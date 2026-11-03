@@ -7,14 +7,14 @@ import { WarehousesPage } from '../pages/WarehousesPage';
 const WAREHOUSE_NAME = 'Genova Test Warehouse';
 const OTHER_WAREHOUSE_NAME = 'Aleksa QA Warehouse';
 
-test('WEB-WH-02: Prazno stanje kad nema nijednog magacina', async () => {
+test('WEB-WH-02: Empty state when there are no warehouses', async () => {
   test.skip(
     true,
-    'PRESKOČENO (bezbednosni razlog, ne propust): da bi se ovo testiralo, trebalo bi obrisati SVE magacine iz deljene baze — oni se trenutno aktivno koriste u stvarnim rutama/vozačima drugih test fajlova, pa bi brisanje pokvarilo ostatak suite-a i potencijalno stvarne podatke. Potrebna izolovana test baza da bi se ovo bezbedno automatizovalo.',
+    'Skipped (safety, not a gap): would require deleting all warehouses from the shared database — they are actively used by routes/drivers in other test files, so deleting them would break the rest of the suite and real data. Needs an isolated test database.',
   );
 });
 
-test('WEB-WH-01: Geofence magacina se može ažurirati i sačuvati', async ({ page }) => {
+test('WEB-WH-01: Warehouse geofence can be updated and saved', async ({ page }) => {
   // Istražio sam direktno: menjanje geofence vrednosti na bilo koju NOVU vrednost (probano
   // i necela, 212.5 ft) ruši stranicu ("This page couldn't load — A server error occurred");
   // re-submit ISTE, već postojeće necele vrednosti ne ruši. Isti koren problema kao WEB-WH-03.
@@ -22,7 +22,7 @@ test('WEB-WH-01: Geofence magacina se može ažurirati i sačuvati', async ({ pa
   test.info().annotations.push({
     type: 'note',
     description:
-      'POZNAT DEFEKT u aplikaciji: čuvanje BILO KOJE nove geofence vrednosti ruši stranicu server greškom ("This page couldn\'t load — A server error occurred") — isti koren problema kao WEB-WH-03. Treba istražiti server akciju za update geofence-a (updateWarehouseGeofenceAction ili ekvivalent).',
+      'Known app defect: saving any new geofence value crashes the page with a server error ("This page couldn\'t load — A server error occurred") — same root cause as WEB-WH-03. Needs investigation in the geofence update server action (updateWarehouseGeofenceAction or equivalent).',
   });
 
   const login = new LoginPage(page);
@@ -42,7 +42,7 @@ test('WEB-WH-01: Geofence magacina se može ažurirati i sačuvati', async ({ pa
   expect(Number(persisted.radiusFeet)).toBeCloseTo(newValues.radiusFeet, 1);
 });
 
-test('WEB-WH-03: Nevalidne geofence vrednosti (non-numeric/negativan radijus) su odbijene', async ({ page }) => {
+test('WEB-WH-03: Invalid geofence values (non-numeric/negative radius) are rejected', async ({ page }) => {
   // Negativan radijus se ispravno blokira NATIVNOM HTML validacijom (input ima min="1") —
   // taj deo već radi ispravno. Ali čuvanje VALJANOG, IZMENJENOG radijusa i dalje ruši
   // stranicu ("This page couldn't load — A server error occurred") — isti koren problema
@@ -51,7 +51,7 @@ test('WEB-WH-03: Nevalidne geofence vrednosti (non-numeric/negativan radijus) su
   test.info().annotations.push({
     type: 'note',
     description:
-      'DELIMIČAN DEFEKT u aplikaciji: negativan radijus se ispravno blokira (HTML min="1") — to NIJE problem. ALI čuvanje validne izmenjene vrednosti i dalje ruši stranicu server greškom — isti koren problema kao WEB-WH-01. Treba popraviti: server akcija za update geofence-a.',
+      'Partial app defect: a negative radius is correctly blocked (HTML min="1") — that part is NOT a problem. BUT saving a valid, changed value still crashes the page with a server error — same root cause as WEB-WH-01. Needs a fix in the geofence update server action.',
   });
 
   const login = new LoginPage(page);

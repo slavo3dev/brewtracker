@@ -18,7 +18,7 @@ import {
 // taj mod bi poskipovao sve ostale testove u fajlu ako bilo koji padne (npr. prolazni mrežni
 // hiccup), što ovde nije potrebno niti poželjno.
 
-test('WEB-TCSET-01: "Run auto-close check" zatvara otvorene unose posle kraja smene', async ({ page }) => {
+test('WEB-TCSET-01: "Run auto-close check" closes open entries past the end of the shift', async ({ page }) => {
   // NAMERNO drugi vozač od web-timeclock-review.spec.ts (QA_DRIVER_TRANSFERS_ID) —
   // ta dva fajla rade paralelno (razliciti workeri) i ranije su se sudarala na ISTOM
   // deljenom time_entries redu, ostavljajući duplirane "pending" kartice koje bi
@@ -46,7 +46,7 @@ test('WEB-TCSET-01: "Run auto-close check" zatvara otvorene unose posle kraja sm
   expect(entry.auto_close_reason).toBe('Shift ended without driver clock-out.');
 });
 
-test('WEB-TCSET-02: Auto-close ne dira unose čija smena još nije završena', async ({ page }) => {
+test('WEB-TCSET-02: Auto-close does not touch entries whose shift has not ended yet', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TCSET_ID!;
   const entryId = await createOpenEntryWithFutureShiftEnd(driverId);
 
@@ -70,7 +70,7 @@ test('WEB-TCSET-02: Auto-close ne dira unose čija smena još nije završena', a
   expect(entry.review_status).toBe('pending');
 });
 
-test('WEB-TCSET-03: Auto-closed unos se pojavljuje u Review Queue-u', async ({ page }) => {
+test('WEB-TCSET-03: An auto-closed entry appears in the Review Queue', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TCSET_ID!;
   const driverEmail = process.env.QA_DRIVER_TCSET_EMAIL!;
   // Ovaj vozač je kroz sesiju nagomilao desetine starih pending unosa — bez ovoga,
@@ -92,7 +92,7 @@ test('WEB-TCSET-03: Auto-closed unos se pojavljuje u Review Queue-u', async ({ p
   await review.expectDriverCardVisible(driverEmail);
 });
 
-test('WEB-TCSET-04: Settings stranica nema selfie-waiver kontrolu (dokumentovan gap)', async ({ page }) => {
+test('WEB-TCSET-04: Settings page has no selfie-waiver control (documented gap)', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -110,7 +110,7 @@ test('WEB-TCSET-04: Settings stranica nema selfie-waiver kontrolu (dokumentovan 
   await expect(page.getByText(/waive|waiver|selfie/i)).toHaveCount(0);
 });
 
-test('WEB-TCSET-05: Otvoreni unosi BEZ shift_end_at se nikad ne auto-zatvaraju', async ({ page }) => {
+test('WEB-TCSET-05: Open entries with no shift_end_at are never auto-closed', async ({ page }) => {
   const driverId = process.env.QA_DRIVER_TCSET_ID!;
   const entryId = await createOpenEntryWithoutShiftEnd(driverId);
 

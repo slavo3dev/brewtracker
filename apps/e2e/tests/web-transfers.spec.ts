@@ -8,7 +8,7 @@ import { TransfersPage } from '../pages/TransfersPage';
 // Takođe namerno NIJE driveraleksa, jer tog vozača koristi web-recon.spec.ts konkurentno.
 const QA_DRIVER_ID = process.env.QA_DRIVER_TRANSFERS_ID!; // aleksadriver@brewtracker.com (Italy)
 
-test('WEB-XFER-12: Validan multi-product transfer se šalje atomično i prikazuje poruku uspeha', async ({ page }) => {
+test('WEB-XFER-12: A valid multi-product transfer submits atomically and shows a success message', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -33,7 +33,7 @@ test('WEB-XFER-12: Validan multi-product transfer se šalje atomično i prikazuj
   await transfers.expectProductsIssuedSuccessfully(2);
 });
 
-test('WEB-XFER-02: Submit je blokiran bez izabranog magacina', async ({ page }) => {
+test('WEB-XFER-02: Submit is blocked without a selected warehouse', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -49,7 +49,7 @@ test('WEB-XFER-02: Submit je blokiran bez izabranog magacina', async ({ page }) 
   await transfers.expectError('Select a warehouse.');
 });
 
-test('WEB-XFER-03: Submit je blokiran bez izabranog vozača', async ({ page }) => {
+test('WEB-XFER-03: Submit is blocked without a selected driver', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -65,7 +65,7 @@ test('WEB-XFER-03: Submit je blokiran bez izabranog vozača', async ({ page }) =
   await transfers.expectError('Select a driver.');
 });
 
-test('WEB-XFER-04: Submit je blokiran kada liniji nedostaje proizvod', async ({ page }) => {
+test('WEB-XFER-04: Submit is blocked when a line is missing a product', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -82,7 +82,7 @@ test('WEB-XFER-04: Submit je blokiran kada liniji nedostaje proizvod', async ({ 
   await transfers.expectError('Select a product for every transfer item.');
 });
 
-test('WEB-XFER-05: Nulta/prazna količina je odbijena po proizvodu', async ({ page }) => {
+test('WEB-XFER-05: Zero/empty quantity is rejected per product', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -99,7 +99,7 @@ test('WEB-XFER-05: Nulta/prazna količina je odbijena po proizvodu', async ({ pa
   await transfers.expectError(/transfer quantity must be greater than zero\./);
 });
 
-test('WEB-XFER-09: Duplirani proizvod u više linija je odbijen', async ({ page }) => {
+test('WEB-XFER-09: The same product added on more than one line is rejected', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -120,7 +120,7 @@ test('WEB-XFER-09: Duplirani proizvod u više linija je odbijen', async ({ page 
   await transfers.expectError('The same product cannot be added more than once.');
 });
 
-test('WEB-XFER-01: Promena smera transfera menja From/To labele', async ({ page }) => {
+test('WEB-XFER-01: Changing the transfer direction swaps the From/To labels', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -139,7 +139,7 @@ test('WEB-XFER-01: Promena smera transfera menja From/To labele', async ({ page 
   expect(custody.to).toBe('Warehouse');
 });
 
-test('WEB-XFER-06: Loose količina je nedostupna za proizvod koji je ne dozvoljava', async ({ page }) => {
+test('WEB-XFER-06: Loose quantity is unavailable for a product that does not allow it', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -154,7 +154,7 @@ test('WEB-XFER-06: Loose količina je nedostupna za proizvod koji je ne dozvolja
   await transfers.expectLooseQuantityInputMissingForRow(0);
 });
 
-test('WEB-XFER-07: Decimalna količina pakovanja je odbijena', async ({ page }) => {
+test('WEB-XFER-07: Decimal package quantity is rejected', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -172,7 +172,7 @@ test('WEB-XFER-07: Decimalna količina pakovanja je odbijena', async ({ page }) 
   await transfers.expectIssueQuantityInvalidForRow(0);
 });
 
-test('WEB-XFER-08: Decimalna loose količina je odbijena kad proizvod ne dozvoljava delimične jedinice', async ({ page }) => {
+test('WEB-XFER-08: Decimal loose quantity is rejected when the product does not allow partial units', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -189,7 +189,7 @@ test('WEB-XFER-08: Decimalna loose količina je odbijena kad proizvod ne dozvolj
   await transfers.expectLooseQuantityInvalidForRow(0);
 });
 
-test('WEB-XFER-11: "Total transfer" readout normalizuje pakovanje+loose u bazne jedinice', async ({ page }) => {
+test('WEB-XFER-11: "Total transfer" readout normalizes package+loose into base units', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -210,7 +210,7 @@ test('WEB-XFER-11: "Total transfer" readout normalizuje pakovanje+loose u bazne 
   }).toPass({ timeout: 5000 });
 });
 
-test('WEB-XFER-10: "+ Add Product" je onemogućeno kad su svi proizvodi već dodati', async ({ page }) => {
+test('WEB-XFER-10: "+ Add Product" is disabled once every product has been added', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);

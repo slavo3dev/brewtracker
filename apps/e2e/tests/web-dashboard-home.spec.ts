@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 
-test('WEB-HOME-02: "Users" kartica je prikazana korisniku sa canManageUsers', async ({ page }) => {
+test('WEB-HOME-02: "Users" card is shown to a user with canManageUsers', async ({ page }) => {
   // AŽURIRANO (app update): kartica "User management" je preimenovana u "Users" i sada živi
   // pod "Management" grupom (vidi navigation.config.ts) umesto u pljosnatoj listi kartica.
   // Pozitivan slučaj — negativan (admin BEZ canManageUsers) se ne može postaviti jer u
@@ -16,7 +16,7 @@ test('WEB-HOME-02: "Users" kartica je prikazana korisniku sa canManageUsers', as
   await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
 });
 
-test('WEB-HOME-03: Sve dashboard navigacione kartice (grupisane) vode na ispravne stranice', async ({ page }) => {
+test('WEB-HOME-03: All dashboard navigation cards (grouped) link to the correct pages', async ({ page }) => {
   // AŽURIRANO (app update): dashboard home je prepravljen — kartice su sad grupisane u 4
   // sekcije (Operations/Inventory/Management/Reports) umesto jedne pljosnate liste. Dodate
   // su i potpuno nove kartice: "Service" i "Inventory Overview" (Operations/Inventory grupe)
@@ -72,7 +72,7 @@ test('WEB-HOME-03: Sve dashboard navigacione kartice (grupisane) vode na ispravn
   }
 });
 
-test('WEB-HOME-04: "Warehouses" kartica vodi na ispravnu stranicu', async ({ page }) => {
+test('WEB-HOME-04: "Warehouses" card links to the correct page', async ({ page }) => {
   // AŽURIRANO (app update): raniji latentni bug (relativni href bez vodeće kose crte, koji
   // je slučajno ispravno radio samo kad se klikne sa tačno /dashboard) više NE postoji —
   // navigation.config.ts sada koristi apsolutan "/dashboard/inventory/warehouses" href za

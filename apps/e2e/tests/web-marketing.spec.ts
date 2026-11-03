@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 
-test('WEB-MKT-02: Feature grid kartice vode na ispravne destinacije', async ({ page }) => {
+test('WEB-MKT-02: Feature grid cards link to the correct destinations', async ({ page }) => {
   const cards: Array<[string, RegExp]> = [
     ['Routes', /\/login$/],
     ['Service workflow', /\/login$/],
@@ -20,7 +20,7 @@ test('WEB-MKT-02: Feature grid kartice vode na ispravne destinacije', async ({ p
   await expect(page).toHaveURL(/\/ai-quality$/);
 });
 
-test('WEB-MKT-05: Header prikazuje Sign in/Get started izlogovan, ime/Sign out ulogovan', async ({ page }) => {
+test('WEB-MKT-05: Header shows Sign in/Get started when logged out, name/Sign out when logged in', async ({ page }) => {
   // Scoped na <header> — hero sekcija IMA sopstveno "Get started" dugme (vodi na
   // /get-started), pa bi globalni getByRole uhvatio oba i izazvao strict mode grešku.
   const header = page.locator('header');
@@ -39,7 +39,7 @@ test('WEB-MKT-05: Header prikazuje Sign in/Get started izlogovan, ime/Sign out u
   await expect(header.getByRole('link', { name: 'Sign in' })).toHaveCount(0);
 });
 
-test('WEB-MKT-01: Home stranica prikazuje hero i CTA dugmad', async ({ page }) => {
+test('WEB-MKT-01: Home page shows the hero and CTA buttons', async ({ page }) => {
   await page.goto('/');
 
   await expect(
@@ -58,7 +58,7 @@ test('WEB-MKT-01: Home stranica prikazuje hero i CTA dugmad', async ({ page }) =
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test('WEB-MKT-03: "Get started" stranica je statični mockup bez signup forme', async ({ page }) => {
+test('WEB-MKT-03: "Get started" page is a static mockup with no signup form', async ({ page }) => {
   await page.goto('/get-started');
 
   await expect(page.getByText('← Back home')).toBeVisible();
@@ -68,12 +68,12 @@ test('WEB-MKT-03: "Get started" stranica je statični mockup bez signup forme', 
   await expect(page).toHaveURL(/\/$/);
 });
 
-test('WEB-MKT-04: "How it works" stranica je statični mockup', async ({ page }) => {
+test('WEB-MKT-04: "How it works" page is a static mockup', async ({ page }) => {
   await page.goto('/how-it-works');
   await expect(page.getByText('← Back home')).toBeVisible();
 });
 
-test('WEB-MKT-06: Footer legal linkovi su placeholder-i', async ({ page }) => {
+test('WEB-MKT-06: Footer legal links are placeholders', async ({ page }) => {
   await page.goto('/');
   const footer = page.locator('footer');
 
@@ -82,7 +82,7 @@ test('WEB-MKT-06: Footer legal linkovi su placeholder-i', async ({ page }) => {
   }
 });
 
-test('WEB-AUTH-06: Dugme prikazuje "Signing in…" dok je zahtev u toku', async ({ page }) => {
+test('WEB-AUTH-06: Button shows "Signing in…" while the request is in progress', async ({ page }) => {
   // Veštački usporavamo POST na /login da bismo pouzdano uhvatili tranzijentno stanje —
   // na brzom staging serveru zahtev bi inače mogao da se završi pre nego što Playwright
   // stigne da proveri dugme.
@@ -103,7 +103,7 @@ test('WEB-AUTH-06: Dugme prikazuje "Signing in…" dok je zahtev u toku', async 
   await page.waitForURL(/\/dashboard/, { timeout: 10000 });
 });
 
-test('WEB-HOME-01: Dashboard pozdravlja ulogovanog admina po imenu', async ({ page }) => {
+test('WEB-HOME-01: Dashboard greets the logged-in admin by name', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);

@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 
-test('WEB-MVMT-02: Per-product agregatne kolone se tačno računaju (NET = TAKEN - DELIVERED - MACHINE - RETURNED)', async ({ page }) => {
+test('WEB-MVMT-02: Per-product aggregate columns compute correctly (NET = TAKEN - DELIVERED - MACHINE - RETURNED)', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -35,7 +35,7 @@ test('WEB-MVMT-02: Per-product agregatne kolone se tačno računaju (NET = TAKEN
   }
 });
 
-test('WEB-MVMT-03: Stranica jasno naglašava da je izveštaj, ne autoritativno stanje', async ({ page }) => {
+test('WEB-MVMT-03: Page clearly states it is a report, not the authoritative stock state', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);

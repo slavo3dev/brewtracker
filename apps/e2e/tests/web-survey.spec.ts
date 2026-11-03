@@ -12,7 +12,7 @@ import {
 // trajno "potrošio" taj token (postaje "already answered").
 test.describe.configure({ mode: 'serial' });
 
-test('WEB-SURV-01: Validan survey token prikazuje formu za ocenu', async ({ page }) => {
+test('WEB-SURV-01: Valid survey token shows the rating form', async ({ page }) => {
   // Ne šalje ocenu, pa je token bezbedno koristiti samo za ovaj test (ne mora deljeni fixture).
   const token = await createFreshSurveyToken();
   const survey = new SurveyPage(page);
@@ -20,14 +20,14 @@ test('WEB-SURV-01: Validan survey token prikazuje formu za ocenu', async ({ page
   await survey.expectRatingFormVisible();
 });
 
-test('WEB-SURV-02: Nepostojeći token je odbijen prilikom slanja', async ({ page }) => {
+test('WEB-SURV-02: Non-existent token is rejected on submit', async ({ page }) => {
   const survey = new SurveyPage(page);
   // Nepostojeći token se odbija odmah na učitavanju stranice (ne tek na submit-u).
   await survey.goto('00000000-0000-4000-8000-000000000000');
   await survey.expectInvalidTokenError();
 });
 
-test('WEB-SURV-05: Slanje ocene 1-4 prikazuje zahvalnicu bez Google review poziva', async ({ page }) => {
+test('WEB-SURV-05: Submitting a rating of 1-4 shows a thank-you without the Google review prompt', async ({ page }) => {
   const token = await createFreshSurveyToken();
 
   const survey = new SurveyPage(page);
@@ -37,7 +37,7 @@ test('WEB-SURV-05: Slanje ocene 1-4 prikazuje zahvalnicu bez Google review poziv
   await survey.expectThankYouWithoutGoogleReview();
 });
 
-test('WEB-SURV-06: 5 zvezdica sa podešenim Google review URL-om prikazuje poziv na akciju', async ({ page }) => {
+test('WEB-SURV-06: 5 stars with a configured Google review URL shows the call to action', async ({ page }) => {
   const originalUrl = await getGoogleReviewUrl();
   const testUrl = 'https://g.page/r/qa-test-review-link/review';
 
@@ -55,7 +55,7 @@ test('WEB-SURV-06: 5 zvezdica sa podešenim Google review URL-om prikazuje poziv
   }
 });
 
-test('WEB-SURV-08: Ponovno slanje na već odgovoren survey link prikazuje "already received" stanje', async ({ page }) => {
+test('WEB-SURV-08: Resubmitting an already-answered survey link shows the "already received" state', async ({ page }) => {
   const token = await createFreshSurveyToken();
 
   const survey = new SurveyPage(page);
@@ -72,7 +72,7 @@ test('WEB-SURV-08: Ponovno slanje na već odgovoren survey link prikazuje "alrea
   await survey.expectAlreadyReceived();
 });
 
-test('WEB-SURV-04: Svaki klik na zvezdicu ispravno osvetljava zvezdice i ažurira aria-pressed', async ({ page }) => {
+test('WEB-SURV-04: Each star click correctly highlights the stars and updates aria-pressed', async ({ page }) => {
   const token = await createFreshSurveyToken();
   const survey = new SurveyPage(page);
   await survey.goto(token);
@@ -83,7 +83,7 @@ test('WEB-SURV-04: Svaki klik na zvezdicu ispravno osvetljava zvezdice i ažurir
   }
 });
 
-test('WEB-SURV-10: Ocena van opsega 1-5 je odbijena na nivou baze (forged request)', async () => {
+test('WEB-SURV-10: Rating outside the 1-5 range is rejected at the database level (forged request)', async () => {
   // Regresiona tabela sama priznaje da ovo nikad nije direktno probano ("not exercised
   // separately") — UI onemogućava bilo koju vrednost osim 1-5 (vidi WEB-SURV-04), pa
   // umesto pokušaja da se replicira fragilan Next.js server-action poziv, ovo direktno
@@ -97,7 +97,7 @@ test('WEB-SURV-10: Ocena van opsega 1-5 je odbijena na nivou baze (forged reques
   }
 });
 
-test('WEB-SURV-03: Submit je blokiran bez izabrane ocene', async ({ page }) => {
+test('WEB-SURV-03: Submit is blocked with no rating selected', async ({ page }) => {
   // "Submit rating" ima disabled={!selectedRating || pending} — dugme je NATIVNO
   // onemogućeno dok ocena nije izabrana (ne može se ni kliknuti), umesto da se klikom
   // tek na submit-u pokaže greška.
@@ -107,7 +107,7 @@ test('WEB-SURV-03: Submit je blokiran bez izabrane ocene', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Submit rating' })).toBeDisabled();
 });
 
-test('WEB-SURV-07: 5 zvezdica bez podešenog Google review URL-a preskače poziv na akciju', async ({ page }) => {
+test('WEB-SURV-07: 5 stars with no configured Google review URL skips the call to action', async ({ page }) => {
   const originalUrl = await getGoogleReviewUrl();
 
   try {
@@ -124,7 +124,7 @@ test('WEB-SURV-07: 5 zvezdica bez podešenog Google review URL-a preskače poziv
   }
 });
 
-test('WEB-SURV-09: Konkurentno dupliranje slanja se rukuje bez pada', async ({ page, context }) => {
+test('WEB-SURV-09: Concurrent duplicate submission is handled without crashing', async ({ page, context }) => {
   const token = await createFreshSurveyToken();
   const page2 = await context.newPage();
 

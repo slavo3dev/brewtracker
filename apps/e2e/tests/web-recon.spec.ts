@@ -9,7 +9,7 @@ import { supabaseAdmin } from '../helpers/supabaseAdmin';
 // testovi rade jedan za drugim, ne paralelno.
 test.describe.configure({ mode: 'serial' });
 
-test('WEB-RECON-01: Reconciliation stranica se učitava sa driver selektorom', async ({ page }) => {
+test('WEB-RECON-01: Reconciliation page loads with a driver selector', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -19,7 +19,7 @@ test('WEB-RECON-01: Reconciliation stranica se učitava sa driver selektorom', a
   await recon.expectDriverSelectorVisible();
 });
 
-test('WEB-RECON-02: Izbor vozača učitava očekivani inventar vozila', async ({ page }) => {
+test('WEB-RECON-02: Selecting a driver loads their expected van inventory', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -30,7 +30,7 @@ test('WEB-RECON-02: Izbor vozača učitava očekivani inventar vozila', async ({
   await recon.expectPhysicalCountLoaded();
 });
 
-test('WEB-RECON-09: Potvrda rekonsilijacije čuva je kao novu osnovu', async ({ page }) => {
+test('WEB-RECON-09: Confirming a reconciliation saves it as the new baseline', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -51,7 +51,7 @@ test('WEB-RECON-09: Potvrda rekonsilijacije čuva je kao novu osnovu', async ({ 
   await recon.expectExpectedValueForFirstProduct(/^5 \S+$/);
 });
 
-test('WEB-RECON-04: Varijansa se računa uživo kao physical minus expected', async ({ page }) => {
+test('WEB-RECON-04: Variance is computed live as physical minus expected', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -80,7 +80,7 @@ test('WEB-RECON-04: Varijansa se računa uživo kao physical minus expected', as
   await recon.expectVarianceForFirstProduct(/^\+2 \S+$/);
 });
 
-test('WEB-RECON-05: Review je blokiran bez unetih brojeva', async ({ page }) => {
+test('WEB-RECON-05: Review is blocked with no counts entered', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -91,7 +91,7 @@ test('WEB-RECON-05: Review je blokiran bez unetih brojeva', async ({ page }) => 
   await recon.expectReviewBlockedWithNoCounts();
 });
 
-test('WEB-RECON-10: Expected količina postaje potvrđeni count nakon potvrde', async ({ page }) => {
+test('WEB-RECON-10: Expected quantity becomes the confirmed count after confirmation', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -114,7 +114,7 @@ test('WEB-RECON-10: Expected količina postaje potvrđeni count nakon potvrde', 
   expect(expected).toBe(parseInt(confirmedCount, 10));
 });
 
-test('WEB-RECON-11: Kasniji pokreti menjaju očekivanu količinu', async ({ page }) => {
+test('WEB-RECON-11: Later movements change the expected quantity', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -166,7 +166,7 @@ test('WEB-RECON-11: Kasniji pokreti menjaju očekivanu količinu', async ({ page
   expect(expectedAfterTransfer).toBe(baseline + 3 * unitsPerIssueUnit);
 });
 
-test('WEB-RECON-03: Proizvod bez osnove pokazuje "No baseline"', async ({ page }) => {
+test('WEB-RECON-03: A product with no baseline shows "No baseline"', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -184,7 +184,7 @@ test('WEB-RECON-03: Proizvod bez osnove pokazuje "No baseline"', async ({ page }
   await recon.expectNoBaselineNoteVisible();
 });
 
-test('WEB-RECON-06: Samo izbrojani proizvodi su uključeni u review', async ({ page }) => {
+test('WEB-RECON-06: Only counted products are included in the review', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -202,7 +202,7 @@ test('WEB-RECON-06: Samo izbrojani proizvodi su uključeni u review', async ({ p
   await recon.expectReviewItemCount(2);
 });
 
-test('WEB-RECON-07: Nevalidna fizička količina je odbijena', async ({ page }) => {
+test('WEB-RECON-07: Invalid physical quantity is rejected', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -227,7 +227,7 @@ test('WEB-RECON-07: Nevalidna fizička količina je odbijena', async ({ page }) 
   await expect(page.getByRole('button', { name: 'Back to edit' })).toHaveCount(0);
 });
 
-test('WEB-RECON-12: Razlog i napomene se čuvaju uz rekonsilijaciju', async ({ page }) => {
+test('WEB-RECON-12: Reason and notes are saved with the reconciliation', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -257,7 +257,7 @@ test('WEB-RECON-12: Razlog i napomene se čuvaju uz rekonsilijaciju', async ({ p
   await expect(card.getByText(reasonText)).toBeVisible();
 });
 
-test('WEB-RECON-14: Reconciliation stranice sprovode admin auth', async ({ page }) => {
+test('WEB-RECON-14: Reconciliation pages enforce admin auth', async ({ page }) => {
   await page.goto('/dashboard/inventory/reconciliation');
   await expect(page).toHaveURL(/\/login/);
 
@@ -265,7 +265,7 @@ test('WEB-RECON-14: Reconciliation stranice sprovode admin auth', async ({ page 
   await expect(page).toHaveURL(/\/login/);
 });
 
-test('WEB-RECON-08: "Back to edit" čuva prethodno unete vrednosti', async ({ page }) => {
+test('WEB-RECON-08: "Back to edit" preserves previously entered values', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -288,7 +288,7 @@ test('WEB-RECON-08: "Back to edit" čuva prethodno unete vrednosti', async ({ pa
   expect(await recon.getNotesValue()).toBe('QA RECON-08 notes');
 });
 
-test('WEB-RECON-13: Promena vozača briše unete count-ove', async ({ page }) => {
+test('WEB-RECON-13: Changing driver clears entered counts', async ({ page }) => {
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
