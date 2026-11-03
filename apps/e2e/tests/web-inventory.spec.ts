@@ -195,13 +195,14 @@ test('WEB-INVP-01: "+ Add Product" forma kreira novi proizvod', async ({ page })
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   await page.goto('/dashboard/inventory');
+  await page.getByRole('button', { name: 'Products' }).click();
   await page.getByRole('button', { name: '+ Add Product' }).click();
 
   const name = `QA INVP-01 Test Product ${Date.now()}`;
   await page.getByLabel('Product name *').fill(name);
   await page.getByLabel('Display unit label *').fill('bags');
   await page.getByLabel('Base unit *').fill('bag');
-  await page.getByLabel('Issue unit *').fill('case');
+  await page.getByLabel('Issue unit *', { exact: true }).fill('case');
   await page.getByLabel('Base units per issue unit *').fill('6');
   await page.getByLabel('OCS').check();
   await page.getByRole('button', { name: 'Create Product' }).click();
@@ -215,12 +216,13 @@ test('WEB-INVP-02: Kreiranje proizvoda je blokirano bez izabranog business type-
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   await page.goto('/dashboard/inventory');
+  await page.getByRole('button', { name: 'Products' }).click();
   await page.getByRole('button', { name: '+ Add Product' }).click();
 
   await page.getByLabel('Product name *').fill(`QA INVP-02 ${Date.now()}`);
   await page.getByLabel('Display unit label *').fill('bags');
   await page.getByLabel('Base unit *').fill('bag');
-  await page.getByLabel('Issue unit *').fill('case');
+  await page.getByLabel('Issue unit *', { exact: true }).fill('case');
   await page.getByLabel('Base units per issue unit *').fill('6');
   // OCS je defaultno čekiran — isključi ga da nijedan business type ne ostane izabran.
   await page.getByLabel('OCS').uncheck();
@@ -235,13 +237,14 @@ test('WEB-INVP-03: "Edit" dugme na kartici otvara formu sa postojećim podacima 
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   await page.goto('/dashboard/inventory');
+  await page.getByRole('button', { name: 'Products' }).click();
   await page.getByRole('button', { name: '+ Add Product' }).click();
 
   const originalName = `QA INVP-03 Original ${Date.now()}`;
   await page.getByLabel('Product name *').fill(originalName);
   await page.getByLabel('Display unit label *').fill('bags');
   await page.getByLabel('Base unit *').fill('bag');
-  await page.getByLabel('Issue unit *').fill('case');
+  await page.getByLabel('Issue unit *', { exact: true }).fill('case');
   await page.getByLabel('Base units per issue unit *').fill('6');
   await page.getByLabel('OCS').check();
   await page.getByRole('button', { name: 'Create Product' }).click();

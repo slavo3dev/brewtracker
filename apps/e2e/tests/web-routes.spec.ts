@@ -1,9 +1,15 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 import { RoutesPage } from '../pages/RoutesPage';
-import { getLatestScheduledRouteId, markFirstStopAsStarted, setRouteStatus } from '../helpers/routeSeed';
+import {
+  getLatestScheduledRouteId,
+  markFirstStopAsStarted,
+  setRouteStatus,
+  createTemplateGeneratedRoute,
+  deleteRoute,
+} from '../helpers/routeSeed';
 
-const QA_DRIVER_ID = 'a0b2b53e-2a46-4bf9-bcc6-f8a9f7130434'; // driveraleksa@brewtracker.com
+const QA_DRIVER_ID = process.env.QA_DRIVER_ID!;
 
 // Svi testovi u ovom fajlu čitaju/menjaju istu deljenu listu ruta (brojevi, redosled
 // "najnovije prvo") — paralelno izvršavanje izaziva race (pogrešni brojevi, pogrešan
@@ -136,15 +142,26 @@ test('WEB-RT-10: Recurring vs One-off bedž se ispravno prikazuje', async ({ pag
   await routes.createOneOffRoute(QA_DRIVER_ID, today);
   await routes.expectOneOffBadge(routes.firstRouteCard());
 
-  // Recurring: postojeća template-generisana ruta pripada vozaču van Italy regiona
-  // (menadžer je ne bi video), pa za OVU proveru koristimo CEO (vidi sve regione).
-  // Pretraga po imenu vozača izbegava paginaciju (10 po strani).
-  await login.goto();
-  await login.login(process.env.QA_CEO_EMAIL!, process.env.QA_CEO_PASSWORD!);
-  await routes.goto();
-  await routes.clearDateFilter();
-  await routes.searchRoutes('Diana');
-  await expect(page.locator('article').filter({ hasText: 'Recurring' }).first()).toBeVisible();
+  // Recurring: ruta generisana iz template-a (source_route_template_id != null) — taj cron
+  // posao ne pokrećemo u testovima, pa simuliramo njegov rezultat direktno preko baze.
+  const routeId = await createTemplateGeneratedRoute(
+    process.env.QA_DIANA_DRIVER_ID!,
+    process.env.QA_WAREHOUSE_ID!,
+    process.env.QA_DIANA_TEMPLATE_ID!,
+    today,
+  );
+
+  try {
+    // Pretraga po imenu vozača izbegava paginaciju (10 po strani).
+    await login.goto();
+    await login.login(process.env.QA_CEO_EMAIL!, process.env.QA_CEO_PASSWORD!);
+    await routes.goto();
+    await routes.clearDateFilter();
+    await routes.searchRoutes('Diana');
+    await expect(page.locator('article').filter({ hasText: 'Recurring' }).first()).toBeVisible();
+  } finally {
+    await deleteRoute(routeId);
+  }
 });
 
 test('WEB-RT-11: Map preview zahteva 2+ geokodirane stanice', async ({ page }) => {

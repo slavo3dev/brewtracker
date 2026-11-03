@@ -12,10 +12,12 @@ import {
 test.describe.configure({ mode: 'serial' });
 
 test('WEB-FLEET-02: Prazno stanje kada nema aktivnih vozača', async ({ page }) => {
-  // Mora da radi PRE FLEET-01/03 (koji čine driveraleksa "živim" i ostavljaju ga tako) —
-  // serial mod garantuje redosled unutar fajla. Eksplicitno uklanjamo za determinizam
-  // bez obzira na to da li je prethodni run ostavio nekog "živog" u poslednjih 10 min.
+  // Mora da radi PRE FLEET-01/03/04 (koji čine vozače "živim" i ostavljaju ih tako) —
+  // serial mod garantuje redosled unutar fajla. Eksplicitno uklanjamo SVA 3 fixture vozača
+  // za determinizam bez obzira na to da li je prethodni run ostavio nekog "živog".
   await removeDriverFromFleetMap(process.env.QA_DRIVER_EMAIL!);
+  await removeDriverFromFleetMap(process.env.QA_DRIVER_OTHER_REGION_EMAIL!);
+  await removeDriverFromFleetMap(process.env.QA_DRIVER_REFRESH_TEST_EMAIL!);
 
   const login = new LoginPage(page);
   await login.goto();
@@ -119,7 +121,11 @@ test('WEB-FLEET-07: Fleet stranica preusmerava non-admin naloge', async ({ page 
 });
 
 test('WEB-FLEET-06: Prazno stanje ne montira kartu uopšte', async ({ page }) => {
+  // Ukloni SVE vozače koje prethodni testovi u ovom serial lancu mogu ostaviti "živim"
+  // (FLEET-01/03 koriste QA_DRIVER_EMAIL i OTHER_REGION, FLEET-04 koristi REFRESH_TEST).
   await removeDriverFromFleetMap(process.env.QA_DRIVER_EMAIL!);
+  await removeDriverFromFleetMap(process.env.QA_DRIVER_OTHER_REGION_EMAIL!);
+  await removeDriverFromFleetMap(process.env.QA_DRIVER_REFRESH_TEST_EMAIL!);
 
   const login = new LoginPage(page);
   await login.goto();

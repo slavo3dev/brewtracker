@@ -1,9 +1,9 @@
 import { supabaseAdmin } from './supabaseAdmin';
 
-// Smederevo Warehouse: lat 44.665, lng 20.927, geofence_radius_meters 1500.
-const DEFAULT_WAREHOUSE_ID = '1df74005-fb1f-48dc-8e72-d27401773795';
-const WAREHOUSE_LAT = 44.665;
-const WAREHOUSE_LNG = 20.927;
+// QA Smederevo Warehouse: geofence_radius_meters 120.
+const DEFAULT_WAREHOUSE_ID = process.env.QA_WAREHOUSE_ID!;
+const WAREHOUSE_LAT = 44.6579212712334;
+const WAREHOUSE_LNG = 20.936239461265;
 
 /**
  * Prethodno ostavljeni pending unosi od ranijih pokretanja testa bi inače ostali u review

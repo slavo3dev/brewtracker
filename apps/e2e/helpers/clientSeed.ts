@@ -1,8 +1,5 @@
 import { supabaseAdmin } from './supabaseAdmin';
 
-// NAPOMENA: Clients funkcionalnost (dev grana) zahteva DB kolonu clients.business_type
-// koja JOŠ NIJE primenjena na ovaj Supabase projekat (proveren direktan upit — kolona ne
-// postoji). Ovaj helper će raditi tek pošto se odgovarajuće migracije sa dev grane primene.
 export async function createTestClient(params: {
   name: string;
   businessType?: 'ocs' | 'horeca';

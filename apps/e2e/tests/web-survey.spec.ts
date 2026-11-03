@@ -12,13 +12,11 @@ import {
 // trajno "potrošio" taj token (postaje "already answered").
 test.describe.configure({ mode: 'serial' });
 
-// Postojeći survey_token iz service_visit_summaries (javna stranica, ne zahteva login).
-// Test samo proverava da se forma PRIKAZUJE — ne šalje ocenu, pa je token bezbedno ponovo koristiti.
-const EXISTING_SURVEY_TOKEN = '3a43fc96-489d-40bf-bdfe-8713f57c119a';
-
 test('WEB-SURV-01: Validan survey token prikazuje formu za ocenu', async ({ page }) => {
+  // Ne šalje ocenu, pa je token bezbedno koristiti samo za ovaj test (ne mora deljeni fixture).
+  const token = await createFreshSurveyToken();
   const survey = new SurveyPage(page);
-  await survey.goto(EXISTING_SURVEY_TOKEN);
+  await survey.goto(token);
   await survey.expectRatingFormVisible();
 });
 
@@ -75,8 +73,9 @@ test('WEB-SURV-08: Ponovno slanje na već odgovoren survey link prikazuje "alrea
 });
 
 test('WEB-SURV-04: Svaki klik na zvezdicu ispravno osvetljava zvezdice i ažurira aria-pressed', async ({ page }) => {
+  const token = await createFreshSurveyToken();
   const survey = new SurveyPage(page);
-  await survey.goto(EXISTING_SURVEY_TOKEN);
+  await survey.goto(token);
 
   for (let stars = 1; stars <= 5; stars++) {
     await survey.selectRating(stars);
@@ -102,8 +101,9 @@ test('WEB-SURV-03: Submit je blokiran bez izabrane ocene', async ({ page }) => {
   // "Submit rating" ima disabled={!selectedRating || pending} — dugme je NATIVNO
   // onemogućeno dok ocena nije izabrana (ne može se ni kliknuti), umesto da se klikom
   // tek na submit-u pokaže greška.
+  const token = await createFreshSurveyToken();
   const survey = new SurveyPage(page);
-  await survey.goto(EXISTING_SURVEY_TOKEN);
+  await survey.goto(token);
   await expect(page.getByRole('button', { name: 'Submit rating' })).toBeDisabled();
 });
 

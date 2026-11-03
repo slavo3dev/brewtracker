@@ -44,7 +44,7 @@ export class ReconciliationPage {
     ).toBeVisible();
   }
 
-  async expectExpectedValueForFirstProduct(value: string) {
+  async expectExpectedValueForFirstProduct(value: string | RegExp) {
     await expect(this.page.getByText(value).first()).toBeVisible();
   }
 
@@ -57,14 +57,16 @@ export class ReconciliationPage {
       .locator('.mt-2.text-sm.font-semibold')
       .nth(0)
       .innerText();
-    const match = text.match(/-?\d+/);
+    // formatQuantity() u UI koristi toLocaleString() (npr. "3,605 sleeve") — zarez mora
+    // biti uključen u match, inače regex staje na prvoj grupi cifara i "3,605" postaje 3.
+    const match = text.match(/-?[\d,]+/);
     if (!match) {
       throw new Error(`Nema baseline za prvi proizvod ("${text}") — potrebna je prethodno potvrđena rekonsilijacija.`);
     }
-    return parseInt(match[0], 10);
+    return parseInt(match[0].replace(/,/g, ''), 10);
   }
 
-  async expectVarianceForFirstProduct(expectedVarianceText: string) {
+  async expectVarianceForFirstProduct(expectedVarianceText: string | RegExp) {
     const varianceLocator = this.firstProductRow().locator('.mt-2.text-sm.font-semibold').nth(1);
     await expect(varianceLocator).toHaveText(expectedVarianceText);
   }

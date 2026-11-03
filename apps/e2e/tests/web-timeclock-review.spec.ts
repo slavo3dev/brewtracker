@@ -227,7 +227,7 @@ test('WEB-TCREV-04: Selfie se prikazuje kad postoji validan potpisiv URL', async
   // Stvarna storage putanja preuzeta sa postojećeg unosa iz mobilne upotrebe (ista putanja se
   // može ponovo potpisati za novi test unos — fajl u bucket-u je nezavisan od time_entries reda).
   await createPendingClockInEntry(driverId, {
-    clockInSelfieUrl: 'f54a1e63-3545-4907-8b12-63152de2c405/76207c14-0ab4-434f-963c-268c97c92dd8/clock-in-1785766941660.jpg',
+    clockInSelfieUrl: `${process.env.QA_DRIVER_TRANSFERS_ID}/qa-fixture-entry/clock-in-qa-fixture.jpg`,
   });
 
   const login = new LoginPage(page);

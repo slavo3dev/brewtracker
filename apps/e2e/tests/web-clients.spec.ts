@@ -2,10 +2,10 @@ import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 import { createTestClient, deleteTestClient } from '../helpers/clientSeed';
 
-// NOVA FUNKCIONALNOST (app update, dev grana) — /dashboard/clients. NAPOMENA: u trenutku
-// pisanja ovih testova, NI app kod NI DB migracije (clients.business_type kolona) nisu
-// deployed/primenjeni na ovaj QA projekat — svi testovi ispod će dobiti 404 ili DB grešku
-// dok se oba koraka ne završe. Pisano prema izvornom kodu kao priprema za kad bude gotovo.
+// NOVA FUNKCIONALNOST (app update, dev grana) — /dashboard/clients. Server zahteva da
+// manager kreira/menja klijente ISKLJUČIVO u svom dodeljenom regionu (vidi client-actions.ts
+// "You can only create/edit clients in your assigned region") — svi fixture-i koje manager
+// treba da vidi/menja moraju imati region='Italy' (isti kao QA_MANAGER).
 
 test('WEB-CLI-01: /dashboard/clients zahteva inventory manager pristup (manager/CEO)', async ({ page }) => {
   await page.goto('/dashboard/clients');
@@ -27,6 +27,8 @@ test('WEB-CLI-02: Kreiranje klijenta sa obaveznim poljima uspeva i vodi na detal
   const name = `QA CLI-02 Test Client ${Date.now()}`;
   await page.locator('input[name="name"]').fill(name);
   await page.locator('select[name="business_type"]').selectOption('ocs');
+  // Manager sme da kreira klijenta SAMO u svom dodeljenom regionu (server-side provera).
+  await page.locator('input[name="region"]').fill('Italy');
   await page.getByRole('button', { name: 'Create Client' }).click();
 
   await expect(page).toHaveURL(/\/dashboard\/clients\/[^/]+$/);
@@ -51,6 +53,7 @@ test('WEB-CLI-04: Pretraga i filter po business type sužavaju listu klijenata',
   const clientId = await createTestClient({
     name: `QA CLI-04 Unique Client ${stamp}`,
     businessType: 'horeca',
+    region: 'Italy',
   });
 
   try {
@@ -119,7 +122,7 @@ test('WEB-CLI-06: Manager ne može direktno (URL) da otvori detalj klijenta iz d
 });
 
 test('WEB-CLI-07: Izmena klijenta se perzistira', async ({ page }) => {
-  const clientId = await createTestClient({ name: `QA CLI-07 Original ${Date.now()}` });
+  const clientId = await createTestClient({ name: `QA CLI-07 Original ${Date.now()}`, region: 'Italy' });
 
   try {
     const login = new LoginPage(page);

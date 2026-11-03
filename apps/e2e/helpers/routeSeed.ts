@@ -55,6 +55,38 @@ export async function setRouteStatus(routeId: string, status: string) {
   }
 }
 
+// Simulira rutu generisanu iz recurring template-a (taj cron posao ne pokrećemo u testovima) —
+// koristi se za WEB-RT-10 koji provera da se "Recurring" bedž ispravno prikazuje.
+export async function createTemplateGeneratedRoute(
+  driverId: string,
+  warehouseId: string,
+  templateId: string,
+  routeDateIso: string,
+): Promise<string> {
+  const supabase = supabaseAdmin();
+  const { data, error } = await supabase
+    .from('routes')
+    .insert({
+      driver_id: driverId,
+      warehouse_id: warehouseId,
+      route_date: routeDateIso,
+      status: 'scheduled',
+      source_route_template_id: templateId,
+    })
+    .select('id')
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Ne mogu da napravim template-generisanu rutu: ${error?.message}`);
+  }
+  return data.id;
+}
+
+export async function deleteRoute(routeId: string) {
+  const supabase = supabaseAdmin();
+  await supabase.from('routes').delete().eq('id', routeId);
+}
+
 // Čisti preduslov za testove generisanja ruta iz template-a (npr. WEB-TPL-20): otkazuje SVE
 // postojeće neotkazane rute za tog vozača/datum koje sadrže datu mašinu, da bi test sam
 // kontrolisao jedini konflikt koji namerno pravi — bez ovoga, "osirotela" ruta ostala iz

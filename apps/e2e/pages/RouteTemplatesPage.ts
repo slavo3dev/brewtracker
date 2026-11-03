@@ -30,7 +30,10 @@ export class RouteTemplatesPage {
     await card.getByRole('button', { name: 'Edit' }).click();
     // Checkbox je vizuelno sakriven (sr-only); klik na roditeljski <label> je prirodnija
     // i pouzdanija interakcija od force-click-a na sam input (pokazalo se krhko u --headed modu).
-    await card.locator('label').filter({ has: card.locator(`input[name="${day}"]`) }).click();
+    // "has" filter MORA biti izgrađen iz page.locator (ne card.locator) — card.locator već nosi
+    // pun "article >> ..." prefiks, pa bi ugnježdeni has-selektor tražio <article> UNUTAR <label>,
+    // što nikad ne postoji i izaziva beskonačno čekanje do test timeout-a.
+    await card.locator('label').filter({ has: this.page.locator(`input[name="${day}"]`) }).click();
     await card.getByRole('button', { name: 'Save Changes' }).click();
     await expect(noDaysNotice).not.toBeVisible();
   }

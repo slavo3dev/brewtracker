@@ -118,7 +118,7 @@ test('WEB-TCENT-06: Kartica unosa prikazuje clock-in selfie kad postoji', async 
   // Ista stvarna storage putanja korišćena u WEB-TCREV-04 (fajl u bucket-u nezavisan od
   // time_entries reda, može se ponovo potpisati za drugi unos).
   await createPendingClockInEntry(driverId, {
-    clockInSelfieUrl: 'f54a1e63-3545-4907-8b12-63152de2c405/76207c14-0ab4-434f-963c-268c97c92dd8/clock-in-1785766941660.jpg',
+    clockInSelfieUrl: `${process.env.QA_DRIVER_TRANSFERS_ID}/qa-fixture-entry/clock-in-qa-fixture.jpg`,
   });
 
   const login = new LoginPage(page);

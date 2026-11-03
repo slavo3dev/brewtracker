@@ -65,23 +65,41 @@ test('WEB-USR-06: Prazno stanje kad kombinacija filtera ne pogađa nikoga', asyn
 });
 
 test('WEB-USR-07: Paginacija prikazuje 10 korisnika po strani', async ({ page }) => {
-  const login = new LoginPage(page);
-  await login.goto();
-  await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+  // Test SAM seeduje dovoljno korisnika (umesto da se oslanja na ambijentalni broj u
+  // deljenoj bazi) — garantuje bar 2 pune strane bez obzira koliko trenutno ima korisnika.
+  const stamp = Date.now();
+  const userIds = await Promise.all(
+    Array.from({ length: 15 }, (_, i) =>
+      createTestUser({
+        email: `qa-usr-07-${stamp}-${i}@brewtracker.com`,
+        password: 'TestPass123!',
+        fullName: `QA USR-07 Pagination User ${stamp}-${i}`,
+        role: 'driver',
+        isActive: true,
+      }),
+    ),
+  );
 
-  const users = new UsersPage(page);
-  await users.goto();
+  try {
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
-  // Bez filtera, sa 200+ korisnika u sistemu, paginacija je uvek prisutna.
-  expect(await users.getVisibleUserCount()).toBe(10);
-  expect(await users.getPageIndicatorText()).toMatch(/Page 1 of \d+/);
+    const users = new UsersPage(page);
+    await users.goto();
 
-  await users.clickNextPage();
-  expect(await users.getPageIndicatorText()).toMatch(/Page 2 of \d+/);
-  expect(await users.getVisibleUserCount()).toBe(10);
+    expect(await users.getVisibleUserCount()).toBe(10);
+    expect(await users.getPageIndicatorText()).toMatch(/Page 1 of \d+/);
 
-  await users.clickPreviousPage();
-  expect(await users.getPageIndicatorText()).toMatch(/Page 1 of \d+/);
+    await users.clickNextPage();
+    expect(await users.getPageIndicatorText()).toMatch(/Page 2 of \d+/);
+    expect(await users.getVisibleUserCount()).toBe(10);
+
+    await users.clickPreviousPage();
+    expect(await users.getPageIndicatorText()).toMatch(/Page 1 of \d+/);
+  } finally {
+    await Promise.all(userIds.map((id) => deleteTestUser(id)));
+  }
 });
 
 test('WEB-USR-11: "Send password reset" je onemogućeno za korisnika bez email-a', async ({ page }) => {

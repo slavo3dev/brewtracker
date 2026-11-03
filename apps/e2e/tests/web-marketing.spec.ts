@@ -109,6 +109,6 @@ test('WEB-HOME-01: Dashboard pozdravlja ulogovanog admina po imenu', async ({ pa
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   // "Welcome back, {ime}." je paragraf ispod H1 naslova "Dashboard", ne sama heading.
-  const fullName = 'Aleksa Popovic';
+  const fullName = 'QA Manager Fixture';
   await expect(page.getByText(`Welcome back, ${fullName}.`)).toBeVisible();
 });

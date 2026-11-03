@@ -3,9 +3,9 @@ import { LoginPage } from '../pages/LoginPage';
 import { ServiceVisitsPage } from '../pages/ServiceVisitsPage';
 import { createServiceVisitStop, deleteServiceVisitRoute } from '../helpers/serviceVisitSeed';
 
-const QA_DRIVER_ID = 'a0b2b53e-2a46-4bf9-bcc6-f8a9f7130434'; // driveraleksa@brewtracker.com
+const QA_DRIVER_ID = process.env.QA_DRIVER_ID!;
 const CLIENT_NAME = 'Genova Test Client';
-const DRIVER_NAME = 'New User';
+const DRIVER_NAME = 'QA Driver Fixture';
 
 // Testovi dele isti client+driver par (jedini garantovano čist od postojeće istorije) za
 // svoje fixture-e — paralelno izvršavanje bi privremeno stvorilo više kartica istovremeno
@@ -148,7 +148,7 @@ test('WEB-SV-07: Poseta se ne prikazuje menadžeru ako skladište rute nema pode
   // RLS politika "Managers can read routes in their region" poredi warehouses.region =
   // current_user_region() — skladište bez podešenog regiona (NULL) se tretira kao "izvan
   // regiona" (NULL = 'Italy' nikad nije true), pa menadžer ne vidi tu rutu/stanicu uopšte.
-  const NO_REGION_WAREHOUSE_ID = '11111111-2222-4333-8444-555555555555'; // "QA Test Warehouse", region: null
+  const NO_REGION_WAREHOUSE_ID = process.env.QA_NO_REGION_WAREHOUSE_ID!; // "QA Test Warehouse", region: null
   const route = await createServiceVisitStop({
     driverId: QA_DRIVER_ID,
     arrivedAt: new Date(),

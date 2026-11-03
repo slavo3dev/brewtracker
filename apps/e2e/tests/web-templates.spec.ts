@@ -9,9 +9,9 @@ import {
 } from '../helpers/routeTemplateSeed';
 import { cancelRoutesForMachine } from '../helpers/routeSeed';
 
-const GENOVA_TEST_MACHINE_ID = '2a367b53-e691-4648-99aa-7151410a83c9';
+const GENOVA_TEST_MACHINE_ID = process.env.QA_GENOVA_TEST_MACHINE_ID!;
 
-const QA_DRIVER_ID = 'a0b2b53e-2a46-4bf9-bcc6-f8a9f7130434'; // driveraleksa@brewtracker.com
+const QA_DRIVER_ID = process.env.QA_DRIVER_ID!;
 
 // "QA Conflict E" je postojeći template koji već ima bar jednu stanicu (preduslov za aktivaciju).
 const TEMPLATE_NAME = 'QA Conflict E';

@@ -44,7 +44,10 @@ test('WEB-RECH-04: Otvaranje kartice prikazuje pun detalj brojanja', async ({ pa
 
   await page.goto('/dashboard/inventory/reconciliation/history');
 
-  const firstCard = page.locator('details').first();
+  // Header navigacija (Operations/Inventory/...) TAKOĐE koristi <details> za dropdown meni —
+  // moramo skopirati na listu rekonsilijacija (<section>), inače page.locator('details').first()
+  // pogađa PRVI nav dropdown umesto prve kartice.
+  const firstCard = page.locator('section').locator('details').first();
   await firstCard.locator('summary').click();
 
   await expect(firstCard.getByText('Counted by')).toBeVisible();

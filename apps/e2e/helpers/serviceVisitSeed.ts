@@ -1,11 +1,11 @@
 import { supabaseAdmin } from './supabaseAdmin';
 
-const WAREHOUSE_ID = '44681daa-bcc0-4570-b2b3-289cd78aba17'; // Genova Test Warehouse
+const WAREHOUSE_ID = process.env.QA_GENOVA_TEST_WAREHOUSE_ID!; // Genova Test Warehouse (region: Italy)
 // "Genova Test Client" (za razliku od "Italija") nema NIJEDNU postojeću stanicu sa arrived_at
 // za QA_DRIVER_ID (71+ postojećih za Italija, vrv iz simulirane mobilne aktivnosti) — bez
 // ovoga, pronalaženje TAČNO naše test kartice na /dashboard/service/visits bilo bi dvosmisleno.
-const CLIENT_ID = 'bac55bc1-11b5-4968-a024-ad23984f8c8f'; // Genova Test Client
-const MACHINE_ID = '2a367b53-e691-4648-99aa-7151410a83c9'; // Genova Test Machine
+const CLIENT_ID = process.env.QA_GENOVA_TEST_CLIENT_ID!; // Genova Test Client
+const MACHINE_ID = process.env.QA_GENOVA_TEST_MACHINE_ID!; // Genova Test Machine
 
 // Kreira jednokratnu rutu + jednu stanicu sa KONTROLISANIM arrived_at/completed_at
 // vremenima, direktno preko baze — UI nema put da precizno podesi "vreme provedeno na

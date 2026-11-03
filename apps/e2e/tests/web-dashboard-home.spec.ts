@@ -60,11 +60,13 @@ test('WEB-HOME-03: Sve dashboard navigacione kartice (grupisane) vode na ispravn
 
   for (const { group, cards } of groups) {
     await page.goto('/dashboard');
-    await expect(page.getByRole('heading', { name: group })).toBeVisible();
+    // level: 2 — grupe su <h2>, kartice su <h3> (neke grupe sa jednom karticom dele isti
+    // tekst, npr. "Reports" grupa + "Reports" kartica).
+    await expect(page.getByRole('heading', { name: group, exact: true, level: 2 })).toBeVisible();
 
     for (const [title, expectedUrl] of cards) {
       await page.goto('/dashboard');
-      await page.getByRole('heading', { name: title, exact: true }).click();
+      await page.getByRole('heading', { name: title, exact: true, level: 3 }).click();
       await expect(page).toHaveURL(expectedUrl);
     }
   }
