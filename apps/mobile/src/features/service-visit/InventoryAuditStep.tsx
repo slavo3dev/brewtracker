@@ -63,26 +63,45 @@ function getInventoryAuditErrorMessage(
   error: unknown,
   fallbackMessage: string,
 ): string {
-  if (error instanceof Error) {
-    const message = error.message.toLowerCase();
+  const rawMessage =
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+        ? error.message
+        : error !== null &&
+            typeof error === "object" &&
+            "message" in error &&
+            typeof error.message === "string"
+          ? error.message
+          : "";
 
-    if (message.includes("network request failed")) {
-      return "Unable to sync inventory audit. Check your connection and try again.";
-    }
+  const message = rawMessage.trim();
 
-    if (message.includes("is not configured for this client")) {
-      return (
-        "A product in this inventory audit is no longer active " +
-        "or assigned to this client. Your recorded quantities " +
-        "have been saved. Contact your manager to resolve the " +
-        "product assignment, then retry synchronization."
-      );
-    }
-
-    return error.message;
+  if (!message) {
+    return fallbackMessage;
   }
 
-  return fallbackMessage;
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("network request failed") ||
+    normalizedMessage.includes("failed to fetch") ||
+    normalizedMessage.includes("networkerror") ||
+    normalizedMessage.includes("network error")
+  ) {
+    return "Unable to sync inventory audit. Check your connection and try again.";
+  }
+
+  if (normalizedMessage.includes("is not configured for this client")) {
+    return (
+      "A product in this inventory audit is no longer active " +
+      "or assigned to this client. Your recorded quantities " +
+      "have been saved. Contact your manager to resolve the " +
+      "product assignment, then retry synchronization."
+    );
+  }
+
+  return message;
 }
 
 export default function InventoryAuditStep() {
@@ -115,6 +134,17 @@ export default function InventoryAuditStep() {
     savedAudit.sourceVisitId === activeVisit?.id &&
     savedAudit.syncStatus !== "synced";
 
+  const savedAuditErrorMessage =
+    hasUnfinishedAudit && savedAudit?.syncStatus === "failed"
+      ? getInventoryAuditErrorMessage(
+          savedAudit.syncError,
+          "Unable to sync inventory audit. Check your connection and try again.",
+        )
+      : null;
+
+  const displayedErrorMessage =
+    errorMessage || (!submitting ? savedAuditErrorMessage : null);
+
   const hasLegacyAuditWithoutConfiguration =
     hasUnfinishedAudit && !savedAudit.configuredProducts?.length;
 
@@ -140,7 +170,6 @@ export default function InventoryAuditStep() {
       }
 
       setLoading(true);
-      setErrorMessage(null);
 
       try {
         /*
@@ -621,9 +650,9 @@ export default function InventoryAuditStep() {
         </View>
       ) : null}
 
-      {errorMessage ? (
-        <View style={styles.errorCard}>
-          <Text style={styles.errorText}>{errorMessage}</Text>
+      {displayedErrorMessage ? (
+        <View style={styles.errorCard} accessibilityRole="alert">
+          <Text style={styles.errorText}>{displayedErrorMessage}</Text>
         </View>
       ) : null}
 
