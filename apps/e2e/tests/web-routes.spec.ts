@@ -174,7 +174,12 @@ test('WEB-RT-11: Map preview zahteva 2+ geokodirane stanice', async ({ page }) =
 
   // Sveža ruta bez ijedne stanice — sigurno ima < 2 geokodirane stanice.
   const today = new Date().toISOString().slice(0, 10);
-  await routes.createOneOffRoute(QA_DRIVER_ID, today);
+  // Lista ruta sortira SAMO po route_date (bez tiebreaker-a po created_at) — sa mnogo ruta
+  // za isti dan, "prva" kartica nije pouzdano naša novokreirana. Jedinstvena napomena +
+  // pretraga garantuju da otvaramo BAŠ nju (isti obrazac kao RT-19/20/21/12/16).
+  const noteTag = `QA-RT-11-${Date.now()}`;
+  await routes.createOneOffRoute(QA_DRIVER_ID, today, noteTag);
+  await routes.searchRoutes(noteTag);
   await routes.expandFirstRoute();
   await routes.expectMapPreviewMissingMessage();
 });
@@ -189,8 +194,12 @@ test('WEB-RT-14: Uklanjanje stanice zahteva potvrdu dijaloga', async ({ page }) 
   const before = await routes.getTotalRouteCount();
 
   const today = new Date().toISOString().slice(0, 10);
-  await routes.createOneOffRoute(QA_DRIVER_ID, today);
+  // Vidi napomenu u RT-11: lista sortira samo po datumu, pa nam treba jedinstvena napomena
+  // + pretraga da pouzdano otvorimo BAŠ ovu, novokreiranu rutu.
+  const noteTag = `QA-RT-14-${Date.now()}`;
+  await routes.createOneOffRoute(QA_DRIVER_ID, today, noteTag);
   await routes.expectRouteCountIncreasedBy(before, 1);
+  await routes.searchRoutes(noteTag);
   await routes.expandFirstRoute();
   await routes.addStopToExpandedRoute('Italija', 'Italija Machine');
 
@@ -217,8 +226,12 @@ test('WEB-RT-15: Otkazivanje zakazane rute', async ({ page }) => {
   await routes.goto();
 
   // Napravi svežu rutu (ne diramo postojeće podatke) i proveri da je nova — na vrhu liste, "scheduled".
+  // Vidi napomenu u RT-11: lista sortira samo po datumu, pa nam treba jedinstvena napomena
+  // + pretraga da pouzdano otvorimo BAŠ ovu, novokreiranu rutu.
   const today = new Date().toISOString().slice(0, 10);
-  await routes.createOneOffRoute(QA_DRIVER_ID, today);
+  const noteTag = `QA-RT-15-${Date.now()}`;
+  await routes.createOneOffRoute(QA_DRIVER_ID, today, noteTag);
+  await routes.searchRoutes(noteTag);
   await expect(routes.firstRouteCard().getByText('scheduled', { exact: true })).toBeVisible();
 
   await routes.expandFirstRoute();
@@ -252,15 +265,21 @@ test('WEB-RT-18: Zakazana ruta sa započetom stanicom je odbijena od servera', a
 
   const routes = new RoutesPage(page);
   const today = new Date().toISOString().slice(0, 10);
+  // Lista ruta sortira SAMO po route_date (bez tiebreaker-a po created_at) — sa mnogo ruta
+  // za isti dan (deljena baza, stotine ruta za "danas"), "prva" kartica nije pouzdano naša
+  // novokreirana. Jedinstvena napomena + pretraga garantuju da otvaramo BAŠ nju (isti
+  // obrazac kao RT-19/20/21/12/16).
+  const noteTag = `QA-RT-18-${Date.now()}`;
 
   // Napravi rutu i dodaj joj stanicu (ruta ostaje "scheduled" — status rute se ne menja
   // automatski samim dodavanjem stanice).
   await routes.goto();
   const before = await routes.getTotalRouteCount();
-  await routes.createOneOffRoute(QA_DRIVER_ID, today);
+  await routes.createOneOffRoute(QA_DRIVER_ID, today, noteTag);
   // Sačekaj da se lista STVARNO osveži sa novom rutom pre nego što kliknemo "prvu" —
   // inače možemo da uhvatimo staru rutu koja je bila prva pre osvežavanja.
   await routes.expectRouteCountIncreasedBy(before, 1);
+  await routes.searchRoutes(noteTag);
   await routes.expandFirstRoute();
   await routes.addStopToExpandedRoute('Italija', 'Italija Machine');
 
@@ -271,6 +290,7 @@ test('WEB-RT-18: Zakazana ruta sa započetom stanicom je odbijena od servera', a
   // Ruta je i dalje "scheduled" u UI-ju (dugme Cancel route i dalje postoji), ali server
   // odbija sam zahtev za otkazivanje.
   await routes.goto();
+  await routes.searchRoutes(noteTag);
   await routes.expandFirstRoute();
   await routes.cancelExpandedRoute();
 
