@@ -36,7 +36,8 @@ test('WEB-INV-03: Pretraga po visit ID ili unit substring radi', async ({ page }
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   await page.goto('/dashboard/inventory');
-  // Substring poznatog source_visit_id iz baze.
+  // Substring trajno zasejanog source_visit_id fixture pokreta ("qa-fixture-visit-ndfec463") —
+  // ne oslanja se na slučajnu istorijsku vrednost koja može nestati kad se deljena baza menja.
   await page.getByPlaceholder('Search visit or unit').fill('ndfec463');
   await page.getByRole('button', { name: 'Search' }).click();
 
@@ -248,6 +249,11 @@ test('WEB-INVP-03: "Edit" dugme na kartici otvara formu sa postojećim podacima 
   await page.getByLabel('Base units per issue unit *').fill('6');
   await page.getByLabel('OCS').check();
   await page.getByRole('button', { name: 'Create Product' }).click();
+
+  // Deljeni katalog je dovoljno veliki da nov proizvod (alfabetski posle mnogih
+  // postojećih "C.../I.../M..." imena) ne mora pasti na prvu stranicu (10 po strani) —
+  // pretraga po imenu izbegava tu zavisnost od paginacije.
+  await page.getByPlaceholder('Search products').fill(originalName);
   await expect(page.getByText(originalName)).toBeVisible();
 
   const card = page.locator('article').filter({ hasText: originalName });
@@ -259,6 +265,12 @@ test('WEB-INVP-03: "Edit" dugme na kartici otvara formu sa postojećim podacima 
   await page.getByLabel('Product name *').fill(updatedName);
   await page.getByRole('button', { name: 'Save Changes' }).click();
 
+  // Sačekaj da se edit forma stvarno zatvori (server action + revalidate) PRE interakcije
+  // sa search input-om — inače fill() može pogoditi instancu polja koja se baš zamenjuje
+  // tokom re-rendera, pa se upisana vrednost izgubi (prazno polje, "Showing 57 of 57").
+  await expect(page.getByLabel('Product name *')).toHaveCount(0);
+
+  await page.getByPlaceholder('Search products').fill(updatedName);
   await expect(page.getByText(updatedName)).toBeVisible();
   await expect(page.getByText(originalName)).toHaveCount(0);
 });
