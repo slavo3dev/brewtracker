@@ -9,6 +9,7 @@ import type {
   ClockTarget,
   TimeEntry,
 } from "./time-clock.types";
+import { saveShiftSnapshot } from "./time-clock-cache.service";
 
 type RouteRow = Pick<
   Database["public"]["Tables"]["routes"]["Row"],
@@ -253,6 +254,8 @@ async function loadOpenTimeEntryForUser(
     throw new Error(`Unable to load your current shift: ${error.message}`);
   }
 
+  await saveShiftSnapshot(userId, data);
+
   return data;
 }
 
@@ -302,6 +305,8 @@ export async function createClockIn({
 
     throw new Error(`Unable to clock in: ${error.message}`);
   }
+
+  await saveShiftSnapshot(userId, data);
 
   return {
     timeEntry: data,
@@ -383,6 +388,8 @@ export async function clockOut(timeEntryId: string): Promise<ClockOutResult> {
       "The shift is no longer active. Refresh the app and try again.",
     );
   }
+
+  await saveShiftSnapshot(userId, null);
 
   return {
     timeEntry: data,
