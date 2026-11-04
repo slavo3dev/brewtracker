@@ -36,6 +36,14 @@ type GeneratedRoute = {
 // RPC koji inače pokreće dnevni cron — poziva se direktno (preko servisne role) da bi se
 // deterministički testiralo ROUTE-6 pravilo (generisanje se preskače kad već postoji
 // nepotkazana operativna ruta za istog vozača/datum sa istom mašinom ili istim klijentom).
+//
+// POZNATO OGRANIČENJE: ovaj RPC obrađuje SVE aktivne route_templates za dati datum, ne samo
+// onaj koji WEB-TPL-20 pravi — poziv ovde pokreće realno generisanje ruta i za SVE OSTALE
+// aktivne template-e koji imaju današnji dan kao radni (ne samo QA fixture). Prihvatljivo jer
+// je ovo deljeni QA/test Supabase projekat (ista vrsta podataka koju i sami testovi prave), ne
+// produkcija sa pravim klijentima — ako se ovaj paket ikad pokrene nad bazom koja ima stvarni
+// produkcioni saobraćaj, ovaj poziv treba PRVO izmeniti RPC da prima opcioni filter po
+// template ID-u (migracija), jer bi inače generisao stvarne operativne rute mimo cron rasporeda.
 export async function generateRoutesFromTemplates(routeDateIso: string): Promise<GeneratedRoute[]> {
   const supabase = supabaseAdmin();
   const { data, error } = await supabase.rpc('generate_routes_from_templates', {

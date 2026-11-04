@@ -63,7 +63,14 @@ export class RoutesPage {
   }
 
   async expandFirstRoute() {
-    await this.page.getByRole('button', { name: 'View / manage' }).first().click();
+    const buttons = this.page.getByRole('button', { name: 'View / manage' });
+    // Lista sortira SAMO po route_date (bez tiebreaker-a po created_at), pa "prva" kartica
+    // nije pouzdano novokreirana ruta kad ih ima više za isti dan — svaki pozivač MORA prvo
+    // da suzi listu na BAŠ svoju rutu (npr. searchRoutes(noteTag)) pre ovog poziva. Ova
+    // provera to sprovodi: ako suženje izostane, test pada glasno ovde, umesto da tiho
+    // mutira pogrešnu rutu.
+    await expect(buttons).toHaveCount(1);
+    await buttons.first().click();
   }
 
   async getFirstRouteStatus(): Promise<string> {

@@ -96,10 +96,11 @@ export async function deleteRoute(routeId: string) {
   await supabase.from('routes').delete().eq('id', routeId);
 }
 
-// Čisti preduslov za testove generisanja ruta iz template-a (npr. WEB-TPL-20): otkazuje SVE
-// postojeće neotkazane rute za tog vozača/datum koje sadrže datu mašinu, da bi test sam
-// kontrolisao jedini konflikt koji namerno pravi — bez ovoga, "osirotela" ruta ostala iz
-// nekog ranijeg prekinutog pokretanja može trajno blokirati generisanje.
+// Čisti preduslov za testove generisanja ruta iz template-a (npr. WEB-TPL-20): otkazuje SAMO
+// "osirotele" SCHEDULED rute (ostale iz nekog ranijeg prekinutog pokretanja) koje bi inače
+// trajno blokirale generisanje. Namerno NE dira in_progress/completed rute — to bi prepisalo
+// stvarnu servisnu istoriju za ovog deljenog vozača/mašinu, mimo cancel_operational_route
+// lifecycle provera (ovo je direktan admin upis, bez tih provera).
 export async function cancelRoutesForMachine(driverId: string, routeDateIso: string, machineId: string) {
   const supabase = supabaseAdmin();
   const { data: stops, error: stopsError } = await supabase
@@ -108,7 +109,7 @@ export async function cancelRoutesForMachine(driverId: string, routeDateIso: str
     .eq('machine_id', machineId)
     .eq('route.driver_id', driverId)
     .eq('route.route_date', routeDateIso)
-    .neq('route.status', 'cancelled');
+    .eq('route.status', 'scheduled');
 
   if (stopsError) {
     throw new Error(`Ne mogu da nađem konfliktne rute: ${stopsError.message}`);
