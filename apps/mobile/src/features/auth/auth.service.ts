@@ -1,6 +1,11 @@
 import type { AuthUser } from "@brewtracker/types";
 
 import { supabase } from "../../lib/supabase";
+import {
+  loadCachedProfile,
+  removeCachedProfile,
+  saveCachedProfile,
+} from "./auth-profile-cache.service";
 
 export type SignInCredentials = {
   email: string;
@@ -37,16 +42,74 @@ export async function signOut(): Promise<void> {
   }
 }
 
-export async function getCurrentUserProfile(userId: string): Promise<AuthUser> {
-  const { data, error } = await supabase
-    .from("users")
-    .select("id, role, region, is_active")
-    .eq("id", userId)
-    .single();
+export function isAuthNetworkError(error: unknown): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : error !== null &&
+          typeof error === "object" &&
+          "message" in error &&
+          typeof error.message === "string"
+        ? error.message
+        : "";
 
-  if (error) {
-    throw new Error(`Unable to load user profile: ${error.message}`);
+  const normalized = message.toLowerCase();
+
+  return (
+    normalized.includes("network request failed") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("networkerror") ||
+    normalized.includes("network error") ||
+    normalized.includes("unable to connect.")
+  );
+}
+
+export async function getCurrentUserProfile(
+  userId: string,
+  { allowCached = true }: { allowCached?: boolean } = {},
+): Promise<AuthUser> {
+  let profile: AuthUser;
+
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, role, region, is_active")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.id !== userId) {
+      throw new Error("Your employee profile could not be found.");
+    }
+
+    profile = data;
+  } catch (error) {
+    if (isAuthNetworkError(error)) {
+      if (allowCached) {
+        const cachedProfile = await loadCachedProfile(userId);
+
+        if (cachedProfile) {
+          return cachedProfile;
+        }
+      }
+
+      throw new Error(
+        "Unable to connect. Check your internet connection and try again.",
+      );
+    }
+
+    // A server rejection must not fall back to older access details.
+    await removeCachedProfile(userId);
+
+    throw new Error(
+      "Unable to verify your employee profile. Try again or contact your manager.",
+    );
   }
 
-  return data;
+  await saveCachedProfile(profile);
+
+  return profile;
 }
