@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 import { UsersPage } from '../pages/UsersPage';
-import { createTestUser, deleteTestUser, setUserEmailToNull } from '../helpers/userSeed';
+import { createTestUser, deleteTestUser, getUserIdByEmail, setUserEmailToNull } from '../helpers/userSeed';
 
 test('WEB-USR-01: Creating a user with all fields succeeds and sends the setup email', async ({ page }) => {
   // Dokumentovan, već potvrđen defekt (regresioni plan, Critical Fail): createUserAction()
@@ -24,16 +24,27 @@ test('WEB-USR-01: Creating a user with all fields succeeds and sends the setup e
   await users.openAddUserForm();
 
   const stamp = Date.now();
-  await users.fillAndSubmit({
-    fullName: 'QA USR-01 Test User',
-    email: `qa-usr-01-${stamp}@brewtracker.com`,
-    phone: `+3816${String(stamp).slice(-8)}`,
-    address: 'Test Address 1',
-    region: 'Italy',
-    role: 'driver',
-  });
+  const email = `qa-usr-01-${stamp}@brewtracker.com`;
 
-  await users.expectUserCreatedAndEmailSent();
+  try {
+    await users.fillAndSubmit({
+      fullName: 'QA USR-01 Test User',
+      email,
+      phone: `+3816${String(stamp).slice(-8)}`,
+      address: 'Test Address 1',
+      region: 'Italy',
+      role: 'driver',
+    });
+
+    await users.expectUserCreatedAndEmailSent();
+  } finally {
+    // Dokumentovan defekt gore: nalog se pravi u bazi i kad finalna poruka ne uspe (rate
+    // limit na email), pa čistimo bez obzira na ishod — da reruns ne gomilaju naloge.
+    const userId = await getUserIdByEmail(email);
+    if (userId) {
+      await deleteTestUser(userId);
+    }
+  }
 });
 
 test('WEB-USR-02: Role select in the Add user form defaults to Driver', async ({ page }) => {

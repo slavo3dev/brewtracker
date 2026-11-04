@@ -32,7 +32,16 @@ test('WEB-WH-01: Warehouse geofence can be updated and saved', async ({ page }) 
   const warehouses = new WarehousesPage(page);
   await warehouses.goto();
 
-  const newValues = { latitude: 44.4056, longitude: 8.9463, radiusFeet: 212.5 };
+  // Radius se bira u odnosu na TRENUTNO upisanu vrednost (ne fiksna konstanta) — inače, čim
+  // se neki run jednom uspešno sačuva na 212.5, svaki sledeći run samo re-submituje ISTU
+  // vrednost i test prestaje da testira update (vidi napomenu gore: resubmit iste vrednosti
+  // ne ruši stranicu, pa bi test lažno prolazio bez stvarne provere).
+  const current = await warehouses.getGeofenceValues(WAREHOUSE_NAME);
+  const newValues = {
+    latitude: 44.4056,
+    longitude: 8.9463,
+    radiusFeet: Number(current.radiusFeet) === 212.5 ? 213.5 : 212.5,
+  };
   await warehouses.updateGeofence(WAREHOUSE_NAME, newValues);
 
   await warehouses.goto();

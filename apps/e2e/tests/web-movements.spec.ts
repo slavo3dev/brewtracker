@@ -14,7 +14,7 @@ test('WEB-MVMT-02: Per-product aggregate columns compute correctly (NET = TAKEN 
       const cells = tr.querySelectorAll('td');
       const parseNum = (cell: Element) => {
         const text = cell.querySelector('span')?.textContent ?? '0';
-        return parseInt(text.replace(/[^\d-]/g, ''), 10);
+        return parseFloat(text.replace(/[^\d.-]/g, ''));
       };
       return {
         product: cells[0].querySelector('p')?.textContent,
@@ -31,7 +31,7 @@ test('WEB-MVMT-02: Per-product aggregate columns compute correctly (NET = TAKEN 
 
   for (const row of rows) {
     const expectedNet = row.taken - row.delivered - row.machine - row.returned;
-    expect(row.net, `NET za "${row.product}"`).toBe(expectedNet);
+    expect(row.net, `NET za "${row.product}"`).toBeCloseTo(expectedNet, 3);
   }
 });
 

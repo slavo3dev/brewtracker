@@ -19,7 +19,14 @@ export class WarehousesPage {
     await form.locator('input[name="latitude"]').fill(String(values.latitude));
     await form.locator('input[name="longitude"]').fill(String(values.longitude));
     await form.locator('input[name="radiusFeet"]').fill(String(values.radiusFeet));
+
+    // Server action submit (action={updateWarehouseGeofenceAction}) ne menja URL — čekamo
+    // na POST da se ne vrati PRE nego što je čuvanje (ili server greška) stvarno gotovo.
+    const saved = this.page.waitForResponse(
+      (response) => response.request().method() === 'POST' && response.url().includes('/dashboard/inventory/warehouses'),
+    );
     await form.getByRole('button', { name: 'Save geofence' }).click();
+    await saved;
   }
 
   async getGeofenceValues(warehouseName: string): Promise<{

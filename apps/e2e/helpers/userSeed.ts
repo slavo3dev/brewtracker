@@ -49,6 +49,12 @@ export async function createTestUser(params: {
  * edge case (WEB-USR-11). Ne menja auth.users email (ostaje isti realan nalog), samo
  * denormalizovano display polje koje Users stranica koristi.
  */
+export async function getUserIdByEmail(email: string): Promise<string | null> {
+  const supabase = supabaseAdmin();
+  const { data } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
+  return data?.id ?? null;
+}
+
 export async function setUserEmailToNull(userId: string) {
   const supabase = supabaseAdmin();
   const { error } = await supabase.from('users').update({ email: null }).eq('id', userId);
@@ -59,8 +65,23 @@ export async function setUserEmailToNull(userId: string) {
 
 export async function deleteTestUser(userId: string) {
   const supabase = supabaseAdmin();
-  await supabase.from('users').delete().eq('id', userId);
-  await supabase.auth.admin.deleteUser(userId);
+
+  // Trigger koji pravi public.users red takođe (posredno) pravi i inventory_locations red
+  // za tog vozača — mora se obrisati PRE users reda zbog ON DELETE RESTRICT FK-a.
+  const { error: locationError } = await supabase.from('inventory_locations').delete().eq('driver_id', userId);
+  if (locationError) {
+    throw new Error(`Ne mogu da obrišem inventory location: ${locationError.message}`);
+  }
+
+  const { error: profileError } = await supabase.from('users').delete().eq('id', userId);
+  if (profileError) {
+    throw new Error(`Ne mogu da obrišem profil: ${profileError.message}`);
+  }
+
+  const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+  if (authError) {
+    throw new Error(`Ne mogu da obrišem auth nalog: ${authError.message}`);
+  }
 }
 
 /**
