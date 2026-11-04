@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
+import { deleteProductByName } from '../helpers/productSeed';
 
 test('WEB-INV-01: Movement history shows paginated results by default', async ({ page }) => {
   const login = new LoginPage(page);
@@ -200,20 +201,27 @@ test('WEB-INVP-01: "+ Add Product" form creates a new product', async ({ page })
   await page.getByRole('button', { name: '+ Add Product' }).click();
 
   const name = `QA INVP-01 Test Product ${Date.now()}`;
-  await page.getByLabel('Product name *').fill(name);
-  await page.getByLabel('Display unit label *').fill('bags');
-  await page.getByLabel('Base unit *').fill('bag');
-  await page.getByLabel('Issue unit *', { exact: true }).fill('case');
-  await page.getByLabel('Base units per issue unit *').fill('6');
-  await page.getByLabel('OCS').check();
-  await page.getByRole('button', { name: 'Create Product' }).click();
 
-  // Deljeni katalog je narastao dovoljno (50+ proizvoda) da nov proizvod ne mora pasti
-  // na prvu stranicu (10 po strani) — sačekaj da se forma zatvori (handleProductSaved
-  // već resetovao search na "") pre upisa, pa pretraži po imenu da izbegnemo tu zavisnost.
-  await expect(page.getByLabel('Product name *')).toHaveCount(0);
-  await page.getByPlaceholder('Search products').fill(name);
-  await expect(page.getByText(name)).toBeVisible();
+  try {
+    await page.getByLabel('Product name *').fill(name);
+    await page.getByLabel('Display unit label *').fill('bags');
+    await page.getByLabel('Base unit *').fill('bag');
+    await page.getByLabel('Issue unit *', { exact: true }).fill('case');
+    await page.getByLabel('Base units per issue unit *').fill('6');
+    await page.getByLabel('OCS').check();
+    await page.getByRole('button', { name: 'Create Product' }).click();
+
+    // Deljeni katalog je narastao dovoljno (50+ proizvoda) da nov proizvod ne mora pasti
+    // na prvu stranicu (10 po strani) — sačekaj da se forma zatvori (handleProductSaved
+    // već resetovao search na "") pre upisa, pa pretraži po imenu da izbegnemo tu zavisnost.
+    await expect(page.getByLabel('Product name *')).toHaveCount(0);
+    await page.getByPlaceholder('Search products').fill(name);
+    await expect(page.getByText(name)).toBeVisible();
+  } finally {
+    // Bez ovoga, deljeni katalog trajno rase sa svakim zelenim run-om — i pomera pozicione
+    // izbore u WEB-XFER-10-tipa petljama koje prolaze kroz SVE aktivne proizvode.
+    await deleteProductByName(name);
+  }
 });
 
 test('WEB-INVP-02: Creating a product is blocked without a selected business type', async ({ page }) => {
@@ -247,42 +255,50 @@ test('WEB-INVP-03: "Edit" button on a card opens a form with existing data and s
   await page.getByRole('button', { name: '+ Add Product' }).click();
 
   const originalName = `QA INVP-03 Original ${Date.now()}`;
-  await page.getByLabel('Product name *').fill(originalName);
-  await page.getByLabel('Display unit label *').fill('bags');
-  await page.getByLabel('Base unit *').fill('bag');
-  await page.getByLabel('Issue unit *', { exact: true }).fill('case');
-  await page.getByLabel('Base units per issue unit *').fill('6');
-  await page.getByLabel('OCS').check();
-  await page.getByRole('button', { name: 'Create Product' }).click();
-
-  // handleProductSaved() u app kodu BRIŠE search polje na "" posle SVAKOG uspešnog
-  // create/edit (i zatvara formu) — moramo sačekati da se forma stvarno zatvori (taj
-  // reset se već desio) PRE nego što upišemo search, inače app sam obriše ono što upišemo.
-  await expect(page.getByLabel('Product name *')).toHaveCount(0);
-
-  // Deljeni katalog je dovoljno veliki da nov proizvod (alfabetski posle mnogih
-  // postojećih "C.../I.../M..." imena) ne mora pasti na prvu stranicu (10 po strani) —
-  // pretraga po imenu izbegava tu zavisnost od paginacije.
-  await page.getByPlaceholder('Search products').fill(originalName);
-  await expect(page.getByText(originalName)).toBeVisible();
-
-  const card = page.locator('article').filter({ hasText: originalName });
-  await card.getByRole('button', { name: 'Edit' }).click();
-
-  await expect(page.getByLabel('Product name *')).toHaveValue(originalName);
-
   const updatedName = `QA INVP-03 Updated ${Date.now()}`;
-  await page.getByLabel('Product name *').fill(updatedName);
-  await page.getByRole('button', { name: 'Save Changes' }).click();
 
-  // Sačekaj da se edit forma stvarno zatvori (server action + revalidate) PRE interakcije
-  // sa search input-om — inače fill() može pogoditi instancu polja koja se baš zamenjuje
-  // tokom re-rendera, pa se upisana vrednost izgubi (prazno polje, "Showing 57 of 57").
-  await expect(page.getByLabel('Product name *')).toHaveCount(0);
+  try {
+    await page.getByLabel('Product name *').fill(originalName);
+    await page.getByLabel('Display unit label *').fill('bags');
+    await page.getByLabel('Base unit *').fill('bag');
+    await page.getByLabel('Issue unit *', { exact: true }).fill('case');
+    await page.getByLabel('Base units per issue unit *').fill('6');
+    await page.getByLabel('OCS').check();
+    await page.getByRole('button', { name: 'Create Product' }).click();
 
-  await page.getByPlaceholder('Search products').fill(updatedName);
-  await expect(page.getByText(updatedName)).toBeVisible();
-  await expect(page.getByText(originalName)).toHaveCount(0);
+    // handleProductSaved() u app kodu BRIŠE search polje na "" posle SVAKOG uspešnog
+    // create/edit (i zatvara formu) — moramo sačekati da se forma stvarno zatvori (taj
+    // reset se već desio) PRE nego što upišemo search, inače app sam obriše ono što upišemo.
+    await expect(page.getByLabel('Product name *')).toHaveCount(0);
+
+    // Deljeni katalog je dovoljno veliki da nov proizvod (alfabetski posle mnogih
+    // postojećih "C.../I.../M..." imena) ne mora pasti na prvu stranicu (10 po strani) —
+    // pretraga po imenu izbegava tu zavisnost od paginacije.
+    await page.getByPlaceholder('Search products').fill(originalName);
+    await expect(page.getByText(originalName)).toBeVisible();
+
+    const card = page.locator('article').filter({ hasText: originalName });
+    await card.getByRole('button', { name: 'Edit' }).click();
+
+    await expect(page.getByLabel('Product name *')).toHaveValue(originalName);
+
+    await page.getByLabel('Product name *').fill(updatedName);
+    await page.getByRole('button', { name: 'Save Changes' }).click();
+
+    // Sačekaj da se edit forma stvarno zatvori (server action + revalidate) PRE interakcije
+    // sa search input-om — inače fill() može pogoditi instancu polja koja se baš zamenjuje
+    // tokom re-rendera, pa se upisana vrednost izgubi (prazno polje, "Showing 57 of 57").
+    await expect(page.getByLabel('Product name *')).toHaveCount(0);
+
+    await page.getByPlaceholder('Search products').fill(updatedName);
+    await expect(page.getByText(updatedName)).toBeVisible();
+    await expect(page.getByText(originalName)).toHaveCount(0);
+  } finally {
+    // Proizvod sad postoji pod updatedName (preimenovan) — ili pod originalName ako je edit
+    // korak pao pre rename-a; pokušaj oba da ne ostavimo nijedan trag u deljenom katalogu.
+    await deleteProductByName(updatedName);
+    await deleteProductByName(originalName);
+  }
 });
 
 test('WEB-INVP-04: Non-manager/CEO cannot manage inventory products', async ({ page }) => {

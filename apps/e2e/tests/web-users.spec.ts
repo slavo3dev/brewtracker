@@ -79,19 +79,27 @@ test('WEB-USR-07: Pagination shows 10 users per page', async ({ page }) => {
   // Test SAM seeduje dovoljno korisnika (umesto da se oslanja na ambijentalni broj u
   // deljenoj bazi) — garantuje bar 2 pune strane bez obzira koliko trenutno ima korisnika.
   const stamp = Date.now();
-  const userIds = await Promise.all(
-    Array.from({ length: 15 }, (_, i) =>
-      createTestUser({
-        email: `qa-usr-07-${stamp}-${i}@brewtracker.com`,
-        password: 'TestPass123!',
-        fullName: `QA USR-07 Pagination User ${stamp}-${i}`,
-        role: 'driver',
-        isActive: true,
-      }),
-    ),
-  );
-
+  // allSettled (ne all) + push u try — ako JEDAN od 15 zahteva odbije, ostali koji su uspeli
+  // moraju ostati zabeleženi za cleanup ispod, umesto da se trajno izgube u deljenoj bazi.
+  const userIds: string[] = [];
   try {
+    const results = await Promise.allSettled(
+      Array.from({ length: 15 }, async (_, i) => {
+        const id = await createTestUser({
+          email: `qa-usr-07-${stamp}-${i}@brewtracker.com`,
+          password: 'TestPass123!',
+          fullName: `QA USR-07 Pagination User ${stamp}-${i}`,
+          role: 'driver',
+          isActive: true,
+        });
+        userIds.push(id);
+      }),
+    );
+    const failure = results.find((result) => result.status === 'rejected');
+    if (failure?.status === 'rejected') {
+      throw failure.reason;
+    }
+
     const login = new LoginPage(page);
     await login.goto();
     await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -151,7 +159,8 @@ test('WEB-USR-03: Creating a user is blocked without a full name', async ({ page
 
   // "fullName" ima HTML required atribut — browser blokira submit pre nego što ikada
   // stigne do servera (nema "User created..." poruke).
-  await expect(users.fullNameField()).toHaveJSProperty('validity.valid', false);
+  const fullNameField = users.fullNameField();
+  await expect.poll(() => fullNameField.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
   await expect(page.getByText('User created and password setup email sent.')).toHaveCount(0);
 });
 
@@ -315,7 +324,8 @@ test('WEB-USR-09: Full name is required when saving an edit', async ({ page }) =
     // "fullName" ima HTML required atribut — browser blokira submit pre nego što ikada
     // stigne do servera.
     await users.attemptClearFullNameAndSave(email);
-    await expect(users.userCard(email).locator('input[name="fullName"]')).toHaveJSProperty('validity.valid', false);
+    const fullNameInput = users.userCard(email).locator('input[name="fullName"]');
+    await expect.poll(() => fullNameInput.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
     await expect(users.userCard(email).getByText('User updated.')).toHaveCount(0);
   } finally {
     await deleteTestUser(userId);

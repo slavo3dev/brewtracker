@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 import { RoutesPage } from '../pages/RoutesPage';
-import { getLatestScheduledRouteId, deleteRoute } from '../helpers/routeSeed';
+import { getRouteIdByNotes, deleteRoute } from '../helpers/routeSeed';
 import { todayLocalIso } from '../helpers/date';
 
 const QA_DRIVER_ID = process.env.QA_DRIVER_ID!;
@@ -31,8 +31,9 @@ test('WEB-RT-13: Add stop requires a client; the machine list is client-scoped',
     expect(machineOptions).toContain('Italija Machine');
     expect(machineOptions).not.toContain('Select a client first');
   } finally {
-    // UI je gore već potvrdio da je ruta vidljiva/otvorena, pa je DB upis sigurno vidljiv ovde.
-    const routeId = await getLatestScheduledRouteId(QA_DRIVER_ID, today);
-    await deleteRoute(routeId);
+    // Po noteTag-u, ne "najnovija zakazana" — ako kreiranje nije uspelo (pre try bloka),
+    // "najnovija zakazana ruta za ovog vozača" može biti neka tuđa, nepovezana ruta.
+    const routeId = await getRouteIdByNotes(noteTag);
+    if (routeId) await deleteRoute(routeId);
   }
 });

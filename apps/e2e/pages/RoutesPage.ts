@@ -193,7 +193,8 @@ export class RoutesPage {
   }
 
   async expectRequiredFieldInvalid(fieldName: 'driverId' | 'warehouseId') {
-    await expect(this.page.locator(`select[name="${fieldName}"]`)).toHaveJSProperty('validity.valid', false);
+    const select = this.page.locator(`select[name="${fieldName}"]`);
+    await expect.poll(() => select.evaluate((el: HTMLSelectElement) => el.validity.valid)).toBe(false);
   }
 
   async searchRoutes(text: string) {

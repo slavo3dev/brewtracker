@@ -50,6 +50,6 @@ export class WarehousesPage {
 
   async expectRadiusFieldInvalid(warehouseName: string) {
     const input = this.form(warehouseName).locator('input[name="radiusFeet"]');
-    await expect(input).toHaveJSProperty('validity.valid', false);
+    await expect.poll(() => input.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
   }
 }

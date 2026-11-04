@@ -51,7 +51,8 @@ test('WEB-AUTH-02: Login is blocked with empty fields', async ({ page }) => {
 
   // "email"/"password" imaju HTML required atribut — browser blokira submit pre nego
   // što ikada stigne do servera (ista "Select a warehouse."-tipa provera kao na drugim formama).
-  await expect(page.locator('#email')).toHaveJSProperty('validity.valid', false);
+  const emailInput = page.locator('#email');
+  await expect.poll(() => emailInput.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
   await expect(page).toHaveURL(/\/login/);
 });
 
@@ -78,7 +79,7 @@ test('WEB-AUTH-08: Forgot password is blocked with an empty email', async ({ pag
   await page.getByRole('button', { name: 'Send reset link' }).click();
 
   // "email" ima HTML required atribut — ista client-side blokada kao na login formi.
-  await expect(emailField).toHaveJSProperty('validity.valid', false);
+  await expect.poll(() => emailField.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
 });
 
 test('WEB-AUTH-14: Active manager can access /dashboard/users', async ({ page }) => {

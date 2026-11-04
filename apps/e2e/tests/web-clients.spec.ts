@@ -44,7 +44,8 @@ test('WEB-CLI-03: Creating a client is blocked without a name', async ({ page })
   await page.getByRole('button', { name: 'Create Client' }).click();
 
   // "name" ima HTML required atribut — browser blokira submit pre nego što stigne do servera.
-  await expect(page.locator('input[name="name"]')).toHaveJSProperty('validity.valid', false);
+  const nameInput = page.locator('input[name="name"]');
+  await expect.poll(() => nameInput.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
   await expect(page).toHaveURL(/\/dashboard\/clients\/new$/);
 });
 

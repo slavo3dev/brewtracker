@@ -1,5 +1,14 @@
 import { supabaseAdmin } from './supabaseAdmin';
 
+// "Latest scheduled route" nije pouzdan izbor za konkretnu, upravo kreiranu rutu — druga ruta
+// za istog vozača/dan može biti upisana pre ove (ili ova nikad nije ni napravljena ako je UI
+// korak pre ovog poziva pao). Jedinstveni noteTag je jedini siguran način da pogodimo BAŠ nju.
+export async function getRouteIdByNotes(notes: string): Promise<string | null> {
+  const supabase = supabaseAdmin();
+  const { data } = await supabase.from('routes').select('id').eq('notes', notes).maybeSingle();
+  return data?.id ?? null;
+}
+
 export async function getLatestScheduledRouteId(driverId: string, routeDateIso: string): Promise<string> {
   const supabase = supabaseAdmin();
   const { data, error } = await supabase

@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 import { RoutesPage } from '../pages/RoutesPage';
 import {
-  getLatestScheduledRouteId,
+  getRouteIdByNotes,
   markFirstStopAsStarted,
   setRouteStatus,
   createTemplateGeneratedRoute,
@@ -285,7 +285,10 @@ test('WEB-RT-18: A scheduled route with a started stop is rejected by the server
   await routes.addStopToExpandedRoute('Italija', 'Italija Machine');
 
   // Direktno preko baze označi tu stanicu kao započetu (to inače radi samo mobilna app).
-  const routeId = await getLatestScheduledRouteId(QA_DRIVER_ID, today);
+  // Po noteTag-u, ne "najnovija zakazana" — druga ruta za istog vozača/dan može biti upisana
+  // pre ove.
+  const routeId = await getRouteIdByNotes(noteTag);
+  if (!routeId) throw new Error(`Ne mogu da nađem rutu sa noteTag: ${noteTag}`);
   await markFirstStopAsStarted(routeId);
 
   // Ruta je i dalje "scheduled" u UI-ju (dugme Cancel route i dalje postoji), ali server
@@ -345,7 +348,10 @@ test('WEB-RT-20: A route in progress does not allow managing stops', async ({ pa
   await routes.expandFirstRoute();
   await routes.addStopToExpandedRoute('Italija', 'Italija Machine');
 
-  const routeId = await getLatestScheduledRouteId(QA_DRIVER_ID, today);
+  // Po noteTag-u, ne "najnovija zakazana" — druga ruta za istog vozača/dan može biti upisana
+  // pre ove.
+  const routeId = await getRouteIdByNotes(noteTag);
+  if (!routeId) throw new Error(`Ne mogu da nađem rutu sa noteTag: ${noteTag}`);
   // UI nema put da rutu postavi u "in_progress" (to radi samo mobilna app) — direktno preko baze,
   // uz vraćanje na "scheduled" na kraju da ne zaprlja podatke za druge testove.
   await setRouteStatus(routeId, 'in_progress');

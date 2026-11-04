@@ -53,12 +53,14 @@ export class TransfersPage {
 
   async expectIssueQuantityInvalidForRow(rowIndex: number) {
     const card = this.page.locator('.rounded-2xl.border.border-latte-200.bg-latte-50').nth(rowIndex);
-    await expect(card.locator('input[type="number"]').first()).toHaveJSProperty('validity.valid', false);
+    const input = card.locator('input[type="number"]').first();
+    await expect.poll(() => input.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
   }
 
   async expectLooseQuantityInvalidForRow(rowIndex: number) {
     const card = this.page.locator('.rounded-2xl.border.border-latte-200.bg-latte-50').nth(rowIndex);
-    await expect(card.locator('input[type="number"]').nth(1)).toHaveJSProperty('validity.valid', false);
+    const input = card.locator('input[type="number"]').nth(1);
+    await expect.poll(() => input.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
   }
 
   async getTotalTransferReadoutForRow(rowIndex: number): Promise<string> {
