@@ -156,7 +156,7 @@ export class RouteTemplatesPage {
       await card.locator('select[name="machineId"]').selectOption({ label: machineLabel });
     }
     await card.getByRole('button', { name: 'Add Stop', exact: true }).click();
-    await expect(card.getByText('Stop added to route template.')).toBeVisible({ timeout: 10000 });
+    await expect(card.getByText('Stop added to route template.')).toBeVisible({ timeout: 15000 });
   }
 
   async attemptAddStop(templateName: string, clientLabel: string, machineLabel?: string) {

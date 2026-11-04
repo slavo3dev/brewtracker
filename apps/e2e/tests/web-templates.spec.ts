@@ -8,6 +8,7 @@ import {
   generateRoutesFromTemplates,
 } from '../helpers/routeTemplateSeed';
 import { cancelRoutesForMachine } from '../helpers/routeSeed';
+import { todayLocalIso } from '../helpers/date';
 
 const GENOVA_TEST_MACHINE_ID = process.env.QA_GENOVA_TEST_MACHINE_ID!;
 
@@ -525,9 +526,11 @@ test('WEB-TPL-19: An active template must keep at least one service day', async 
 
 test('WEB-TPL-20: Daily generation skips an occurrence that conflicts with an existing route', async ({ page }) => {
   const name = `QA TPL-20 ${Date.now()}`;
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = todayLocalIso();
   const weekdayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const todayWeekday = weekdayNames[new Date().getUTCDay()];
+  // Derived FROM todayIso (not a separate "now" call) so the weekday always matches the exact
+  // calendar date we use everywhere else below, regardless of timezone.
+  const todayWeekday = weekdayNames[new Date(`${todayIso}T00:00:00Z`).getUTCDay()];
 
   try {
     // Čist preduslov — "osirotela" neotkazana ruta iz nekog ranijeg prekinutog pokretanja ovog

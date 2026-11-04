@@ -1,6 +1,10 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 import { RoutesPage } from '../pages/RoutesPage';
+import { getLatestScheduledRouteId, deleteRoute } from '../helpers/routeSeed';
+import { todayLocalIso } from '../helpers/date';
+
+const QA_DRIVER_ID = process.env.QA_DRIVER_ID!;
 
 test('WEB-RT-13: Add stop requires a client; the machine list is client-scoped', async ({ page }) => {
   const login = new LoginPage(page);
@@ -8,16 +12,27 @@ test('WEB-RT-13: Add stop requires a client; the machine list is client-scoped',
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   const routes = new RoutesPage(page);
+  const today = todayLocalIso();
+  const noteTag = `QA-RT-13-${Date.now()}`;
   await routes.goto();
-  await routes.expandFirstRoute();
-  await routes.openAddStopForm();
+  await routes.createOneOffRoute(QA_DRIVER_ID, today, noteTag);
 
-  // Pre izbora klijenta, polje za mašinu je zaključano na "Select a client first".
-  await routes.expectMachineRequiresClientFirst();
+  try {
+    await routes.searchRoutes(noteTag);
+    await routes.expandFirstRoute();
+    await routes.openAddStopForm();
 
-  // Posle izbora klijenta, lista mašina se puni SAMO mašinama tog klijenta.
-  await routes.selectStopClient('Italija');
-  const machineOptions = await routes.getMachineOptionLabels();
-  expect(machineOptions).toContain('Italija Machine');
-  expect(machineOptions).not.toContain('Select a client first');
+    // Pre izbora klijenta, polje za mašinu je zaključano na "Select a client first".
+    await routes.expectMachineRequiresClientFirst();
+
+    // Posle izbora klijenta, lista mašina se puni SAMO mašinama tog klijenta.
+    await routes.selectStopClient('Italija');
+    const machineOptions = await routes.getMachineOptionLabels();
+    expect(machineOptions).toContain('Italija Machine');
+    expect(machineOptions).not.toContain('Select a client first');
+  } finally {
+    // UI je gore već potvrdio da je ruta vidljiva/otvorena, pa je DB upis sigurno vidljiv ovde.
+    const routeId = await getLatestScheduledRouteId(QA_DRIVER_ID, today);
+    await deleteRoute(routeId);
+  }
 });

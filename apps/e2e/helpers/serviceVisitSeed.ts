@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabaseAdmin';
+import { todayLocalIso } from './date';
 
 const WAREHOUSE_ID = process.env.QA_GENOVA_TEST_WAREHOUSE_ID!; // Genova Test Warehouse (region: Italy)
 // "Genova Test Client" (za razliku od "Italija") nema NIJEDNU postojeću stanicu sa arrived_at
@@ -17,7 +18,7 @@ export async function createServiceVisitStop(params: {
   warehouseId?: string;
 }): Promise<{ routeId: string; stopId: string }> {
   const supabase = supabaseAdmin();
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = todayLocalIso();
 
   const { data: route, error: routeError } = await supabase
     .from('routes')

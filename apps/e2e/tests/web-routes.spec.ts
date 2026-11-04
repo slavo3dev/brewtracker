@@ -8,6 +8,7 @@ import {
   createTemplateGeneratedRoute,
   deleteRoute,
 } from '../helpers/routeSeed';
+import { todayLocalIso } from '../helpers/date';
 
 const QA_DRIVER_ID = process.env.QA_DRIVER_ID!;
 
@@ -25,7 +26,7 @@ test('WEB-RT-02: Creating a one-off route with all required fields', async ({ pa
   await routes.goto();
   const before = await routes.getTotalRouteCount();
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   await routes.createOneOffRoute(QA_DRIVER_ID, today);
 
   await routes.expectRouteCountIncreasedBy(before, 1);
@@ -94,7 +95,7 @@ test('WEB-RT-07: "Reset to today" link appears when the date changes', async ({ 
   await routes.expectResetToTodayVisible();
 
   await routes.clickResetToToday();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   await expect(page.locator('input[type="date"]')).toHaveValue(today);
 });
 
@@ -138,7 +139,7 @@ test('WEB-RT-10: Recurring vs one-off badge displays correctly', async ({ page }
 
   // One-off: sveže ručno kreirana ruta.
   await routes.goto();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   await routes.createOneOffRoute(QA_DRIVER_ID, today);
   await routes.expectOneOffBadge(routes.firstRouteCard());
 
@@ -173,7 +174,7 @@ test('WEB-RT-11: Map preview requires 2+ geocoded stops', async ({ page }) => {
   await routes.goto();
 
   // Sveža ruta bez ijedne stanice — sigurno ima < 2 geokodirane stanice.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   // Lista ruta sortira SAMO po route_date (bez tiebreaker-a po created_at) — sa mnogo ruta
   // za isti dan, "prva" kartica nije pouzdano naša novokreirana. Jedinstvena napomena +
   // pretraga garantuju da otvaramo BAŠ nju (isti obrazac kao RT-19/20/21/12/16).
@@ -193,7 +194,7 @@ test('WEB-RT-14: Removing a stop requires dialog confirmation', async ({ page })
   await routes.goto();
   const before = await routes.getTotalRouteCount();
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   // Vidi napomenu u RT-11: lista sortira samo po datumu, pa nam treba jedinstvena napomena
   // + pretraga da pouzdano otvorimo BAŠ ovu, novokreiranu rutu.
   const noteTag = `QA-RT-14-${Date.now()}`;
@@ -228,7 +229,7 @@ test('WEB-RT-15: Cancelling a scheduled route', async ({ page }) => {
   // Napravi svežu rutu (ne diramo postojeće podatke) i proveri da je nova — na vrhu liste, "scheduled".
   // Vidi napomenu u RT-11: lista sortira samo po datumu, pa nam treba jedinstvena napomena
   // + pretraga da pouzdano otvorimo BAŠ ovu, novokreiranu rutu.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   const noteTag = `QA-RT-15-${Date.now()}`;
   await routes.createOneOffRoute(QA_DRIVER_ID, today, noteTag);
   await routes.searchRoutes(noteTag);
@@ -264,7 +265,7 @@ test('WEB-RT-18: A scheduled route with a started stop is rejected by the server
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   const routes = new RoutesPage(page);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   // Lista ruta sortira SAMO po route_date (bez tiebreaker-a po created_at) — sa mnogo ruta
   // za isti dan (deljena baza, stotine ruta za "danas"), "prva" kartica nije pouzdano naša
   // novokreirana. Jedinstvena napomena + pretraga garantuju da otvaramo BAŠ nju (isti
@@ -305,7 +306,7 @@ test('WEB-RT-19: A cancelled route does not allow managing stops', async ({ page
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   const routes = new RoutesPage(page);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   // Više testova u istom prolazu pravi rute za isti dan, a lista se ne sortira pouzdano po
   // vremenu kreiranja za taj slučaj — jedinstvena napomena + pretraga garantuju da otvaramo BAŠ
   // tu rutu umesto da se oslanjamo na poziciju "prve" kartice.
@@ -333,7 +334,7 @@ test('WEB-RT-20: A route in progress does not allow managing stops', async ({ pa
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   const routes = new RoutesPage(page);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   const noteTag = `QA-RT-20-${Date.now()}`;
 
   await routes.goto();
@@ -366,7 +367,7 @@ test('WEB-RT-21: Updating stop order', async ({ page }) => {
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   const routes = new RoutesPage(page);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   const noteTag = `QA-RT-21-${Date.now()}`;
 
   await routes.goto();
@@ -437,7 +438,7 @@ test('WEB-RT-12: "Open in Google Maps" generates the correct directions URL', as
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   const routes = new RoutesPage(page);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   const noteTag = `QA-RT-12-${Date.now()}`;
 
   await routes.goto();
@@ -469,7 +470,7 @@ test('WEB-RT-16: Dismissing the cancel dialog changes nothing', async ({ page })
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   const routes = new RoutesPage(page);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalIso();
   const noteTag = `QA-RT-16-${Date.now()}`;
 
   await routes.goto();
