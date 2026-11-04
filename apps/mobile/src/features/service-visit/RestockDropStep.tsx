@@ -286,9 +286,15 @@ export default function RestockDropStep() {
       return true;
     }
 
-    return (
-      value.issueQuantity.trim() === "" && value.looseQuantity.trim() === ""
-    );
+    const issueQuantityIsBlank = value.issueQuantity.trim() === "";
+
+    if (!row.product.packaging.allowsLooseUnits) {
+      return issueQuantityIsBlank;
+    }
+
+    const looseQuantityIsBlank = value.looseQuantity.trim() === "";
+
+    return issueQuantityIsBlank && looseQuantityIsBlank;
   }).length;
 
   const hasInvalidQuantity = deliveryRows.some((row) => {
