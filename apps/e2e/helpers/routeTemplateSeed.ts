@@ -37,17 +37,18 @@ type GeneratedRoute = {
 // deterministički testiralo ROUTE-6 pravilo (generisanje se preskače kad već postoji
 // nepotkazana operativna ruta za istog vozača/datum sa istom mašinom ili istim klijentom).
 //
-// POZNATO OGRANIČENJE: ovaj RPC obrađuje SVE aktivne route_templates za dati datum, ne samo
-// onaj koji WEB-TPL-20 pravi — poziv ovde pokreće realno generisanje ruta i za SVE OSTALE
-// aktivne template-e koji imaju današnji dan kao radni (ne samo QA fixture). Prihvatljivo jer
-// je ovo deljeni QA/test Supabase projekat (ista vrsta podataka koju i sami testovi prave), ne
-// produkcija sa pravim klijentima — ako se ovaj paket ikad pokrene nad bazom koja ima stvarni
-// produkcioni saobraćaj, ovaj poziv treba PRVO izmeniti RPC da prima opcioni filter po
-// template ID-u (migracija), jer bi inače generisao stvarne operativne rute mimo cron rasporeda.
-export async function generateRoutesFromTemplates(routeDateIso: string): Promise<GeneratedRoute[]> {
+// p_template_id je opcioni parametar (migracija 20261104171218) — kad se prosledi, RPC
+// generiše SAMO za taj template, ne za sve aktivne template-e tog dana (što bi inače,
+// pozvano iz testa, pokretalo realno generisanje ruta i za tuđe, nepovezane template-e).
+// Cron i dalje zove RPC sa samo datumom — default null čuva identično ponašanje za njega.
+export async function generateRoutesFromTemplates(
+  routeDateIso: string,
+  templateId?: string,
+): Promise<GeneratedRoute[]> {
   const supabase = supabaseAdmin();
   const { data, error } = await supabase.rpc('generate_routes_from_templates', {
     p_route_date: routeDateIso,
+    p_template_id: templateId ?? null,
   });
   if (error) {
     throw new Error(`RPC generate_routes_from_templates nije uspeo: ${error.message}`);

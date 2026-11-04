@@ -4,7 +4,9 @@ export class TimeClockReviewPage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto('/dashboard/time-clock/review');
+    // Isti razlog kao TimeClockEntriesPage.goto() — ne čekaj da SVE selfie slike završe
+    // učitavanje, samo DOM.
+    await this.page.goto('/dashboard/time-clock/review', { waitUntil: 'domcontentloaded' });
   }
 
   cardForDriverEmail(email: string): Locator {

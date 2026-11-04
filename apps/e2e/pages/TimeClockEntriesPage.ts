@@ -4,7 +4,11 @@ export class TimeClockEntriesPage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto('/dashboard/time-clock/entries');
+    // Stranica NEMA limit (vidi napomenu ispod) i mnogi unosi imaju namerno nepostojeću
+    // selfie putanju (WEB-TCENT-07/WEB-TCREV-05 fixture-i) — default 'load' čeka da SVAKA
+    // slika na stranici završi (ili ne uspe), što raste sa brojem takvih unosa u deljenoj
+    // bazi. Testu treba samo DOM, ne i da sve slike završe učitavanje.
+    await this.page.goto('/dashboard/time-clock/entries', { waitUntil: 'domcontentloaded' });
   }
 
   // Stranica NEMA limit — prikazuje CELU istoriju unosa za sve vozače, sortiranu po

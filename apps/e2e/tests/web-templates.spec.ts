@@ -562,7 +562,7 @@ test('WEB-TPL-20: Daily generation skips an occurrence that conflicts with an ex
     await routes.addStopToExpandedRoute('Genova Test Client', 'Genova Test Machine');
 
     // Konfliktna neotkazana ruta već postoji — okurencija se preskače.
-    let generated = await generateRoutesFromTemplates(todayIso);
+    let generated = await generateRoutesFromTemplates(todayIso, templateId);
     expect(generated.some((r) => r.route_template_id === templateId)).toBe(false);
 
     // Otkazivanje konfliktne rute uklanja prepreku — sledeća generacija uspeva.
@@ -572,7 +572,7 @@ test('WEB-TPL-20: Daily generation skips an occurrence that conflicts with an ex
     await routes.cancelExpandedRoute();
     await expect(routes.expandedRouteCard().getByText('cancelled', { exact: true })).toBeVisible();
 
-    generated = await generateRoutesFromTemplates(todayIso);
+    generated = await generateRoutesFromTemplates(todayIso, templateId);
     expect(generated.some((r) => r.route_template_id === templateId)).toBe(true);
   } finally {
     await forceCleanupTemplates(['QA TPL-20']);

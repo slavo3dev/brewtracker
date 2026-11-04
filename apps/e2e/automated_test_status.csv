@@ -172,7 +172,7 @@ WEB-TPL-16,Adding a conflicting stop to an active template is blocked,tests/web-
 WEB-TPL-17,Editing an active template into a conflict is blocked,tests/web-templates.spec.ts,Pass,
 WEB-TPL-18,"Stop validation — end before start is rejected, machines are limited to the client",tests/web-templates.spec.ts,Pass,
 WEB-TPL-19,An active template must keep at least one service day,tests/web-templates.spec.ts,Pass,
-WEB-TPL-20,Daily generation skips an occurrence that conflicts with an existing route,tests/web-templates.spec.ts,Pass,"Known limitation: this test calls the real generate_routes_from_templates RPC (the one the daily cron runs), which processes every active template for today, not just the QA fixture. Acceptable on this shared QA/test Supabase project; would need a template-scoped RPC filter before running against a project with real production traffic."
+WEB-TPL-20,Daily generation skips an occurrence that conflicts with an existing route,tests/web-templates.spec.ts,Pass,
 WEB-TPLEX-01,"""Skip route"" exception prevents generation for that date",tests/web-templates.spec.ts,Pass,
 WEB-TPLEX-02,"""Replace driver"" exception requires a replacement driver",tests/web-templates.spec.ts,Pass,
 WEB-TPLEX-03,"""Replace driver"" exception correctly applies for that date",tests/web-templates.spec.ts,Pass,
