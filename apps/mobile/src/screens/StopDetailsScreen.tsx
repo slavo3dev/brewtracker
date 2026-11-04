@@ -78,13 +78,23 @@ export default function StopDetailsScreen({
 
   const hasVisitForThisStop = isVisitForStop(stop.id);
 
+  const hasUnsyncedCompletedVisit =
+    activeVisit?.status === "completed" &&
+    activeVisit.summary.syncStatus !== "synced";
+
   const hasDifferentActiveVisit =
-    activeVisit?.status === "in_progress" && activeVisit.stopId !== stop.id;
+    activeVisit !== null &&
+    activeVisit.stopId !== stop.id &&
+    (activeVisit.status === "in_progress" || hasUnsyncedCompletedVisit);
 
   const isCompletedStop = stop.status === "completed";
   const isSkippedStop = stop.status === "skipped";
 
-  const cannotStartService = isCompletedStop || isSkippedStop;
+  const canRetrySyncForThisStop =
+    hasVisitForThisStop && hasUnsyncedCompletedVisit;
+
+  const cannotStartService =
+    !canRetrySyncForThisStop && (isCompletedStop || isSkippedStop);
 
   const [openingNavigation, setOpeningNavigation] = useState(false);
   const [navigationError, setNavigationError] = useState<string | null>(null);
@@ -140,6 +150,11 @@ export default function StopDetailsScreen({
       return;
     }
 
+    if (canRetrySyncForThisStop) {
+      onServiceStarted();
+      return;
+    }
+
     if (isCompletedStop) {
       setServiceError("This service stop has already been completed.");
       return;
@@ -156,9 +171,7 @@ export default function StopDetailsScreen({
     }
 
     if (!stop.machine) {
-      setServiceError(
-        "No machine is assigned to this service stop.",
-      );
+      setServiceError("No machine is assigned to this service stop.");
       return;
     }
 
@@ -363,8 +376,9 @@ export default function StopDetailsScreen({
           {hasDifferentActiveVisit ? (
             <View style={styles.activeVisitWarning}>
               <Text style={styles.activeVisitWarningText}>
-                Another service visit is currently in progress. Complete or
-                cancel it before starting this stop.
+                {hasUnsyncedCompletedVisit
+                  ? "A completed service visit still needs to sync. Open that visit and tap Retry Sync before starting this stop."
+                  : "Another service visit is currently in progress. Complete or cancel it before starting this stop."}
               </Text>
             </View>
           ) : null}
@@ -399,13 +413,15 @@ export default function StopDetailsScreen({
               <ActivityIndicator color="#ffffff" />
             ) : (
               <Text style={styles.serviceButtonText}>
-                {isCompletedStop
-                  ? "Service Completed"
-                  : isSkippedStop
-                    ? "Stop Skipped"
-                    : hasVisitForThisStop
-                      ? "Resume Service"
-                      : "Start Service"}
+                {canRetrySyncForThisStop
+                  ? "Retry Sync"
+                  : isCompletedStop
+                    ? "Service Completed"
+                    : isSkippedStop
+                      ? "Stop Skipped"
+                      : hasVisitForThisStop
+                        ? "Resume Service"
+                        : "Start Service"}
               </Text>
             )}
           </Pressable>
