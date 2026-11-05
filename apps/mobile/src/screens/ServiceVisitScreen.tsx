@@ -134,6 +134,8 @@ export default function ServiceVisitScreen({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         scrollEnabled={!signatureActive}
       >
