@@ -2,6 +2,8 @@ import type { AuthUser } from "@brewtracker/types";
 
 import { supabase } from "../../lib/supabase";
 import {
+  beginProfileCacheRequest,
+  isCurrentProfileCacheRequest,
   loadCachedProfile,
   removeCachedProfile,
   saveCachedProfile,
@@ -68,22 +70,24 @@ export async function getCurrentUserProfile(
   userId: string,
   { allowCached = true }: { allowCached?: boolean } = {},
 ): Promise<AuthUser> {
+  const request = beginProfileCacheRequest(userId);
+
+  function assertCurrentRequest(): void {
+    if (!isCurrentProfileCacheRequest(request)) {
+      throw new Error("The employee profile request was superseded.");
+    }
+  }
+
   let profile: AuthUser;
 
   try {
-    const { data, error, status } = await supabase
+    const { data, error } = await supabase
       .from("users")
       .select("id, role, region, is_active")
       .eq("id", userId)
       .single();
 
     if (error) {
-      if (status >= 500 && status < 600) {
-        throw new Error(
-          "Unable to connect. Check your internet connection and try again.",
-        );
-      }
-
       throw error;
     }
 
@@ -93,9 +97,13 @@ export async function getCurrentUserProfile(
 
     profile = data;
   } catch (error) {
+    assertCurrentRequest();
+
     if (isAuthNetworkError(error)) {
       if (allowCached) {
-        const cachedProfile = await loadCachedProfile(userId);
+        const cachedProfile = await loadCachedProfile(request);
+
+        assertCurrentRequest();
 
         if (cachedProfile) {
           return cachedProfile;
@@ -107,15 +115,21 @@ export async function getCurrentUserProfile(
       );
     }
 
-    // A server rejection must not fall back to older access details.
-    await removeCachedProfile(userId);
+    // Only this request may remove its user's cached profile.
+    await removeCachedProfile(userId, request);
+
+    assertCurrentRequest();
 
     throw new Error(
       "Unable to verify your employee profile. Try again or contact your manager.",
     );
   }
 
-  await saveCachedProfile(profile);
+  assertCurrentRequest();
+
+  await saveCachedProfile(profile, request);
+
+  assertCurrentRequest();
 
   return profile;
 }

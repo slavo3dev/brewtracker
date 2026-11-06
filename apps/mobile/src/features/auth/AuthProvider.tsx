@@ -48,18 +48,22 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<AuthStatus>("initializing");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const profileRequestRef = useRef(0);
+  const signingOutRef = useRef(false);
+  const sessionUserIdRef = useRef<string | null>(null);
 
   const loadProfile = useCallback(
     async (currentSession: Session): Promise<void> => {
+      if (signingOutRef.current) {
+        return;
+      }
+
       const requestId = ++profileRequestRef.current;
 
       setStatus("loading_profile");
       setErrorMessage(null);
 
       try {
-        const userProfile = await getCurrentUserProfile(
-          currentSession.user.id,
-        );
+        const userProfile = await getCurrentUserProfile(currentSession.user.id);
 
         if (requestId !== profileRequestRef.current) {
           return;
@@ -68,9 +72,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setProfile(userProfile);
 
         setStatus(
-          canAccessDriverApp(userProfile)
-            ? "authenticated"
-            : "access_denied",
+          canAccessDriverApp(userProfile) ? "authenticated" : "access_denied",
         );
       } catch (error) {
         if (requestId !== profileRequestRef.current) {
@@ -92,6 +94,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const applySession = useCallback(
     async (nextSession: Session | null): Promise<void> => {
+      if (signingOutRef.current && nextSession) {
+        return;
+      }
+
+      const previousUserId = sessionUserIdRef.current;
+
+      sessionUserIdRef.current = nextSession?.user.id ?? null;
+
       setSession(nextSession);
 
       if (!nextSession) {
@@ -100,6 +110,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setProfile(null);
         setErrorMessage(null);
         setStatus("signed_out");
+
+        if (previousUserId) {
+          try {
+            await removeCachedProfile(previousUserId);
+          } catch (error) {
+            console.error(
+              "Unable to remove cached profile after session ended:",
+              error,
+            );
+          }
+        }
+
         return;
       }
 
@@ -184,6 +206,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (
         cancelled ||
         inFlight ||
+        signingOutRef.current ||
         AppState.currentState !== "active"
       ) {
         return;
@@ -191,17 +214,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       inFlight = true;
 
-      const requestId = profileRequestRef.current;
+      const requestId = ++profileRequestRef.current;
 
       try {
         const userProfile = await getCurrentUserProfile(userId, {
           allowCached: false,
         });
 
-        if (
-          cancelled ||
-          requestId !== profileRequestRef.current
-        ) {
+        if (cancelled || requestId !== profileRequestRef.current) {
           return;
         }
 
@@ -212,10 +232,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           setStatus("access_denied");
         }
       } catch (error) {
-        if (
-          cancelled ||
-          requestId !== profileRequestRef.current
-        ) {
+        if (cancelled || requestId !== profileRequestRef.current) {
           return;
         }
 
@@ -237,14 +254,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
     }
 
-    const subscription = AppState.addEventListener(
-      "change",
-      (nextState) => {
-        if (nextState === "active") {
-          void revalidateProfile();
-        }
-      },
-    );
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        void revalidateProfile();
+      }
+    });
 
     const timer = setInterval(() => {
       void revalidateProfile();
@@ -263,20 +277,32 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const signOut = useCallback(async () => {
-    const userId = session?.user.id;
-
-    await signOutService();
-
-    profileRequestRef.current += 1;
-
-    if (userId) {
-      await removeCachedProfile(userId);
+    if (signingOutRef.current) {
+      return;
     }
 
-    setSession(null);
-    setProfile(null);
-    setErrorMessage(null);
-    setStatus("signed_out");
+    signingOutRef.current = true;
+    profileRequestRef.current += 1;
+
+    const userId = session?.user.id;
+
+    try {
+      if (userId) {
+        // Invalidates older cache requests before the first await.
+        await removeCachedProfile(userId);
+      }
+
+      await signOutService();
+
+      sessionUserIdRef.current = null;
+
+      setSession(null);
+      setProfile(null);
+      setErrorMessage(null);
+      setStatus("signed_out");
+    } finally {
+      signingOutRef.current = false;
+    }
   }, [session?.user.id]);
 
   const retryProfile = useCallback(async () => {
