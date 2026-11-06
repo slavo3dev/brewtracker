@@ -356,6 +356,10 @@ function AppContent() {
         onClockInPress={() => {
           setScreen("clockIn");
         }}
+        onResumeServiceVisit={() => {
+          setSelectedStop(null);
+          setScreen("serviceVisit");
+        }}
         onResumeSelfie={(timeEntryId) => {
           setCurrentTimeEntryId(timeEntryId);
           setScreen("selfie");

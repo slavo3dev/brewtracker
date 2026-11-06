@@ -21,10 +21,12 @@ import {
   type TimeEntry,
 } from "../features/time-clock/time-clock.types";
 import { stopLocationTracking } from "../features/fleet/location-tracking.service";
+import { useServiceVisit } from "../features/service-visit/ServiceVisitProvider";
 
 type Props = {
   onClockInPress: () => void;
   onResumeSelfie: (timeEntryId: string) => void;
+  onResumeServiceVisit: () => void;
   refreshKey: number;
   onStopPress?: (routeId: string, stop: TodayRouteStop) => void;
 };
@@ -46,10 +48,22 @@ function isNetworkError(error: unknown): boolean {
 export default function HomeScreen({
   onClockInPress,
   onResumeSelfie,
+  onResumeServiceVisit,
   refreshKey,
   onStopPress,
 }: Props) {
   const { profile, session, signOut } = useAuth();
+
+  const { activeVisit, restoringVisit } = useServiceVisit();
+
+const hasUnsyncedCompletion =
+  activeVisit?.status === "completed" &&
+  activeVisit.summary.syncStatus !== "synced";
+
+const hasRecoverableVisit =
+  !restoringVisit &&
+  activeVisit !== null &&
+  (activeVisit.status === "in_progress" || hasUnsyncedCompletion);
 
   const {
     openEntry,
@@ -263,6 +277,44 @@ export default function HomeScreen({
             </Text>
           </View>
         ) : null}
+
+        {hasRecoverableVisit && activeVisit ? (
+          <View style={styles.routeAccessNotice}>
+            <Text style={styles.routeAccessNoticeTitle}>
+              {hasUnsyncedCompletion
+                ? "Service waiting to sync"
+                : "Unfinished service visit"}
+            </Text>
+
+            <Text style={styles.routeAccessNoticeText}>
+              {activeVisit.target.clientName}
+              {"\n"}
+              Started: {new Date(activeVisit.startedAt).toLocaleString()}
+            </Text>
+
+            <Text style={styles.routeAccessNoticeText}>
+              {hasUnsyncedCompletion
+                ? "Your completed service is saved on this device. Retry synchronization before starting another service."
+                : "You have a saved service visit. Resume and finish it before starting another service."}
+            </Text>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={onResumeServiceVisit}
+              style={({ pressed }) => [
+                styles.resumeSelfieButton,
+                pressed && styles.buttonPressed,
+              ]}
+            >
+              <Text style={styles.resumeSelfieButtonText}>
+                {hasUnsyncedCompletion
+                  ? "Open Retry Sync"
+                  : "Resume Saved Service"}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         <TodayRouteCard
           route={route}
           source={source}
