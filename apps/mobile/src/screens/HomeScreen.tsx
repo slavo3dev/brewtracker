@@ -301,6 +301,7 @@ const hasRecoverableVisit =
             <Pressable
               accessibilityRole="button"
               onPress={onResumeServiceVisit}
+              disabled={!hasUnsyncedCompletion && !canAccessRouteStops}
               style={({ pressed }) => [
                 styles.resumeSelfieButton,
                 pressed && styles.buttonPressed,
