@@ -26,7 +26,7 @@ async function handleReview(
   formData: FormData,
   reviewStatus: TimeEntryReviewStatus,
 ): Promise<ReviewActionResult> {
-  const reviewer = await requireClockInReviewer();
+  await requireClockInReviewer();
 
   const timeEntryId = String(formData.get("timeEntryId") ?? "");
   const reviewNote = String(formData.get("reviewNote") ?? "").trim() || null;
@@ -41,7 +41,6 @@ async function handleReview(
   try {
     await reviewTimeEntry({
       timeEntryId,
-      reviewedBy: reviewer.id,
       reviewStatus,
       reviewNote,
     });
