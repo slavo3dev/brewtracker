@@ -71,13 +71,19 @@ export async function getCurrentUserProfile(
   let profile: AuthUser;
 
   try {
-    const { data, error } = await supabase
+    const { data, error, status } = await supabase
       .from("users")
       .select("id, role, region, is_active")
       .eq("id", userId)
       .single();
 
     if (error) {
+      if (status >= 500 && status < 600) {
+        throw new Error(
+          "Unable to connect. Check your internet connection and try again.",
+        );
+      }
+
       throw error;
     }
 
