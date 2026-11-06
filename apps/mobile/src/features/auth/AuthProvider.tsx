@@ -8,16 +8,19 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
 } from "react";
 import { AppState } from "react-native";
 
 import { supabase } from "../../lib/supabase";
 import {
   getCurrentUserProfile,
+  isAuthNetworkError,
   signInWithEmailAndPassword,
   signOut as signOutService,
   type SignInCredentials,
 } from "./auth.service";
+import { removeCachedProfile } from "./auth-profile-cache.service";
 
 type AuthStatus =
   | "initializing"
@@ -44,26 +47,41 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [profile, setProfile] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>("initializing");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const profileRequestRef = useRef(0);
+  const signingOutRef = useRef(false);
+  const sessionUserIdRef = useRef<string | null>(null);
 
   const loadProfile = useCallback(
     async (currentSession: Session): Promise<void> => {
+      if (signingOutRef.current) {
+        return;
+      }
+
+      const requestId = ++profileRequestRef.current;
+
       setStatus("loading_profile");
       setErrorMessage(null);
 
       try {
         const userProfile = await getCurrentUserProfile(currentSession.user.id);
 
-        setProfile(userProfile);
-
-        if (!canAccessDriverApp(userProfile)) {
-          setStatus("access_denied");
+        if (requestId !== profileRequestRef.current) {
           return;
         }
 
-        setStatus("authenticated");
+        setProfile(userProfile);
+
+        setStatus(
+          canAccessDriverApp(userProfile) ? "authenticated" : "access_denied",
+        );
       } catch (error) {
+        if (requestId !== profileRequestRef.current) {
+          return;
+        }
+
         setProfile(null);
         setStatus("error");
+
         setErrorMessage(
           error instanceof Error
             ? error.message
@@ -76,12 +94,34 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const applySession = useCallback(
     async (nextSession: Session | null): Promise<void> => {
+      if (signingOutRef.current && nextSession) {
+        return;
+      }
+
+      const previousUserId = sessionUserIdRef.current;
+
+      sessionUserIdRef.current = nextSession?.user.id ?? null;
+
       setSession(nextSession);
 
       if (!nextSession) {
+        profileRequestRef.current += 1;
+
         setProfile(null);
         setErrorMessage(null);
         setStatus("signed_out");
+
+        if (previousUserId) {
+          try {
+            await removeCachedProfile(previousUserId);
+          } catch (error) {
+            console.error(
+              "Unable to remove cached profile after session ended:",
+              error,
+            );
+          }
+        }
+
         return;
       }
 
@@ -102,7 +142,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       if (error) {
         setStatus("error");
-        setErrorMessage(error.message);
+
+        setErrorMessage(
+          isAuthNetworkError(error)
+            ? "Unable to restore your session offline. Connect to the internet and try again."
+            : "Unable to restore your session. Please sign in again.",
+        );
+
         return;
       }
 
@@ -146,19 +192,118 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!session || status !== "authenticated") {
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+
+    const userId = session.user.id;
+
+    async function revalidateProfile(): Promise<void> {
+      if (
+        cancelled ||
+        inFlight ||
+        signingOutRef.current ||
+        AppState.currentState !== "active"
+      ) {
+        return;
+      }
+
+      inFlight = true;
+
+      const requestId = ++profileRequestRef.current;
+
+      try {
+        const userProfile = await getCurrentUserProfile(userId, {
+          allowCached: false,
+        });
+
+        if (cancelled || requestId !== profileRequestRef.current) {
+          return;
+        }
+
+        setProfile(userProfile);
+        setErrorMessage(null);
+
+        if (!canAccessDriverApp(userProfile)) {
+          setStatus("access_denied");
+        }
+      } catch (error) {
+        if (cancelled || requestId !== profileRequestRef.current) {
+          return;
+        }
+
+        // Keep the last known profile during a connection failure.
+        if (isAuthNetworkError(error)) {
+          return;
+        }
+
+        setProfile(null);
+        setStatus("error");
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to verify your employee profile.",
+        );
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        void revalidateProfile();
+      }
+    });
+
+    const timer = setInterval(() => {
+      void revalidateProfile();
+    }, 30_000);
+
+    return () => {
+      cancelled = true;
+      subscription.remove();
+      clearInterval(timer);
+    };
+  }, [session?.user.id, status]);
+
   const signIn = useCallback(async (credentials: SignInCredentials) => {
     setErrorMessage(null);
     await signInWithEmailAndPassword(credentials);
   }, []);
 
   const signOut = useCallback(async () => {
-    await signOutService();
+    if (signingOutRef.current) {
+      return;
+    }
 
-    setSession(null);
-    setProfile(null);
-    setErrorMessage(null);
-    setStatus("signed_out");
-  }, []);
+    signingOutRef.current = true;
+    profileRequestRef.current += 1;
+
+    const userId = session?.user.id;
+
+    try {
+      if (userId) {
+        // Invalidates older cache requests before the first await.
+        await removeCachedProfile(userId);
+      }
+
+      await signOutService();
+
+      sessionUserIdRef.current = null;
+
+      setSession(null);
+      setProfile(null);
+      setErrorMessage(null);
+      setStatus("signed_out");
+    } finally {
+      signingOutRef.current = false;
+    }
+  }, [session?.user.id]);
 
   const retryProfile = useCallback(async () => {
     if (!session) {
