@@ -23,7 +23,14 @@ export async function resolveExistingPendingEntries(driverId: string) {
 
 export async function createPendingClockInEntry(
   driverId: string,
-  options?: { geofence?: 'inside' | 'outside'; leaveOpen?: boolean; clockInSelfieUrl?: string },
+  options?: {
+    geofence?: 'inside' | 'outside';
+    leaveOpen?: boolean;
+    clockInSelfieUrl?: string;
+    warehouseId?: string;
+    warehouseLat?: number;
+    warehouseLng?: number;
+  },
 ): Promise<string> {
   const supabase = supabaseAdmin();
 
@@ -36,18 +43,20 @@ export async function createPendingClockInEntry(
     .in('status', ['open', 'manager_override'])
     .is('clock_out_at', null);
 
-  // "outside" pomera klik-in ~3.3km severno od magacina — jasno van 1500m radijusa.
+  // "outside" pomera klik-in ~3.3km severno od magacina — jasno van svih test radijusa.
   const latOffset = options?.geofence === 'outside' ? 0.03 : 0.0001;
   const leaveOpen = options?.leaveOpen ?? true;
+  const warehouseLat = options?.warehouseLat ?? WAREHOUSE_LAT;
+  const warehouseLng = options?.warehouseLng ?? WAREHOUSE_LNG;
 
   const { data, error } = await supabase
     .from('time_entries')
     .insert({
       driver_id: driverId,
-      warehouse_id: DEFAULT_WAREHOUSE_ID,
+      warehouse_id: options?.warehouseId ?? DEFAULT_WAREHOUSE_ID,
       clock_in_at: new Date().toISOString(),
-      clock_in_latitude: WAREHOUSE_LAT + latOffset,
-      clock_in_longitude: WAREHOUSE_LNG,
+      clock_in_latitude: warehouseLat + latOffset,
+      clock_in_longitude: warehouseLng,
       // Drugi (ne-otvoren) unos za istog vozača mora da ima clock_out_at da ne bi
       // probio "jedan otvoren unos po vozaču" constraint.
       ...(leaveOpen

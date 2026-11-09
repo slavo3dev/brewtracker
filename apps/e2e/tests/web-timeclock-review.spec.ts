@@ -15,17 +15,11 @@ test('WEB-TCREV-02: Empty state when there are no pending entries', async () => 
 });
 
 test('WEB-TCREV-01: Review queue lists only review_status=pending entries for its own region', async ({ page }) => {
-  // Poznat, već dokumentovan nalaz u regression tabeli (status: Fail): queue nije
-  // region-scoped jer getTimeEntryReviewQueue() koristi service-role klijent bez
-  // region filtera — manager vidi pending unose SVIH regiona, ne samo svog. Test ispod ne
-  // koristi test.fail() — namerno PADA (crveno) dok god je ovaj defekt prisutan. Koristi
-  // IZOLOVAN vozač (QA_DRIVER_OTHER_REGION_ID, ne deljeni TRANSFERS vozač ispod) i namerno
-  // je van serial grupe ispod — njegov pad ne sme da blokira ostale TCREV-* testove.
-  test.info().annotations.push({
-    type: 'note',
-    description:
-      'Known app defect: the review queue uses a service-role client with no region filter — a manager sees and can approve/reject pending clock-in entries from drivers in every region, not just their own. Fix: getTimeEntryReviewQueue() should filter by the logged-in manager\'s region.',
-  });
+  // Bio poznat defekt (service-role klijent bez region filtera — manager je vidio pending
+  // unose SVIH regiona). Popravljeno na dev: getTimeEntryReviewQueue()/getTimeEntries() sad
+  // idu kroz region-scoped klijenta (requireReviewerContext()). Koristi IZOLOVAN vozač
+  // (QA_DRIVER_OTHER_REGION_ID, ne deljeni TRANSFERS vozač ispod) i namerno je van serial
+  // grupe ispod — njegov pad ne sme da blokira ostale TCREV-* testove.
 
   // QA_MANAGER je u regionu Italy; driver1@brewtracker.demo je u regionu Florida —
   // namerno DRUGI region da bismo proverili da li je queue region-scoped.
@@ -60,9 +54,17 @@ test('WEB-TCREV-03: Card shows the correct geofence distance and status', async 
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
+  // Default QA magacin (QA_WAREHOUSE_ID) ima region "Global", koji RLS politika
+  // ("CEO and managers can read warehouses") ne prepoznaje kao poseban slučaj — manager
+  // vidi SAMO magacine iz svog regiona. QA_MANAGER je u "Italy" regionu, pa koristimo
+  // Genova magacin (region "Italy") da warehouse/geofence polja stvarno budu vidljiva.
+  const warehouseId = process.env.QA_GENOVA_TEST_WAREHOUSE_ID!;
+  const warehouseLat = 44.4056;
+  const warehouseLng = 8.9463;
+
   await resolveExistingPendingEntries(driverId);
-  await createPendingClockInEntry(driverId, { geofence: 'inside', leaveOpen: true });
-  await createPendingClockInEntry(driverId, { geofence: 'outside', leaveOpen: false });
+  await createPendingClockInEntry(driverId, { geofence: 'inside', leaveOpen: true, warehouseId, warehouseLat, warehouseLng });
+  await createPendingClockInEntry(driverId, { geofence: 'outside', leaveOpen: false, warehouseId, warehouseLat, warehouseLng });
 
   const login = new LoginPage(page);
   await login.goto();
@@ -199,7 +201,14 @@ test('WEB-TCREV-12: A clock-in outside the geofence is visible and actionable to
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
   await resolveExistingPendingEntries(driverId);
-  const entryId = await createPendingClockInEntry(driverId, { geofence: 'outside' });
+  // Vidi napomenu u WEB-TCREV-03: default magacin (region "Global") nije vidljiv manageru
+  // (region "Italy") pod RLS-om — koristi Genova magacin da warehouse/geofence poljaradе.
+  const entryId = await createPendingClockInEntry(driverId, {
+    geofence: 'outside',
+    warehouseId: process.env.QA_GENOVA_TEST_WAREHOUSE_ID!,
+    warehouseLat: 44.4056,
+    warehouseLng: 8.9463,
+  });
 
   const login = new LoginPage(page);
   await login.goto();
