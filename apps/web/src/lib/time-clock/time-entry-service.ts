@@ -1,7 +1,30 @@
-import type { Database } from "@brewtracker/types";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { canReviewClockIns, type Database } from "@brewtracker/types";
+
+import { getCurrentUserProfile } from "@/lib/auth/get-current-user";
+import { createClient } from "@/lib/supabase/server";
 
 const TIME_ENTRY_SELFIES_BUCKET = "time-entry-selfies";
+
+async function requireReviewerContext() {
+  const reviewer = await getCurrentUserProfile();
+
+  if (!reviewer || !canReviewClockIns(reviewer)) {
+    throw new Error("You do not have permission to review clock-ins.");
+  }
+
+  if (
+    reviewer.role === "manager" &&
+    !reviewer.region?.trim()
+  ) {
+    throw new Error(
+      "Your manager account has no assigned region. Contact an administrator.",
+    );
+  }
+
+  const supabase = await createClient();
+
+  return { supabase, reviewer };
+}
 
 async function createSelfieSignedUrls(
   storagePaths: string[],
@@ -10,7 +33,7 @@ async function createSelfieSignedUrls(
     return new Map();
   }
 
-  const supabase = createAdminClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase.storage
     .from(TIME_ENTRY_SELFIES_BUCKET)
@@ -73,7 +96,7 @@ export type TimeEntryListItem =
   };
 
 export async function getTimeEntryReviewQueue(): Promise<ReviewQueueItem[]> {
-  const supabase = createAdminClient();
+  const { supabase } = await requireReviewerContext();
 
   const { data, error } = await supabase
     .from("time_entries")
@@ -128,30 +151,52 @@ export async function getTimeEntryReviewQueue(): Promise<ReviewQueueItem[]> {
 
 export async function reviewTimeEntry(input: {
   timeEntryId: string;
-  reviewedBy: string;
   reviewStatus: TimeEntryReviewStatus;
   reviewNote: string | null;
 }) {
-  const supabase = createAdminClient();
+  const { supabase, reviewer } = await requireReviewerContext();
 
-  const { error } = await supabase
+  if (
+    input.reviewStatus !== "approved" &&
+    input.reviewStatus !== "flagged" &&
+    input.reviewStatus !== "rejected"
+  ) {
+    throw new Error("Invalid clock-in review action.");
+  }
+
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
     .from("time_entries")
     .update({
       review_status: input.reviewStatus,
-      reviewed_by: input.reviewedBy,
-      reviewed_at: new Date().toISOString(),
+      reviewed_by: reviewer.id,
+      reviewed_at: now,
       review_note: input.reviewNote,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
-    .eq("id", input.timeEntryId);
+    .eq("id", input.timeEntryId)
+    .eq("review_status", "pending")
+    .select("id")
+    .maybeSingle();
 
   if (error) {
-    throw new Error(error.message);
+    console.error("Unable to review clock-in:", error);
+
+    throw new Error(
+      "Unable to review this clock-in. Refresh the page and try again.",
+    );
+  }
+
+  if (!data) {
+    throw new Error(
+      "This clock-in is unavailable, outside your permitted region, or has already been reviewed.",
+    );
   }
 }
 
 export async function getTimeEntries(): Promise<TimeEntryListItem[]> {
-  const supabase = createAdminClient();
+  const { supabase } = await requireReviewerContext();
 
   const { data, error } = await supabase
     .from("time_entries")
@@ -217,7 +262,7 @@ export async function getTimeEntries(): Promise<TimeEntryListItem[]> {
 export async function autoCloseForgottenClockOuts(input: {
   reviewedBy: string;
 }): Promise<number> {
-  const supabase = createAdminClient();
+  const { supabase, reviewer } = await requireReviewerContext();
   const now = new Date().toISOString();
 
   const { data, error } = await supabase
@@ -229,7 +274,7 @@ export async function autoCloseForgottenClockOuts(input: {
       review_reason: "Forgotten clock-out auto-closed after shift end.",
       auto_closed_at: now,
       auto_close_reason: "Shift ended without driver clock-out.",
-      reviewed_by: input.reviewedBy,
+      reviewed_by: reviewer.id,
       updated_at: now,
     })
     .eq("status", "open")
