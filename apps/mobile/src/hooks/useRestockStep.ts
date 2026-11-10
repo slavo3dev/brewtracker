@@ -9,6 +9,11 @@ import {
 } from "../../src/features/service-visit/restock-drop.service";
 
 import {
+  ReserveAfterSyncError,
+  syncReserveAfter,
+} from "../features/service-visit/client-reserve-after.sync";
+
+import {
   saveServiceVisit,
 } from "../../src/features/service-visit/service-visit.storage";
 
@@ -57,6 +62,42 @@ export function useRestockStep({
           throw new Error(
             "Delivery can only be completed during Step 6.",
           );
+        }
+
+        // Delivery is already synced.
+        // Resume reserve-after without submitting delivery again.
+        if (
+          activeVisit.restockDrop?.syncStatus === "synced" &&
+          activeVisit.restockDrop.databaseId
+        ) {
+          try {
+            const syncedVisit = await syncReserveAfter(activeVisit);
+
+            const transitionedVisit = transitionToNextStep(
+              syncedVisit,
+              "restock",
+              new Date().toISOString(),
+            );
+
+            await saveServiceVisit(transitionedVisit);
+
+            setActiveVisit(transitionedVisit);
+            setErrorMessage(null);
+
+            return transitionedVisit;
+          } catch (error) {
+            if (error instanceof ReserveAfterSyncError) {
+              setActiveVisit(error.visit);
+            }
+
+            setErrorMessage(
+              error instanceof Error
+                ? error.message
+                : "Unable to sync client reserve after delivery.",
+            );
+
+            throw error;
+          }
         }
 
         const reserveBefore =
