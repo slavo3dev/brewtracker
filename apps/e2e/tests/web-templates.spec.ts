@@ -7,7 +7,7 @@ import {
   getTemplateIdByName,
   generateRoutesFromTemplates,
 } from '../helpers/routeTemplateSeed';
-import { cancelRoutesForMachine } from '../helpers/routeSeed';
+import { cancelRoutesForMachine, deleteRoute } from '../helpers/routeSeed';
 import { todayLocalIso } from '../helpers/date';
 
 const GENOVA_TEST_MACHINE_ID = process.env.QA_GENOVA_TEST_MACHINE_ID!;
@@ -534,8 +534,9 @@ test('WEB-TPL-20: Daily generation skips an occurrence that conflicts with an ex
 
   try {
     // Čist preduslov — "osirotela" neotkazana ruta iz nekog ranijeg prekinutog pokretanja ovog
-    // testa bi inače trajno blokirala generisanje za ovu mašinu/dan.
-    await cancelRoutesForMachine(QA_DRIVER_ID, todayIso, GENOVA_TEST_MACHINE_ID);
+    // testa bi inače trajno blokirala generisanje za ovu mašinu/dan. notesPrefix osigurava da
+    // se dira SAMO ranija fixture ruta ovog testa, ne tuđa legitimna zakazana ruta.
+    await cancelRoutesForMachine(QA_DRIVER_ID, todayIso, GENOVA_TEST_MACHINE_ID, 'QA-TPL-20-');
 
     const login = new LoginPage(page);
     await login.goto();
@@ -574,6 +575,14 @@ test('WEB-TPL-20: Daily generation skips an occurrence that conflicts with an ex
 
     generated = await generateRoutesFromTemplates(todayIso, templateId);
     expect(generated.some((r) => r.route_template_id === templateId)).toBe(true);
+
+    // RPC generiše PRAVU operativnu rutu (notes nasleđeno sa template-a, obično null — ne nosi
+    // naš noteTag), koja bez eksplicitnog čišćenja ovde ostaje trajno "scheduled" za ovog
+    // vozača/mašinu/dan i blokira SVAKO naredno pokretanje ovog testa.
+    const generatedRouteId = generated.find((r) => r.route_template_id === templateId)?.route_id;
+    if (generatedRouteId) {
+      await deleteRoute(generatedRouteId);
+    }
   } finally {
     await forceCleanupTemplates(['QA TPL-20']);
   }

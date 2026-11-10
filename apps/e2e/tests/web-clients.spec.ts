@@ -91,6 +91,11 @@ test('WEB-CLI-05: Manager sees only clients in their own region, CEO sees all', 
     await page.goto('/dashboard/clients');
     await expect(page.getByText(`QA CLI-05 Other Region ${stamp}`)).toHaveCount(0);
 
+    // Odjava pre prelaska na CEO nalog — middleware preusmerava ULOGOVANOG korisnika sa
+    // /login nazad na /dashboard, pa bi login.goto() bez prethodne odjave propustio formu.
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await expect(page).toHaveURL(/\/login(?:\?|$)/);
+
     await login.goto();
     await login.login(process.env.QA_CEO_EMAIL!, process.env.QA_CEO_PASSWORD!);
 
@@ -135,7 +140,9 @@ test('WEB-CLI-07: Editing a client persists', async ({ page }) => {
     await page.locator('input[name="name"]').fill(updatedName);
     await page.getByRole('button', { name: 'Save Changes' }).click();
 
-    await expect(page).toHaveURL(`/dashboard/clients/${clientId}`);
+    // Default 5s timeout povremeno istekne pod opterećenjem dok je dugme još "Saving changes..."
+    // (server action + redirect nije stigao) — isti obrazac kao drugde u suiti.
+    await expect(page).toHaveURL(`/dashboard/clients/${clientId}`, { timeout: 15000 });
     await expect(page.getByRole('heading', { name: updatedName, exact: true })).toBeVisible();
   } finally {
     await deleteTestClient(clientId);

@@ -97,19 +97,28 @@ export async function deleteRoute(routeId: string) {
 }
 
 // Čisti preduslov za testove generisanja ruta iz template-a (npr. WEB-TPL-20): otkazuje SAMO
-// "osirotele" SCHEDULED rute (ostale iz nekog ranijeg prekinutog pokretanja) koje bi inače
-// trajno blokirale generisanje. Namerno NE dira in_progress/completed rute — to bi prepisalo
-// stvarnu servisnu istoriju za ovog deljenog vozača/mašinu, mimo cancel_operational_route
-// lifecycle provera (ovo je direktan admin upis, bez tih provera).
-export async function cancelRoutesForMachine(driverId: string, routeDateIso: string, machineId: string) {
+// "osirotele" SCHEDULED rute (ostale iz nekog ranijeg prekinutog pokretanja ISTOG testa) koje
+// bi inače trajno blokirale generisanje. driver+date+machine+status SAM po sebi nije dovoljno
+// precizan identifikator — mogao bi pogoditi i tuđu, legitimnu zakazanu rutu za istog deljenog
+// vozača na istoj mašini. notesPrefix (npr. "QA-TPL-20-") dodatno suzi na rute koje je BAŠ ovaj
+// test ranije tagovao, bez obzira na timestamp iz tog ranijeg pokretanja. Namerno NE dira
+// in_progress/completed rute — to bi prepisalo stvarnu servisnu istoriju, mimo
+// cancel_operational_route lifecycle provera (ovo je direktan admin upis, bez tih provera).
+export async function cancelRoutesForMachine(
+  driverId: string,
+  routeDateIso: string,
+  machineId: string,
+  notesPrefix: string,
+) {
   const supabase = supabaseAdmin();
   const { data: stops, error: stopsError } = await supabase
     .from('stops')
-    .select('route_id, route:routes!inner(id,status,route_date,driver_id)')
+    .select('route_id, route:routes!inner(id,status,route_date,driver_id,notes)')
     .eq('machine_id', machineId)
     .eq('route.driver_id', driverId)
     .eq('route.route_date', routeDateIso)
-    .eq('route.status', 'scheduled');
+    .eq('route.status', 'scheduled')
+    .ilike('route.notes', `${notesPrefix}%`);
 
   if (stopsError) {
     throw new Error(`Ne mogu da nađem konfliktne rute: ${stopsError.message}`);

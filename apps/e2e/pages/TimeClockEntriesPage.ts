@@ -8,7 +8,19 @@ export class TimeClockEntriesPage {
     // selfie putanju (WEB-TCENT-07/WEB-TCREV-05 fixture-i) — default 'load' čeka da SVAKA
     // slika na stranici završi (ili ne uspe), što raste sa brojem takvih unosa u deljenoj
     // bazi. Testu treba samo DOM, ne i da sve slike završe učitavanje.
-    await this.page.goto('/dashboard/time-clock/entries', { waitUntil: 'domcontentloaded' });
+    try {
+      await this.page.goto('/dashboard/time-clock/entries', { waitUntil: 'domcontentloaded' });
+    } catch (error) {
+      // WEB-TCENT-04 zove goto() više puta brzo zaredom (DB upis pa odmah ponovo goto, bez UI
+      // interakcije između) — povremeno pogodi poznat Playwright/Chromium kvirk (ERR_ABORTED)
+      // kad nova navigacija na ISTI URL stigne dok prethodna još nije potpuno "slegla". Jedan
+      // retry je dovoljan — ne znači da je stranica stvarno pokvarena.
+      if (error instanceof Error && error.message.includes('ERR_ABORTED')) {
+        await this.page.goto('/dashboard/time-clock/entries', { waitUntil: 'domcontentloaded' });
+      } else {
+        throw error;
+      }
+    }
   }
 
   // Stranica NEMA limit — prikazuje CELU istoriju unosa za sve vozače, sortiranu po
@@ -44,7 +56,13 @@ export class TimeClockEntriesPage {
 
   async expectSelfieImageVisible(card: Locator) {
     await expect(card.getByText('Clock-in selfie', { exact: true })).toBeVisible();
-    await expect(card.locator('img')).toBeVisible();
+    const image = card.locator('img');
+    await expect(image).toBeVisible();
+    // Isti razlog kao TimeClockReviewPage: toBeVisible() ne garantuje da je slika STVARNO
+    // učitana (pokvaren signed URL je i dalje "visible" u DOM-u).
+    await expect
+      .poll(() => image.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+      .toBe(true);
   }
 
   async expectNoSelfieMessage(card: Locator) {

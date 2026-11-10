@@ -61,7 +61,13 @@ export class TechnicalIssuesPage {
   }
 
   async expectPhotoVisible(ticketDescription: string) {
-    await expect(this.ticketCard(ticketDescription).locator('img')).toBeVisible();
+    const image = this.ticketCard(ticketDescription).locator('img');
+    await expect(image).toBeVisible();
+    // Isti razlog kao TimeClockReviewPage/TimeClockEntriesPage: toBeVisible() ne garantuje
+    // da je slika STVARNO učitana (pokvaren signed URL je i dalje "visible" u DOM-u).
+    await expect
+      .poll(() => image.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+      .toBe(true);
   }
 
   async getTechnicianOptionLabels(ticketDescription: string): Promise<string[]> {

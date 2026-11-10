@@ -69,7 +69,13 @@ export class TimeClockReviewPage {
 
   async expectSelfieImageVisible(card: Locator) {
     await expect(card.getByText('Clock-in selfie', { exact: true })).toBeVisible();
-    await expect(card.locator('img')).toBeVisible();
+    const image = card.locator('img');
+    await expect(image).toBeVisible();
+    // toBeVisible() prolazi i za pokvarenu sliku (broken img je i dalje "visible" u DOM-u) —
+    // provera da je stvarno učitana (signed URL radi), ne samo da postoji <img> element.
+    await expect
+      .poll(() => image.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+      .toBe(true);
   }
 
   async expectNoSelfieMessage(card: Locator) {
