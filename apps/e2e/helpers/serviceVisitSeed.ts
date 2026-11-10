@@ -56,8 +56,17 @@ export async function createServiceVisitStop(params: {
   return { routeId: route.id, stopId: stop.id };
 }
 
+// Baza ima zaštitu (23514, "Closed stops cannot be deleted") koja blokira .delete() na
+// stanici čim je status 'completed'/'in_progress' sa arrived_at postavljenim — tačno stanje
+// u kom WEB-SV-* testovi ostavljaju svoje fixture stanice. .delete() tiho ne uspe (greška se
+// nije proveravala), stanica trajno ostane na Service Visits listi za sledeće pokretanje. Umesto
+// brisanja: ukloni arrived_at/completed_at (to kontroliše vidljivost na listi) i otkaži rutu.
 export async function deleteServiceVisitRoute(routeId: string) {
   const supabase = supabaseAdmin();
-  await supabase.from('stops').delete().eq('route_id', routeId);
-  await supabase.from('routes').delete().eq('id', routeId);
+  const { data: stops } = await supabase.from('stops').select('id').eq('route_id', routeId);
+  const stopIds = (stops ?? []).map((s) => s.id);
+  if (stopIds.length > 0) {
+    await supabase.from('stops').update({ arrived_at: null, completed_at: null }).in('id', stopIds);
+  }
+  await supabase.from('routes').update({ status: 'cancelled' }).eq('id', routeId);
 }

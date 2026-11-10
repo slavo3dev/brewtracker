@@ -221,6 +221,11 @@ test('WEB-USR-08: Editing and saving user data persists', async ({ page }) => {
     };
     await users.editUserDetails(email, updated);
 
+    // Rola selecta se ažurira ODMAH na ekranu posle snimanja, bez reload-a — pre popravke
+    // (router.refresh() + key na <select>) uncontrolled select je i dalje prikazivao STARU
+    // rolu dok se stranica ručno ne učita ponovo.
+    expect((await users.getUserDetails(email)).role).toBe(updated.role);
+
     // Perzistencija — ponovo učitaj stranicu i proveri da izmene ostaju.
     await users.goto();
     await users.expandUser(email);

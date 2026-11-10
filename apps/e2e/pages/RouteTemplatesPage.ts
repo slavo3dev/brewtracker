@@ -105,7 +105,9 @@ export class RouteTemplatesPage {
     await card.locator('input[name="exceptionDate"]').fill(options.dateIso);
     await card.locator('select[name="clientId"]').selectOption({ label: options.clientLabel });
     await card.getByRole('button', { name: 'Add one-off stop' }).click();
-    await expect(card.getByText('One-off stop added.')).toBeVisible();
+    // Isti obrazac kao addStop(): fajl je dovoljno veliki (29 testova) da pod opterećenjem
+    // (deljena baza narasla preko dana) povremeno istekne 5s default timeout na uspeh-poruci.
+    await expect(card.getByText('One-off stop added.')).toBeVisible({ timeout: 15000 });
   }
 
   async expectStopExceptionListed(templateName: string, dateLabel: string) {

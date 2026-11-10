@@ -194,7 +194,7 @@ WEB-USR-04,Search filters by part of the phone number,tests/web-users.spec.ts,Pa
 WEB-USR-05,Role/Status/Region filters combine with AND,tests/web-users.spec.ts,Pass,
 WEB-USR-06,Empty state when the filter combination matches nobody,tests/web-users.spec.ts,Pass,
 WEB-USR-07,Pagination shows 10 users per page,tests/web-users.spec.ts,Pass,
-WEB-USR-08,Editing and saving user data persists,tests/web-users.spec.ts,Pass,
+WEB-USR-08,Editing and saving user data persists,tests/web-users.spec.ts,Pass,"Extended after dev merge (#107 ""refresh displayed user role after saving changes""): now also checks the role selector shows the new value immediately after save, before any page reload — the specific gap the old uncontrolled <select> bug left uncovered."
 WEB-USR-09,Full name is required when saving an edit,tests/web-users.spec.ts,Pass,
 WEB-USR-10,"""Send password reset"" asks for confirmation and requires an email on the account",tests/web-users.spec.ts,Pass*,"Not an app defect — depends on the shared Supabase email quota. If this fails, check the quota before investigating the code (same root cause class as WEB-USR-01 / WEB-AUTH-07)."
 WEB-USR-11,"""Send password reset"" is disabled for a user with no email",tests/web-users.spec.ts,Pass,

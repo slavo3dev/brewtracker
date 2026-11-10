@@ -137,11 +137,18 @@ test('WEB-RT-10: Recurring vs one-off badge displays correctly', async ({ page }
 
   const routes = new RoutesPage(page);
 
-  // One-off: sveže ručno kreirana ruta.
+  // One-off: sveže ručno kreirana ruta. Lista sortira SAMO po route_date (bez tiebreaker-a po
+  // created_at) — sa mnogo ruta za isti dan, "prva" kartica nije pouzdano naša novokreirana.
+  // Jedinstvena napomena + pretraga garantuju da gledamo BAŠ nju (isti obrazac kao RT-11/14/15).
   await routes.goto();
   const today = todayLocalIso();
-  await routes.createOneOffRoute(QA_DRIVER_ID, today);
+  const noteTag = `QA-RT-10-${Date.now()}`;
+  await routes.createOneOffRoute(QA_DRIVER_ID, today, noteTag);
+  await routes.searchRoutes(noteTag);
   await routes.expectOneOffBadge(routes.firstRouteCard());
+
+  const oneOffRouteId = await getRouteIdByNotes(noteTag);
+  if (!oneOffRouteId) throw new Error(`Ne mogu da nađem rutu sa noteTag: ${noteTag}`);
 
   // Recurring: ruta generisana iz template-a (source_route_template_id != null) — taj cron
   // posao ne pokrećemo u testovima, pa simuliramo njegov rezultat direktno preko baze.
@@ -162,6 +169,7 @@ test('WEB-RT-10: Recurring vs one-off badge displays correctly', async ({ page }
     await expect(page.locator('article').filter({ hasText: 'Recurring' }).first()).toBeVisible();
   } finally {
     await deleteRoute(routeId);
+    await deleteRoute(oneOffRouteId);
   }
 });
 
