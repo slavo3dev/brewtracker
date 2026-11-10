@@ -44,15 +44,15 @@ export function useMachineRefillStep({
       }
 
       /*
-      * --------------------------------------------------
-      * FLOW-18 RESUME / RETRY
-      * --------------------------------------------------
-      *
-      * Machine refill has already been synced.
-      *
-      * Do not submit it again. Only finish the
-      * interrupted local step transition.
-      */
+       * --------------------------------------------------
+       * FLOW-18 RESUME / RETRY
+       * --------------------------------------------------
+       *
+       * Machine refill has already been synced.
+       *
+       * Do not submit it again. Only finish the
+       * interrupted local step transition.
+       */
       if (
         activeVisit.machineRefill?.syncStatus === "synced" &&
         activeVisit.machineRefill.databaseId
@@ -114,14 +114,26 @@ export function useMachineRefillStep({
         );
       }
 
-      const configuredProducts =
-        input.configuredProducts;
+      /*
+       * INV-V3-03:
+       * Client reserve after delivery must already be synced.
+       *
+       * Machine refill does not calculate or sync
+       * client reserve balances.
+       */
+      if (
+        activeVisit.reserveAfter?.syncStatus !== "synced" ||
+        !activeVisit.reserveAfter.databaseId
+      ) {
+        throw new Error(
+          "Client reserve after delivery must be synced before machine refill.",
+        );
+      }
+
+      const configuredProducts = input.configuredProducts;
 
       const configuredById = new Map(
-        configuredProducts.map((product) => [
-          product.productId,
-          product,
-        ]),
+        configuredProducts.map((product) => [product.productId, product]),
       );
 
       const productIds = new Set<string>();
@@ -141,14 +153,10 @@ export function useMachineRefillStep({
         }
 
         if (productIds.has(quantity.productId)) {
-          throw new Error(
-            "A product cannot appear more than once.",
-          );
+          throw new Error("A product cannot appear more than once.");
         }
 
-        const product = configuredById.get(
-          quantity.productId,
-        );
+        const product = configuredById.get(quantity.productId);
 
         if (!product) {
           throw new Error(
@@ -172,15 +180,11 @@ export function useMachineRefillStep({
          * This also protects against stale local UI state
          * for products where loose units are not allowed.
          */
-        const looseQuantity =
-          product.packaging.allowsLooseUnits
-            ? quantity.looseQuantity
-            : 0;
+        const looseQuantity = product.packaging.allowsLooseUnits
+          ? quantity.looseQuantity
+          : 0;
 
-        if (
-          !Number.isFinite(looseQuantity) ||
-          looseQuantity < 0
-        ) {
+        if (!Number.isFinite(looseQuantity) || looseQuantity < 0) {
           throw new Error(
             `${product.name}: loose quantity cannot be negative.`,
           );
@@ -197,8 +201,7 @@ export function useMachineRefillStep({
         }
 
         const actualQuantity =
-          quantity.issueQuantity *
-            product.packaging.unitsPerIssueUnit +
+          quantity.issueQuantity * product.packaging.unitsPerIssueUnit +
           looseQuantity;
 
         /*
@@ -207,28 +210,22 @@ export function useMachineRefillStep({
          * It is only meaningful when no product was
          * actually added to the machine.
          */
-        let zeroReason: MachineRefillZeroReason | null =
-          null;
+        let zeroReason: MachineRefillZeroReason | null = null;
 
         let zeroReasonNote: string | null = null;
 
         if (actualQuantity === 0) {
           if (
             quantity.zeroReason !== null &&
-            !MACHINE_REFILL_ZERO_REASONS.has(
-              quantity.zeroReason,
-            )
+            !MACHINE_REFILL_ZERO_REASONS.has(quantity.zeroReason)
           ) {
-            throw new Error(
-              `${product.name}: invalid zero refill reason.`,
-            );
+            throw new Error(`${product.name}: invalid zero refill reason.`);
           }
 
           zeroReason = quantity.zeroReason;
 
           if (zeroReason === "other") {
-            const trimmedNote =
-              quantity.zeroReasonNote?.trim() ?? "";
+            const trimmedNote = quantity.zeroReasonNote?.trim() ?? "";
 
             if (!trimmedNote) {
               throw new Error(
@@ -269,8 +266,7 @@ export function useMachineRefillStep({
 
           actualQuantity,
 
-          normalizedUnit:
-            product.packaging.baseUnit,
+          normalizedUnit: product.packaging.baseUnit,
 
           zeroReason,
 
@@ -280,8 +276,7 @@ export function useMachineRefillStep({
         productIds.add(quantity.productId);
       }
 
-      const machineRefillConfirmedAt =
-        new Date().toISOString();
+      const machineRefillConfirmedAt = new Date().toISOString();
 
       /*
        * FLOW-18:
@@ -307,9 +302,7 @@ export function useMachineRefillStep({
         updatedAt: machineRefillConfirmedAt,
       };
 
-      await saveServiceVisit(
-        pendingMachineRefillVisit,
-      );
+      await saveServiceVisit(pendingMachineRefillVisit);
 
       setActiveVisit(pendingMachineRefillVisit);
 
@@ -323,21 +316,19 @@ export function useMachineRefillStep({
       let syncedMachineRefillVisit: ServiceVisit;
 
       try {
-        const machineRefillDatabaseId =
-          await saveMachineRefill({
-            sourceVisitId: activeVisit.id,
+        const machineRefillDatabaseId = await saveMachineRefill({
+          sourceVisitId: activeVisit.id,
 
-            clientId: activeVisit.clientId,
+          clientId: activeVisit.clientId,
 
-            stopId: activeVisit.stopId,
+          stopId: activeVisit.stopId,
 
-            machineId: activeVisit.machineId,
+          machineId: activeVisit.machineId,
 
-            confirmedAt:
-              machineRefillConfirmedAt,
+          confirmedAt: machineRefillConfirmedAt,
 
-            quantities: normalizedQuantities,
-          });
+          quantities: normalizedQuantities,
+        });
 
         syncedMachineRefillVisit = {
           ...pendingMachineRefillVisit,
@@ -356,18 +347,14 @@ export function useMachineRefillStep({
         };
 
         /*
-        * Persist successful machine refill immediately.
-        *
-        * If the local step transition fails, the next
-        * attempt must not submit machine refill again.
-        */
-        await saveServiceVisit(
-          syncedMachineRefillVisit,
-        );
+         * Persist successful machine refill immediately.
+         *
+         * If the local step transition fails, the next
+         * attempt must not submit machine refill again.
+         */
+        await saveServiceVisit(syncedMachineRefillVisit);
 
-        setActiveVisit(
-          syncedMachineRefillVisit,
-        );
+        setActiveVisit(syncedMachineRefillVisit);
       } catch (error) {
         const message =
           error instanceof Error
@@ -388,13 +375,9 @@ export function useMachineRefillStep({
           updatedAt: new Date().toISOString(),
         };
 
-        await saveServiceVisit(
-          failedMachineRefillVisit,
-        );
+        await saveServiceVisit(failedMachineRefillVisit);
 
-        setActiveVisit(
-          failedMachineRefillVisit,
-        );
+        setActiveVisit(failedMachineRefillVisit);
 
         setErrorMessage(message);
 
@@ -402,15 +385,15 @@ export function useMachineRefillStep({
       }
 
       /*
-      * --------------------------------------------------
-      * FLOW-18 COMPLETE
-      * --------------------------------------------------
-      *
-      * Machine refill is already synced.
-      * Reserve-after was handled during Client Delivery.
-      *
-      * Advance to the next service step.
-      */
+       * --------------------------------------------------
+       * FLOW-18 COMPLETE
+       * --------------------------------------------------
+       *
+       * Machine refill is already synced.
+       * Reserve-after was handled during Client Delivery.
+       *
+       * Advance to the next service step.
+       */
       const transitionedVisit = transitionToNextStep(
         syncedMachineRefillVisit,
         "machine_refill",
@@ -424,11 +407,7 @@ export function useMachineRefillStep({
 
       return transitionedVisit;
     },
-    [
-      activeVisit,
-      setActiveVisit,
-      setErrorMessage,
-    ],
+    [activeVisit, setActiveVisit, setErrorMessage],
   );
 
   return {
