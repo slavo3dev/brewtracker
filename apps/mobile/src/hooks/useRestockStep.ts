@@ -378,66 +378,32 @@ export function useRestockStep({
           pendingVisit,
         );
 
+        let syncedDeliveryVisit: ServiceVisit;
+
         try {
-          const databaseId =
-            await saveClientDelivery({
-              sourceVisitId:
-                activeVisit.id,
+          const databaseId = await saveClientDelivery({
+            sourceVisitId: activeVisit.id,
+            clientId: activeVisit.clientId,
+            stopId: activeVisit.stopId,
+            machineId: activeVisit.machineId,
+            confirmedAt,
+            quantities: input.quantities,
+          });
 
-              clientId:
-                activeVisit.clientId,
-
-              stopId:
-                activeVisit.stopId,
-
-              machineId:
-                activeVisit.machineId,
-
-              confirmedAt,
-
-              quantities:
-                input.quantities,
-            });
-
-          const syncedAt =
-            new Date().toISOString();
-
-          const syncedVisit: ServiceVisit = {
+          syncedDeliveryVisit = {
             ...pendingVisit,
-
             restockDrop: {
-              ...pendingVisit
-                .restockDrop!,
-
+              ...pendingVisit.restockDrop!,
               databaseId,
-
-              syncStatus:
-                "synced",
-
+              syncStatus: "synced",
               syncError: null,
             },
-
-            updatedAt: syncedAt,
+            updatedAt: new Date().toISOString(),
           };
 
-          const updatedVisit =
-            transitionToNextStep(
-              syncedVisit,
-              "restock",
-              syncedAt,
-            );
-
-          await saveServiceVisit(
-            updatedVisit,
-          );
-
-          setActiveVisit(
-            updatedVisit,
-          );
-
-          setErrorMessage(null);
-
-          return updatedVisit;
+          // Persist delivery success independently.
+          await saveServiceVisit(syncedDeliveryVisit);
+          setActiveVisit(syncedDeliveryVisit);
         } catch (error) {
           const message =
             error instanceof Error
@@ -446,32 +412,48 @@ export function useRestockStep({
 
           const failedVisit: ServiceVisit = {
             ...pendingVisit,
-
             restockDrop: {
-              ...pendingVisit
-                .restockDrop!,
-
-              syncStatus:
-                "failed",
-
-              syncError:
-                message,
+              ...pendingVisit.restockDrop!,
+              syncStatus: "failed",
+              syncError: message,
             },
-
-            updatedAt:
-              new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           };
 
-          await saveServiceVisit(
-            failedVisit,
+          await saveServiceVisit(failedVisit);
+          setActiveVisit(failedVisit);
+          setErrorMessage(message);
+
+          throw error;
+        }
+
+        // Delivery is now synced.
+        // Reserve-after is a separate operation.
+        try {
+          const syncedReserveAfterVisit =
+            await syncReserveAfter(syncedDeliveryVisit);
+
+          const transitionedVisit = transitionToNextStep(
+            syncedReserveAfterVisit,
+            "restock",
+            new Date().toISOString(),
           );
 
-          setActiveVisit(
-            failedVisit,
-          );
+          await saveServiceVisit(transitionedVisit);
+
+          setActiveVisit(transitionedVisit);
+          setErrorMessage(null);
+
+          return transitionedVisit;
+        } catch (error) {
+          if (error instanceof ReserveAfterSyncError) {
+            setActiveVisit(error.visit);
+          }
 
           setErrorMessage(
-            message,
+            error instanceof Error
+              ? error.message
+              : "Unable to sync client reserve after delivery.",
           );
 
           throw error;

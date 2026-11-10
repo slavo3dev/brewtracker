@@ -1,11 +1,9 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 
-import { saveClientReserveAfterService } from "../features/service-visit/client-reserve-after.service";
 import { saveMachineRefill } from "../features/service-visit/machine-refill.service";
 import { saveServiceVisit } from "../features/service-visit/service-visit.storage";
 
 import type {
-  ClientReserveAfterItemRecord,
   CompleteMachineRefillInput,
   MachineRefillItemRecord,
   MachineRefillQuantityInput,
@@ -30,179 +28,6 @@ const MACHINE_REFILL_ZERO_REASONS = new Set<MachineRefillZeroReason>([
   "other",
 ]);
 
-class ReserveAfterSyncError extends Error {
-  visit: ServiceVisit;
-
-  constructor(
-    message: string,
-    visit: ServiceVisit,
-  ) {
-    super(message);
-
-    this.name = "ReserveAfterSyncError";
-    this.visit = visit;
-  }
-}
-
-async function syncReserveAfter(
-  visit: ServiceVisit,
-): Promise<ServiceVisit> {
-  const inventoryAudit = visit.inventoryAudit;
-  const clientDelivery = visit.restockDrop;
-
-  if (
-    !inventoryAudit ||
-    inventoryAudit.syncStatus !== "synced" ||
-    !inventoryAudit.databaseId
-  ) {
-    throw new Error(
-      "Client reserve before service must be synced before calculating reserve after service.",
-    );
-  }
-
-  if (
-    !clientDelivery ||
-    clientDelivery.syncStatus !== "synced" ||
-    !clientDelivery.databaseId
-  ) {
-    throw new Error(
-      "Client delivery must be synced before calculating reserve after service.",
-    );
-  }
-
-  /*
-   * FLOW-19:
-   *
-   * Reserve After =
-   *   Reserve Before + Actual Client Delivery
-   *
-   * FLOW-18 Machine Refill is intentionally excluded.
-   */
-  const deliveryByProduct = new Map(
-    clientDelivery.items.map((item) => [
-      item.productId,
-      item.actualQuantity,
-    ]),
-  );
-
-  const items: ClientReserveAfterItemRecord[] =
-    inventoryAudit.items.map((item) => {
-      const deliveredQuantity =
-        deliveryByProduct.get(item.productId) ?? 0;
-
-      return {
-        productId: item.productId,
-
-        reserveBeforeQuantity:
-          item.normalizedQuantity,
-
-        deliveredQuantity,
-
-        reserveAfterQuantity:
-          item.normalizedQuantity +
-          deliveredQuantity,
-
-        normalizedUnit:
-          item.normalizedUnit,
-      };
-    });
-
-  /*
-   * If this is a retry, preserve the original
-   * calculatedAt timestamp.
-   */
-  const calculatedAt =
-    visit.reserveAfter?.calculatedAt ??
-    new Date().toISOString();
-
-  const pendingVisit: ServiceVisit = {
-    ...visit,
-
-    reserveAfter: {
-      databaseId: null,
-
-      sourceVisitId: visit.id,
-
-      calculatedAt,
-
-      items,
-
-      syncStatus: "pending_sync",
-
-      syncError: null,
-    },
-
-    updatedAt: new Date().toISOString(),
-  };
-
-  await saveServiceVisit(pendingVisit);
-
-  try {
-    const databaseId =
-      await saveClientReserveAfterService({
-        sourceVisitId: visit.id,
-
-        clientId: visit.clientId,
-
-        stopId: visit.stopId,
-
-        machineId: visit.machineId,
-
-        calculatedAt,
-      });
-
-    const syncedVisit: ServiceVisit = {
-      ...pendingVisit,
-
-      reserveAfter: {
-        ...pendingVisit.reserveAfter!,
-
-        databaseId,
-
-        syncStatus: "synced",
-
-        syncError: null,
-      },
-
-      updatedAt: new Date().toISOString(),
-    };
-
-    await saveServiceVisit(syncedVisit);
-
-    return syncedVisit;
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unable to sync client reserve after service.";
-
-    const failedVisit: ServiceVisit = {
-      ...pendingVisit,
-
-      reserveAfter: {
-        ...pendingVisit.reserveAfter!,
-
-        syncStatus: "failed",
-
-        syncError: message,
-      },
-
-      updatedAt: new Date().toISOString(),
-    };
-
-    await saveServiceVisit(failedVisit);
-
-    /*
-     * Throw the failed visit together with the error so
-     * the caller can update React state correctly.
-     */
-    throw new ReserveAfterSyncError(
-      message,
-      failedVisit,
-    );
-  }
-}
-
 export function useMachineRefillStep({
   activeVisit,
   setActiveVisit,
@@ -219,91 +44,31 @@ export function useMachineRefillStep({
       }
 
       /*
-       * --------------------------------------------------
-       * FLOW-19 RESUME / RETRY
-       * --------------------------------------------------
-       *
-       * If FLOW-18 is already synced, do not submit
-       * Machine Refill again.
-       *
-       * This covers:
-       *
-       * - FLOW-19 missing
-       * - FLOW-19 pending after app restart
-       * - FLOW-19 failed
-       * - FLOW-19 synced but local transition was interrupted
-       */
+      * --------------------------------------------------
+      * FLOW-18 RESUME / RETRY
+      * --------------------------------------------------
+      *
+      * Machine refill has already been synced.
+      *
+      * Do not submit it again. Only finish the
+      * interrupted local step transition.
+      */
       if (
         activeVisit.machineRefill?.syncStatus === "synced" &&
         activeVisit.machineRefill.databaseId
       ) {
-        /*
-         * FLOW-19 already synced.
-         *
-         * Nothing needs to be sent to Supabase again.
-         * We only need to finish the local transition.
-         */
-        if (
-          activeVisit.reserveAfter?.syncStatus === "synced" &&
-          activeVisit.reserveAfter.databaseId
-        ) {
-          const transitionedVisit = transitionToNextStep(
-            activeVisit,
-            "machine_refill",
-            new Date().toISOString(),
-          );
+        const transitionedVisit = transitionToNextStep(
+          activeVisit,
+          "machine_refill",
+          new Date().toISOString(),
+        );
 
-          await saveServiceVisit(transitionedVisit);
+        await saveServiceVisit(transitionedVisit);
 
-          setActiveVisit(transitionedVisit);
+        setActiveVisit(transitionedVisit);
+        setErrorMessage(null);
 
-          setErrorMessage(null);
-
-          return transitionedVisit;
-        }
-
-        /*
-         * FLOW-18 is synced but FLOW-19 is either:
-         *
-         * - missing
-         * - pending_sync
-         * - failed
-         *
-         * Retry FLOW-19 ONLY.
-         */
-        try {
-          const syncedReserveAfterVisit =
-            await syncReserveAfter(activeVisit);
-
-          const transitionedVisit = transitionToNextStep(
-            syncedReserveAfterVisit,
-            "machine_refill",
-            new Date().toISOString(),
-          );
-
-          await saveServiceVisit(transitionedVisit);
-
-          setActiveVisit(transitionedVisit);
-
-          setErrorMessage(null);
-
-          return transitionedVisit;
-        } catch (error) {
-          if (error instanceof ReserveAfterSyncError) {
-            setActiveVisit(error.visit);
-
-            setErrorMessage(error.message);
-          } else {
-            const message =
-              error instanceof Error
-                ? error.message
-                : "Unable to sync client reserve after service.";
-
-            setErrorMessage(message);
-          }
-
-          throw error;
-        }
+        return transitionedVisit;
       }
 
       /*
@@ -591,11 +356,11 @@ export function useMachineRefillStep({
         };
 
         /*
-         * Persist successful FLOW-18 immediately.
-         *
-         * From this point onward FLOW-18 must remain
-         * "synced", even if FLOW-19 later fails.
-         */
+        * Persist successful machine refill immediately.
+        *
+        * If the local step transition fails, the next
+        * attempt must not submit machine refill again.
+        */
         await saveServiceVisit(
           syncedMachineRefillVisit,
         );
@@ -636,72 +401,28 @@ export function useMachineRefillStep({
         throw error;
       }
 
-            /*
-       * --------------------------------------------------
-       * FLOW-19
-       * --------------------------------------------------
-       *
-       * FLOW-18 is now safely synced.
-       *
-       * Use the same FLOW-19 synchronization path for
-       * both:
-       *
-       * 1. normal completion after FLOW-18
-       * 2. retry/resume when FLOW-18 was already synced
-       */
-      try {
-        const syncedReserveAfterVisit =
-          await syncReserveAfter(
-            syncedMachineRefillVisit,
-          );
+      /*
+      * --------------------------------------------------
+      * FLOW-18 COMPLETE
+      * --------------------------------------------------
+      *
+      * Machine refill is already synced.
+      * Reserve-after was handled during Client Delivery.
+      *
+      * Advance to the next service step.
+      */
+      const transitionedVisit = transitionToNextStep(
+        syncedMachineRefillVisit,
+        "machine_refill",
+        new Date().toISOString(),
+      );
 
-        /*
-         * FLOW-18 and FLOW-19 are both synced.
-         *
-         * It is now safe to advance:
-         *
-         * Machine Refill -> After Service
-         */
-        const transitionedVisit =
-          transitionToNextStep(
-            syncedReserveAfterVisit,
-            "machine_refill",
-            new Date().toISOString(),
-          );
+      await saveServiceVisit(transitionedVisit);
 
-        await saveServiceVisit(
-          transitionedVisit,
-        );
+      setActiveVisit(transitionedVisit);
+      setErrorMessage(null);
 
-        setActiveVisit(
-          transitionedVisit,
-        );
-
-        setErrorMessage(null);
-
-        return transitionedVisit;
-      } catch (error) {
-        if (error instanceof ReserveAfterSyncError) {
-          /*
-           * FLOW-18 remains synced.
-           *
-           * Only FLOW-19 is marked failed by
-           * syncReserveAfter().
-           */
-          setActiveVisit(error.visit);
-
-          setErrorMessage(error.message);
-        } else {
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Unable to sync client reserve after service.";
-
-          setErrorMessage(message);
-        }
-
-        throw error;
-      }
+      return transitionedVisit;
     },
     [
       activeVisit,
