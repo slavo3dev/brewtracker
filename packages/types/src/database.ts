@@ -1946,48 +1946,6 @@ export type Database = {
           },
         ]
       }
-      stop_machines: {
-        Row: {
-          created_at: string
-          drink_count_required: boolean
-          id: string
-          machine_id: string
-          sequence_number: number
-          stop_id: string
-        }
-        Insert: {
-          created_at?: string
-          drink_count_required?: boolean
-          id?: string
-          machine_id: string
-          sequence_number: number
-          stop_id: string
-        }
-        Update: {
-          created_at?: string
-          drink_count_required?: boolean
-          id?: string
-          machine_id?: string
-          sequence_number?: number
-          stop_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "stop_machines_machine_id_fkey"
-            columns: ["machine_id"]
-            isOneToOne: false
-            referencedRelation: "machines"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "stop_machines_stop_id_fkey"
-            columns: ["stop_id"]
-            isOneToOne: false
-            referencedRelation: "stops"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       stops: {
         Row: {
           arrived_at: string | null
@@ -2514,7 +2472,7 @@ export type Database = {
         Returns: undefined
       }
       generate_routes_from_templates: {
-        Args: { p_route_date: string; p_template_id?: string }
+        Args: { p_route_date: string }
         Returns: {
           driver_id: string
           route_date: string
