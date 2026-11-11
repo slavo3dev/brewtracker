@@ -307,15 +307,16 @@ begin
     if exists (
       select 1
       from public.client_delivery_items item
-      join public.inventory_movements movement
+      left join public.inventory_movements movement
         on movement.id = item.movement_id
       where item.delivery_id = v_existing_delivery_id
         and item.actual_quantity > 0
         and (
-          movement.movement_type <> 'client_delivery'
-          or movement.product_id <> item.product_id
-          or movement.normalized_quantity <> item.actual_quantity
-          or movement.normalized_unit <> item.normalized_unit
+          movement.id is null
+          or movement.movement_type is distinct from 'client_delivery'
+          or movement.product_id is distinct from item.product_id
+          or movement.normalized_quantity is distinct from item.actual_quantity
+          or movement.normalized_unit is distinct from item.normalized_unit
           or movement.source_visit_id is distinct from
                trim(p_source_visit_id)
           or movement.stop_id is distinct from p_stop_id
