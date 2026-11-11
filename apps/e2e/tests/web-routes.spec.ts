@@ -9,6 +9,7 @@ import {
   deleteRoute,
 } from '../helpers/routeSeed';
 import { todayLocalIso } from '../helpers/date';
+import { supabaseAdmin } from '../helpers/supabaseAdmin';
 
 const QA_DRIVER_ID = process.env.QA_DRIVER_ID!;
 
@@ -259,12 +260,12 @@ test('WEB-RT-17: A route in progress or completed cannot be cancelled', async ({
   await routes.goto();
   await routes.clearDateFilter();
   await routes.filterByStatus('in_progress');
-  await routes.expectNoCancelButtonOnFirstRoute();
+  await routes.expectNoCancelButtonOnAnyVisibleRoute();
 
   await routes.goto();
   await routes.clearDateFilter();
   await routes.filterByStatus('completed');
-  await routes.expectNoCancelButtonOnFirstRoute();
+  await routes.expectNoCancelButtonOnAnyVisibleRoute();
 });
 
 test('WEB-RT-18: A scheduled route with a started stop is rejected by the server', async ({ page }) => {
@@ -476,6 +477,30 @@ test('WEB-RT-12: "Open in Google Maps" generates the correct directions URL', as
   expect(href).toContain('api=1');
   expect(href).toContain('travelmode=driving');
   expect(href).toMatch(/origin=[\d.]+%2C[\d.]+|origin=[\d.]+,[\d.]+/);
+
+  // Raniji test je proveravao SAMO format origin/api/travelmode — nikad da origin/destination
+  // stvarno odgovaraju koordinatama dodatih stanica. Link bi i dalje "izgledao ispravno" (sve
+  // gornje provere bi prošle) čak i da je app pomešala/pogrešno mapirala stanice. buildGoogleMapsDirectionsUrl()
+  // sortira stanice po sequence_number — prva dodata (Italija) je origin, poslednja (Milano Coffee)
+  // je destination (vidi route-map-preview.tsx); poredimo direktno sa stvarnim koordinatama klijenata iz baze.
+  const supabase = supabaseAdmin();
+  const { data: clients, error } = await supabase
+    .from('clients')
+    .select('name, latitude, longitude')
+    .in('name', ['Italija', 'Milano Coffee']);
+  if (error) throw new Error(`Ne mogu da pročitam koordinate klijenata: ${error.message}`);
+  const italija = clients!.find((c) => c.name === 'Italija');
+  const milanoCoffee = clients!.find((c) => c.name === 'Milano Coffee');
+  if (!italija || !milanoCoffee) throw new Error('Nedostaje fixture klijent Italija ili Milano Coffee.');
+
+  const url = new URL(href!);
+  const [originLat, originLng] = url.searchParams.get('origin')!.split(',').map(Number);
+  const [destLat, destLng] = url.searchParams.get('destination')!.split(',').map(Number);
+
+  expect(originLat).toBeCloseTo(italija.latitude!, 3);
+  expect(originLng).toBeCloseTo(italija.longitude!, 3);
+  expect(destLat).toBeCloseTo(milanoCoffee.latitude!, 3);
+  expect(destLng).toBeCloseTo(milanoCoffee.longitude!, 3);
 });
 
 test('WEB-RT-16: Dismissing the cancel dialog changes nothing', async ({ page }) => {

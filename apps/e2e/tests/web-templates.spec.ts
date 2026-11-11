@@ -95,15 +95,58 @@ test('WEB-STOPEX-03: Remove-recurring-stop mode is disabled when the template ha
 });
 
 test('WEB-TPLEX-01: "Skip route" exception prevents generation for that date', async ({ page }) => {
-  const login = new LoginPage(page);
-  await login.goto();
-  await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+  // Raniji test je proveravao SAMO da red izuzetka postoji u UI listi — nikad da to stvarno
+  // utiče na generisanje (RPC se nikad nije pozvao). Red bi se prikazao i da izuzetak nema
+  // NIKAKAV efekat na generate_routes_from_templates(). Ovde se, po istom obrascu kao WEB-TPL-20,
+  // koristi dedikovan template (ne deljeni TEMPLATE_NAME, čiji dan/vozač/aktivno stanje nisu pod
+  // našom kontrolom) i stvarno se poziva RPC — pre dodavanja izuzetka (dokaz da generisanje za
+  // taj dan radi) i posle (dokaz da izuzetak stvarno preskače TAJ konkretan datum).
+  // Dva stvarna RPC poziva + 4 UI round-trip-a (create/add stop/activate/add exception) su
+  // zajedno sporiji od podrazumevanog 30s budžeta pod opterećenjem deljenog staging servera —
+  // isti obrazac kao WEB-FLEET-05 (test.setTimeout(90000)) negde drugde u suiti.
+  test.setTimeout(60000);
 
-  const templates = new RouteTemplatesPage(page);
-  await templates.goto();
+  const name = `QA TPLEX-01 ${Date.now()}`;
+  const exceptionDateIso = '2027-03-15';
+  const weekdayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const exceptionWeekday = weekdayNames[new Date(`${exceptionDateIso}T00:00:00Z`).getUTCDay()];
 
-  await templates.addSkipException(TEMPLATE_NAME, '2027-01-10');
-  await templates.expectExceptionRowVisible(TEMPLATE_NAME, 'Jan 10, 2027', 'Route skipped');
+  try {
+    // Čist preduslov — isti razlog kao WEB-TPL-20: "osirotela" neotkazana ruta iz nekog ranijeg
+    // prekinutog pokretanja ovog testa bi inače trajno blokirala baseline generisanje ispod
+    // (ROUTE-6 bi je preskočio zbog TE rute, ne zbog skip-izuzetka koji test stvarno proverava).
+    await cancelRoutesForMachine(QA_DRIVER_ID, exceptionDateIso, GENOVA_TEST_MACHINE_ID, 'QA-TPLEX-01-');
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+    const templates = new RouteTemplatesPage(page);
+    await templates.goto();
+
+    await templates.createTemplate({ name, weekday: exceptionWeekday, driverId: QA_DRIVER_ID });
+    await templates.addStop(name, 'Genova Test Client · Genova', 'Genova Test Machine · SN-GENOVA-TEST-01');
+    await templates.activate(name);
+    await templates.expectActive(name);
+
+    const templateId = await getTemplateIdByName(name);
+
+    // Baseline PRE izuzetka: generisanje za taj datum mora stvarno da uspe — bez ovoga, kasniji
+    // "nema generisane rute" rezultat ne bi dokazivao da je BAŠ izuzetak uzrok.
+    let generated = await generateRoutesFromTemplates(exceptionDateIso, templateId);
+    expect(generated.some((r) => r.route_template_id === templateId)).toBe(true);
+    const baselineRouteId = generated.find((r) => r.route_template_id === templateId)?.route_id;
+    if (baselineRouteId) await deleteRoute(baselineRouteId);
+
+    await templates.addSkipException(name, exceptionDateIso);
+    await templates.expectExceptionRowVisible(name, 'Mar 15, 2027', 'Route skipped');
+
+    // Isti datum, sada sa izuzetkom — generisanje za OVAJ template mora biti preskočeno.
+    generated = await generateRoutesFromTemplates(exceptionDateIso, templateId);
+    expect(generated.some((r) => r.route_template_id === templateId)).toBe(false);
+  } finally {
+    await forceCleanupTemplates(['QA TPLEX-01']);
+  }
 });
 
 test('WEB-TPLEX-02: "Replace driver" exception requires a replacement driver', async ({ page }) => {
@@ -123,15 +166,50 @@ test('WEB-TPLEX-02: "Replace driver" exception requires a replacement driver', a
 });
 
 test('WEB-TPLEX-03: "Replace driver" exception correctly applies for that date', async ({ page }) => {
-  const login = new LoginPage(page);
-  await login.goto();
-  await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+  // Isti nedostatak kao WEB-TPLEX-01: raniji test je proveravao SAMO da red izuzetka postoji u
+  // UI listi, nikad da generisana ruta za taj datum stvarno koristi override vozača umesto
+  // template-ovog sopstvenog. Dedikovan template (ne deljeni TEMPLATE_NAME) + stvaran RPC poziv,
+  // po istom obrascu kao WEB-TPL-20.
+  test.setTimeout(60000);
 
-  const templates = new RouteTemplatesPage(page);
-  await templates.goto();
+  const name = `QA TPLEX-03 ${Date.now()}`;
+  const exceptionDateIso = '2027-03-22';
+  const weekdayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const exceptionWeekday = weekdayNames[new Date(`${exceptionDateIso}T00:00:00Z`).getUTCDay()];
 
-  await templates.addDriverException(TEMPLATE_NAME, '2027-01-17');
-  await templates.expectExceptionRowVisible(TEMPLATE_NAME, 'Jan 17, 2027', 'Driver override');
+  try {
+    // Čist preduslov — vidi napomenu u WEB-TPLEX-01.
+    await cancelRoutesForMachine(QA_DRIVER_ID, exceptionDateIso, GENOVA_TEST_MACHINE_ID, 'QA-TPLEX-03-');
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+    const templates = new RouteTemplatesPage(page);
+    await templates.goto();
+
+    await templates.createTemplate({ name, weekday: exceptionWeekday, driverId: QA_DRIVER_ID });
+    await templates.addStop(name, 'Genova Test Client · Genova', 'Genova Test Machine · SN-GENOVA-TEST-01');
+    await templates.activate(name);
+    await templates.expectActive(name);
+
+    const templateId = await getTemplateIdByName(name);
+
+    await templates.addDriverException(name, exceptionDateIso);
+    await templates.expectExceptionRowVisible(name, 'Mar 22, 2027', 'Driver override');
+
+    const generated = await generateRoutesFromTemplates(exceptionDateIso, templateId);
+    const generatedRoute = generated.find((r) => r.route_template_id === templateId);
+    expect(generatedRoute).toBeTruthy();
+    // addDriverException() bira zamenskog vozača iz dropdown-a (drugi po redu, != template-ov
+    // sopstveni vozač) — stvaran dokaz da izuzetak ima efekat je da generisana ruta NIJE na
+    // template-ovom sopstvenom (QA_DRIVER_ID) vozaču, ne samo da red izuzetka postoji u UI-ju.
+    expect(generatedRoute!.driver_id).not.toBe(QA_DRIVER_ID);
+
+    if (generatedRoute) await deleteRoute(generatedRoute.route_id);
+  } finally {
+    await forceCleanupTemplates(['QA TPLEX-03']);
+  }
 });
 
 test('WEB-TPL-01: A new template is always created inactive', async ({ page }) => {
@@ -225,6 +303,17 @@ test('WEB-TPL-11: Deleting an inactive template', async ({ page }) => {
 });
 
 test('WEB-TPL-12: An active template cannot be deleted', async ({ page }) => {
+  // NAPOMENA (istraženo, namerno ostavljeno ovako): ovaj test proverava SAMO da UI sakriva
+  // Delete dugme za aktivan template — ne i da je zaštita sprovedena i na server strani. Da bi
+  // se to proverilo bez izmene app koda, trebalo bi direktno pozvati service-role klijent da
+  // obriše red — ALI grep kroz sve migracije (supabase/migrations/*.sql) potvrđuje da NE postoji
+  // DELETE trigger na route_templates tabeli (forceCleanupTemplates ispod uspešno briše AKTIVNE
+  // template-e direktno preko iste admin konekcije, bez greške) — zaštita je ISKLJUČIVO u server
+  // akciji (aplikacioni kod), ne u bazi. Takav direktan DB poziv bi zato UVEK "uspeo" bez obzira
+  // da li je server akcija ispravna, i ne bi dokazivao ništa o njoj — bio bi lažno uverljiv test,
+  // ne jači. Stvarna provera server-side zaštite bi zahtevala ili DB trigger (izmena baze, van
+  // dozvoljenog opsega ove izmene) ili pozivanje same Next.js server akcije mimo UI-ja (nestabilan
+  // reverse-engineering, isti razlog kao napomena u WEB-SURV-10). Ostavljeno kao poznato ograničenje.
   const name = `QA TPL-12 ${Date.now()}`;
 
   try {

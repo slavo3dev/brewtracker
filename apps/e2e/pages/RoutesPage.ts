@@ -189,9 +189,20 @@ export class RoutesPage {
     await this.page.getByRole('combobox', { name: /status/i }).selectOption(status);
   }
 
-  async expectNoCancelButtonOnFirstRoute() {
-    await this.expandFirstRoute();
-    await expect(this.firstRouteCard().getByRole('button', { name: 'Cancel route' })).toHaveCount(0);
+  // Cancel route dugme postoji u DOM-u SAMO kad je kartica razvijena (isExpanded) I kad je
+  // ruta "scheduled" (canCancel) — provera na SAMO prvoj kartici bi mogla da previdi regresiju
+  // koja je pogodila deo (ne sve) ruta tog statusa ako je baš "prva" kartica ispravna. Ova
+  // metoda razvija SVAKU vidljivu karticu (jednu po jednu, da izbegnemo ambigvitet oko
+  // "View / manage" dugmeta) i proverava odsustvo Cancel dugmeta na svakoj od njih.
+  async expectNoCancelButtonOnAnyVisibleRoute() {
+    const cards = this.page.locator('article');
+    const count = await cards.count();
+    expect(count).toBeGreaterThan(0);
+    for (let i = 0; i < count; i++) {
+      const card = cards.nth(i);
+      await card.getByRole('button', { name: 'View / manage' }).click();
+      await expect(card.getByRole('button', { name: 'Cancel route' })).toHaveCount(0);
+    }
   }
 
   async attemptCreateRouteWithoutRequiredFields() {

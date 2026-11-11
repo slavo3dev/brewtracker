@@ -15,7 +15,11 @@ test('WEB-CLI-01: /dashboard/clients requires inventory manager access (manager/
   await login.goto();
   await login.login(process.env.QA_DRIVER_EMAIL!, process.env.QA_DRIVER_PASSWORD!);
   await page.goto('/dashboard/clients');
-  await expect(page).toHaveURL(/\/login|\/dashboard$/);
+  // Prethodno: /\/login|\/dashboard$/ — ta OR regularna varijanta bi i dalje PROŠLA da je
+  // regresija pustila vozača na /dashboard umesto da ga odbije na /login (requireInventoryManager()
+  // prvo zove requireAdmin(), koji vozača UVEK vraća na /login, isto kao WEB-AUTH-05) — ovde
+  // tražimo ISKLJUČIVO /login, da test stvarno padne ako ta zaštita ikad popusti.
+  await expect(page).toHaveURL(/\/login/);
 });
 
 test('WEB-CLI-02: Creating a client with required fields succeeds and goes to the detail page', async ({ page }) => {

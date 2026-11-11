@@ -29,15 +29,27 @@ test('WEB-FLEET-02: Empty state when there are no active drivers', async ({ page
 });
 
 test('WEB-FLEET-01: Fleet map shows markers for recently active drivers', async ({ page }) => {
-  await ensureDriverIsLiveOnFleetMap(process.env.QA_DRIVER_EMAIL!);
-
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   const fleet = new FleetMapPage(page);
   await fleet.goto();
-  await fleet.expectAtLeastOneDriverMarker();
+  // Baseline PRE nego što naš vozač postane "živ" — ovaj test radi odmah posle FLEET-02 (koji
+  // eksplicitno uklanja sva 3 fixture vozača), pa je ovo obično 0, ali ne pretpostavljamo tu
+  // vrednost, samo je beležimo.
+  const before = await fleet.getMarkerCount();
+
+  await ensureDriverIsLiveOnFleetMap(process.env.QA_DRIVER_EMAIL!);
+  await fleet.goto();
+
+  // Raniji test je proveravao samo "bar jedan marker postoji negde na mapi" — to bi prošlo i
+  // da NAŠ vozač nikad nije postao "živ" (neki drugi, nepovezan vozač u deljenoj bazi bio bi
+  // dovoljan). Klikanje na markere/popup-ove da se identifikuje KONKRETNO čiji je marker je već
+  // dokumentovano (vidi WEB-FLEET-03 ispod) kao nepouzdano za automatizaciju kad ima više
+  // markera blizu jedan drugom — zato se, isto kao WEB-FLEET-04, proverava da se broj markera
+  // STVARNO povećao nakon naše konkretne akcije, umesto apsolutnog "ima bar jedan".
+  await expect.poll(() => fleet.getMarkerCount(), { timeout: 10000 }).toBeGreaterThan(before);
 });
 
 test('WEB-FLEET-03: Manager sees only their own region, CEO sees all regions', async () => {
@@ -116,6 +128,19 @@ test('WEB-FLEET-05: Map falls back to 60s polling when the realtime channel is u
 });
 
 test('WEB-FLEET-07: Fleet page redirects non-admin accounts', async ({ page }) => {
+  // Raniji test je proveravao SAMO anonimnu posetu (dupliranje WEB-AUTH-13), nikad stvaran
+  // pokušaj logina kao vozač — razlika je bitna jer middleware-level redirect za NEULOGOVANOG
+  // korisnika i requireAdmin()-ov redirect za ULOGOVANOG-ali-pogrešne-role korisnika su DVE
+  // različite grane koda. Sada se, isto kao WEB-USR-14/WEB-TCREV-11/WEB-INVP-04, stvarno
+  // loguje kao vozač pre pristupa stranici — i dalje ne testira "ulogovan admin bez baš OVE
+  // dozvole" (ta grana je nedostižna dok god vozači/tehničari ne mogu uopšte na web dashboard,
+  // vidi WEB-AUTH-05), ali bar prolazi kroz login pre provere, ne samo anonimnu posetu.
+  await page.goto('/dashboard/fleet');
+  await expect(page).toHaveURL(/\/login/);
+
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_DRIVER_EMAIL!, process.env.QA_DRIVER_PASSWORD!);
   await page.goto('/dashboard/fleet');
   await expect(page).toHaveURL(/\/login/);
 });

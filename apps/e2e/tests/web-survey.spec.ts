@@ -89,6 +89,16 @@ test('WEB-SURV-10: Rating outside the 1-5 range is rejected at the database leve
   // umesto pokušaja da se replicira fragilan Next.js server-action poziv, ovo direktno
   // testira CHECK constraint (rating between 1 and 5) na service_visit_surveys tabeli —
   // stvarna krajnja linija odbrane, koja važi bez obzira na to odakle zahtev stiže.
+  //
+  // NAPOMENA (poznato ograničenje, ne test bug): ovaj test NE pokriva da li submitSurvey()
+  // server akcija (apps/web/src/app/survey/[token]/actions.ts) i dalje sama validira
+  // 1-5 opseg — samo poslednju liniju odbrane (DB constraint). submitSurvey() je Next.js
+  // server akcija ("use server") pozvana direktno iz klijentske komponente — ne postoji
+  // dostupan HTTP endpoint koji bi se mogao gađati nezavisno od UI-ja bez reverse-engineering-a
+  // Next-ovog internog "Next-Action" wire formata (nestabilno između verzija Next.js-a, loša
+  // inženjerska praksa za regresioni test). Dok god se ne doda testabilan hook u app kodu (van
+  // dozvoljenog opsega ove izmene — menja se samo test kod), app-layer validacija ostaje
+  // pokrivena SAMO indirektno, kroz UI nemogućnost da se uopšte pošalje van-opsega vrednost.
   const token = await createFreshSurveyToken();
 
   for (const invalidRating of [0, 6, -1]) {

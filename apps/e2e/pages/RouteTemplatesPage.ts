@@ -90,10 +90,11 @@ export class RouteTemplatesPage {
     }
     await this.page.getByRole('button', { name: 'Create Template' }).click();
     // Malo duži timeout od podrazumevanog 5s — ovo je realan server round-trip (server
-    // action + revalidate) koji povremeno traje duže pod opterećenjem staging servera.
+    // action + revalidate) koji povremeno traje duže pod opterećenjem staging servera. Fajl je
+    // dovoljno velik (30+ testova, mnogi prave sopstveni template) da je 10s povremeno nedovoljno.
     await expect(
       this.page.getByRole('status').getByText('Route template created. Add at least one stop before activating it.'),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible({ timeout: 25000 });
   }
 
   async addOneOffStopException(
@@ -189,15 +190,19 @@ export class RouteTemplatesPage {
     const removeButtons = card.getByRole('button', { name: 'Remove', exact: true });
     const before = await removeButtons.count();
     await removeButtons.first().click();
-    // Kad se ukloni POSLEDNJA stanica, "Stop removed..." poruka živi unutar TemplateStopRow
-    // komponente koja se u istom trenutku uklanja iz DOM-a (lista postaje prazna) — ista
-    // zamka kao kod uklanjanja stanica na rutama (web-routes.spec.ts WEB-RT-14). Umesto te
-    // tranzijentne poruke, čekamo da se broj Remove dugmadi stvarno smanji.
+    // ISPRAVKA: dugme menja tekst na "Removing..." ISTOG TRENUTKA klika (deletePending postaje
+    // true sinhrono, pre bilo kakvog server round-trip-a — vidi route-template-card.tsx) — to
+    // znači da broj dugmadi sa TAČNIM imenom "Remove" opadne na before-1 ODMAH, bez obzira da li
+    // je server akcija uopšte završila (a kamoli uspela). Stara provera ispod bi prošla i da
+    // server akcija tiho otkaže. Prvo čekamo da pending stanje STVARNO nestane (akcija završena),
+    // pa tek onda proveravamo konačan broj — isti obrazac kao broken-image fix na drugim mestima
+    // u suiti (ne veruj tranzijentnom/optimističkom UI stanju).
+    await expect(card.getByRole('button', { name: 'Removing...' })).toHaveCount(0, { timeout: 15000 });
     await expect(removeButtons).toHaveCount(before - 1, { timeout: 10000 });
   }
 
   async expectNoStopsConfigured(templateName: string) {
-    await expect(this.card(templateName).getByText('No stops configured')).toBeVisible();
+    await expect(this.card(templateName).getByText('No stops configured')).toBeVisible({ timeout: 10000 });
   }
 
   async expectDeleteButtonVisible(templateName: string) {
@@ -335,7 +340,10 @@ export class RouteTemplatesPage {
     await card.locator('select[name="mode"]').selectOption({ label: 'Replace driver' });
     await card.locator('select[name="overrideDriverId"]').selectOption({ index: 1 });
     await card.getByRole('button', { name: 'Add exception' }).click();
-    await expect(card.getByText('Route exception saved.')).toBeVisible({ timeout: 10000 });
+    // Isti obrazac kao addStop()/addOneOffStopException(): pod opterećenjem deljenog staging
+    // servera 10s povremeno nije dovoljno za ovaj server round-trip (potvrđeno izolovanim
+    // ponavljanjem — nije logička greška).
+    await expect(card.getByText('Route exception saved.')).toBeVisible({ timeout: 15000 });
   }
 
   exceptionRow(templateName: string, dateLabel: string, badgeText: string): Locator {

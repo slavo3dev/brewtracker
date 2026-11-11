@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 import { TransfersPage } from '../pages/TransfersPage';
+import { supabaseAdmin } from '../helpers/supabaseAdmin';
 
 // VAŽNO: vozač mora biti u ISTOM regionu kao magacin (Milano = Italy), inače server
 // puca umesto da prikaže grešku o validaciji (potvrđeno istraživanjem — driver1/2/3 su
@@ -29,8 +30,37 @@ test('WEB-XFER-12: A valid multi-product transfer submits atomically and shows a
   await transfers.fillQuantityInput(1, '1'); // box quantity
   await transfers.fillQuantityInput(2, '0'); // loose
 
+  const beforeSubmitIso = new Date().toISOString();
   await transfers.submit();
   await transfers.expectProductsIssuedSuccessfully(2);
+
+  // Raniji test se zaustavljao na generičkoj UI poruci o uspehu — "atomically" iz naziva testa
+  // nikad nije bilo nezavisno provereno na nivou podataka. recordWarehouseTransferAction() zove
+  // JEDAN RPC (record_warehouse_driver_transfer_batch) koji vraća po jedan movement ID po stavci —
+  // delimično upisan transfer bi i dalje mogao da prikaže identičnu poruku da server akcija samo
+  // vrati broj stavki bez provere stvarnog DB stanja. Ovde se direktno čita custody ledger i
+  // potvrđuje da su TAČNO 2 nova "warehouse_issue" reda upisana za ovog vozača.
+  const supabase = supabaseAdmin();
+  const { data: driverLocation, error: locationError } = await supabase
+    .from('inventory_locations')
+    .select('id')
+    .eq('driver_id', QA_DRIVER_ID)
+    .eq('location_type', 'driver')
+    .single();
+  if (locationError || !driverLocation) {
+    throw new Error(`Ne mogu da nađem inventory_locations red za vozača: ${locationError?.message}`);
+  }
+
+  const { data: movements, error: movementsError } = await supabase
+    .from('inventory_movements')
+    .select('id')
+    .eq('to_location_id', driverLocation.id)
+    .eq('movement_type', 'warehouse_issue')
+    .gte('created_at', beforeSubmitIso);
+  if (movementsError) {
+    throw new Error(`Ne mogu da pročitam inventory_movements: ${movementsError.message}`);
+  }
+  expect(movements?.length).toBe(2);
 });
 
 test('WEB-XFER-02: Submit is blocked without a selected warehouse', async ({ page }) => {

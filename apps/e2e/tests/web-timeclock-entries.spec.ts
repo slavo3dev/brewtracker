@@ -6,6 +6,7 @@ import {
   resolveExistingPendingEntries,
   setTimeEntryReasonFields,
 } from '../helpers/timeClockSeed';
+import { supabaseAdmin } from '../helpers/supabaseAdmin';
 
 // Deljeni vozač fiksture sa web-timeclock-review.spec.ts — rade jedan za drugim da izbegnu
 // trku oko istog "jedan otvoren unos po vozaču" reda.
@@ -23,7 +24,12 @@ test('WEB-TCENT-01: Entry list shows all fields correctly', async ({ page }) => 
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
   await resolveExistingPendingEntries(driverId);
-  await createPendingClockInEntry(driverId, { leaveOpen: true });
+  // Podrazumevani QA magacin (QA_WAREHOUSE_ID) ima region "Global", koji RLS politika na
+  // "warehouses" tabeli ne prepoznaje kao poseban slučaj (vidi napomenu u WEB-TCREV-03/WEB-SV-07)
+  // — manager iz regiona Italy bi dobio PRAZAN join za njega, pa bi "Warehouse" legitimno
+  // prikazao "—" bez obzira da li kolona uopšte radi ispravno. Genova magacin (region Italy) je
+  // STVARNO vidljiv manageru, pa test može da potvrdi da se pravo ime magacina renderuje.
+  await createPendingClockInEntry(driverId, { leaveOpen: true, warehouseId: process.env.QA_GENOVA_TEST_WAREHOUSE_ID! });
 
   const login = new LoginPage(page);
   await login.goto();
@@ -34,7 +40,32 @@ test('WEB-TCENT-01: Entry list shows all fields correctly', async ({ page }) => 
 
   const card = entries.cardForDriverEmail(driverEmail);
   await expect(card).toBeVisible();
+  // expectFieldsPopulated() samo proverava da nijedno polje nije PRAZNO — to bi prošlo i da
+  // Warehouse/Review/Auto closed/Reason prikažu POGREŠNU (ali ne-praznu) vrednost. Ova fiksturna
+  // (createPendingClockInEntry sa leaveOpen:true, bez ikakvih reason polja) ima POTPUNO
+  // determinističke vrednosti za ta 4 polja — proveravamo ih konkretno, ne samo "nije prazno".
   await entries.expectFieldsPopulated(card);
+
+  const supabase = supabaseAdmin();
+  const { data: warehouse, error: warehouseError } = await supabase
+    .from('warehouses')
+    .select('name')
+    .eq('id', process.env.QA_GENOVA_TEST_WAREHOUSE_ID!)
+    .single();
+  if (warehouseError || !warehouse) {
+    throw new Error(`Ne mogu da pročitam ime magacina: ${warehouseError?.message}`);
+  }
+
+  expect(await entries.getFieldText(card, 'Warehouse')).toBe(warehouse.name);
+  // <dd class="capitalize"> — innerText() odražava CSS text-transform, pa je renderovan tekst
+  // "Pending" (veliko P), iako je sirova DB vrednost "pending".
+  expect(await entries.getFieldText(card, 'Review')).toBe('Pending');
+  // Mobilni clock-in nikad ne postavlja auto_closed_at, a resolveExistingPendingEntries/
+  // createPendingClockInEntry ovde ga ne diraju — "No" je jedina moguća vrednost za OVU fiksturu.
+  expect(await entries.getFieldText(card, 'Auto closed')).toBe('No');
+  // Nijedno od 4 reason polja nije postavljeno za ovu fiksturu — fallback na "—"
+  // (isti lanac prioriteta koji WEB-TCENT-04 testira eksplicitno, korak po korak).
+  expect(await entries.getFieldText(card, 'Reason')).toBe('—');
 });
 
 test('WEB-TCENT-02: Open entry shows "Still open" for clock out', async ({ page }) => {
@@ -57,6 +88,12 @@ test('WEB-TCENT-02: Open entry shows "Still open" for clock out', async ({ page 
 });
 
 test('WEB-TCENT-04: Reason column goes through the correct fallback chain', async ({ page }) => {
+  // Stranica nema paginaciju i renderuje CELU istoriju unosa (800+ u deljenoj bazi, raste kroz
+  // sesije) — ovaj test zove entries.goto() TRI puta zaredom, pa čak i blago sporiji load (pod
+  // opterećenjem) lako premaši podrazumevani 30s budžet za ceo test. Potvrđeno snimkom ekrana iz
+  // stvarnog pada: sama navigacija je istekla, ne neki lokator/race unutar stranice.
+  test.setTimeout(90000);
+
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
   const login = new LoginPage(page);

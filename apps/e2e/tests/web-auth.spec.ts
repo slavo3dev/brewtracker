@@ -93,8 +93,14 @@ test('WEB-AUTH-14: Active manager can access /dashboard/users', async ({ page })
 });
 
 test('WEB-AIQ-02: /ai-quality is accessible without authentication', async ({ page }) => {
+  // Raniji test je bio ČISTO negativan (samo "nije /login") — to bi prošlo i da je stranica
+  // vratila 404/prazan odgovor, dokle god URL ne sadrži "/login". Dodata je i pozitivna provera
+  // da je STVARAN sadržaj stranice renderovan (naslov jedinstven za ovu stranicu).
   await page.goto('/ai-quality');
   await expect(page).not.toHaveURL(/\/login/);
+  await expect(
+    page.getByRole('heading', { name: 'Review every service visit with AI-assisted quality control.' }),
+  ).toBeVisible();
 });
 
 test('WEB-AIQ-01: /ai-quality shows static cards with no functional queue', async ({ page }) => {

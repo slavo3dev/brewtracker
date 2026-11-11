@@ -50,13 +50,40 @@ test('WEB-RECH-04: Opening a card shows the full count detail', async ({ page })
   const firstCard = page.locator('section').locator('details').first();
   await firstCard.locator('summary').click();
 
-  await expect(firstCard.getByText('Counted by')).toBeVisible();
-  await expect(firstCard.getByText('Confirmed by')).toBeVisible();
+  // Raniji test je proveravao SAMO da labela postoji negde na kartici — to bi prošlo i da je
+  // vrednost pored nje prazna/nedefinisana (npr. da server vrati null gde treba string).
+  // Labela i vrednost su susedni elementi u DOM-u (vidi ReconciliationCard/Metric u
+  // reconciliation/history/page.tsx) — ispod se, pored vidljivosti labele, čita i tekst
+  // SLEDEĆEG sibling elementa i provera da nije prazan. "Confirmed by"/"Confirmed" legitimno
+  // mogu biti "—" (nepotvrđeno) — zato se provera "nije prazan string", ne konkretna vrednost.
+  const summaryFieldValue = (label: string) =>
+    firstCard.getByText(label, { exact: true }).locator('xpath=following-sibling::div[1]');
+
+  await expect(firstCard.getByText('Counted by', { exact: true })).toBeVisible();
+  await expect(summaryFieldValue('Counted by')).not.toHaveText('');
+
+  await expect(firstCard.getByText('Confirmed by', { exact: true })).toBeVisible();
+  await expect(summaryFieldValue('Confirmed by')).not.toHaveText('');
+
   await expect(firstCard.getByText('Confirmed', { exact: true })).toBeVisible();
-  await expect(firstCard.getByText('Expected').first()).toBeVisible();
-  await expect(firstCard.getByText('Physical').first()).toBeVisible();
-  await expect(firstCard.getByText('Variance').first()).toBeVisible();
-  await expect(firstCard.getByText('Reason').first()).toBeVisible();
+  await expect(summaryFieldValue('Confirmed')).not.toHaveText('');
+
+  // Metric (Expected/Physical/Variance) i Reason su po stavci (proizvodu) — proveravamo PRVU
+  // stavku, isto skopovanje kao u originalnom testu.
+  const itemFieldValue = (label: string) =>
+    firstCard.getByText(label, { exact: true }).first().locator('xpath=following-sibling::div[1]');
+
+  await expect(firstCard.getByText('Expected', { exact: true }).first()).toBeVisible();
+  await expect(itemFieldValue('Expected')).not.toHaveText('');
+
+  await expect(firstCard.getByText('Physical', { exact: true }).first()).toBeVisible();
+  await expect(itemFieldValue('Physical')).not.toHaveText('');
+
+  await expect(firstCard.getByText('Variance', { exact: true }).first()).toBeVisible();
+  await expect(itemFieldValue('Variance')).not.toHaveText('');
+
+  await expect(firstCard.getByText('Reason', { exact: true }).first()).toBeVisible();
+  await expect(itemFieldValue('Reason')).not.toHaveText('');
 });
 
 test('WEB-RECH-05: Discrepancy badge and summary totals reflect the variances', async ({ page }) => {
@@ -79,6 +106,23 @@ test('WEB-RECH-05: Discrepancy badge and summary totals reflect the variances', 
   } else {
     await expect(discrepanciesCard.locator('div').last()).not.toHaveClass(/text-red-700/);
   }
+
+  // Raniji test je samo poredio summary broj sa SOPSTVENIM stilom/CSS klasom — nikad nije
+  // nezavisno preračunao ukupan broj iz pojedinačnih bedževa po kartici, pa bi pogrešan
+  // SUMMARY broj (dok su pojedinačni bedževi na karticama ispravni) prošao neopaženo. Svaka
+  // kartica (čak i nerazvijena — bedž je u <summary>, ne u skrivenom delu) nosi SVOJ
+  // "N discrepancy/discrepancies" ili "No discrepancies" bedž; zbir tih brojeva mora da se
+  // poklopi sa summary karticom.
+  const perCardBadges = page.locator('section details summary span.rounded-full');
+  const badgeTexts = await perCardBadges.allInnerTexts();
+  expect(badgeTexts.length).toBeGreaterThan(0);
+
+  const recomputedTotal = badgeTexts.reduce((sum, text) => {
+    if (text.includes('No discrepancies')) return sum;
+    const match = text.match(/\d+/);
+    return sum + (match ? parseInt(match[0], 10) : 0);
+  }, 0);
+  expect(recomputedTotal).toBe(totalDiscrepancies);
 
   // Bar jedna kartica sa 0 varijansi mora da pokaže zeleni "No discrepancies" bedž.
   await expect(page.getByText('No discrepancies').first()).toBeVisible();

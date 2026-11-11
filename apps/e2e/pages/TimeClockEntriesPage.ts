@@ -50,6 +50,10 @@ export class TimeClockEntriesPage {
     return this.fieldValue(card, 'Clock out').innerText();
   }
 
+  async getFieldText(card: Locator, label: string): Promise<string> {
+    return this.fieldValue(card, label).innerText();
+  }
+
   async getReasonValue(card: Locator): Promise<string> {
     return this.fieldValue(card, 'Reason').innerText();
   }

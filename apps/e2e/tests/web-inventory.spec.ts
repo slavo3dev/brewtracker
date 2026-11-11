@@ -37,13 +37,31 @@ test('WEB-INV-03: Search by visit ID or unit substring works', async ({ page }) 
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   await page.goto('/dashboard/inventory');
+  // Server action treba stvaran round-trip da primeni filter — zabeleži tekst PRE pretrage i
+  // sačekaj da se stvarno PROMENI (ne samo da ostane vidljiv) pre čitanja rezultata, inače
+  // ispod možemo pročitati stanje od PRE filtriranja (nefiltriranih 10 od 132 pokreta).
+  const resultsSummary = page.getByText(/^\d+ movements · Showing/);
+  const beforeText = await resultsSummary.innerText();
+
   // Substring trajno zasejanog source_visit_id fixture pokreta ("qa-fixture-visit-ndfec463") —
   // ne oslanja se na slučajnu istorijsku vrednost koja može nestati kad se deljena baza menja.
   await page.getByPlaceholder('Search visit or unit').fill('ndfec463');
   await page.getByRole('button', { name: 'Search' }).click();
+  await expect(resultsSummary).not.toHaveText(beforeText);
 
   await expect(page.locator('article').first()).toBeVisible();
-  await expect(page.getByText(/Visit:/).first()).toBeVisible();
+  // Raniji test je samo proveravao da se NEGDE na stranici pojavi generički tekst "Visit:" —
+  // to bi prošlo i da pretraga ne filtrira ništa (npr. da vraća sve pokrete). Vidljivi tekst
+  // kartice je zasečen (shortenId() seče na 18 karaktera + "…" za duže ID-jeve — za ovaj fixture
+  // to je TAČNO PRE "ndfec463" dela), pa se umesto vidljivog teksta provera radi na "title"
+  // atributu span-a (koji nosi CEO, nesečeno source_visit_id) — tako se stvarno potvrđuje da
+  // je rezultat pretrage povezan sa traženim substring-om, ne samo da je neka kartica prikazana.
+  const visitLabels = page.locator('article span[title]');
+  const visitCount = await visitLabels.count();
+  expect(visitCount).toBeGreaterThan(0);
+  for (let i = 0; i < visitCount; i++) {
+    await expect(visitLabels.nth(i)).toHaveAttribute('title', /ndfec463/);
+  }
 });
 
 test('WEB-INV-05: A loading error shows an error banner', async ({ page }) => {
@@ -304,6 +322,12 @@ test('WEB-INVP-03: "Edit" button on a card opens a form with existing data and s
 test('WEB-INVP-04: Non-manager/CEO cannot manage inventory products', async ({ page }) => {
   // requireInventoryManager() odbija svakog ko nije manager/CEO sa specifičnom porukom —
   // razlikuje se od generičkog requireAdmin() koji se koristi za ostatak Inventory stranice.
+  // NAPOMENA (strukturno ograničenje, ne test bug): vozač se uopšte ne može ulogovati na web
+  // dashboard (vidi WEB-AUTH-05) — ovaj test zato stvarno proverava SAMO taj opštiji login gate,
+  // ne i requireInventoryManager()-ovu specifičnu manager-vs-generic-admin granu (ona grana je
+  // trenutno nedostižna dok god ne postoji ulogovan admin BEZ ove konkretne dozvole). Isti
+  // obrazac kao WEB-USR-14/WEB-TCREV-11/WEB-HOME-02/WEB-FLEET-07 — ne može se popraviti bez
+  // izmene permission modela u aplikaciji.
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_DRIVER_EMAIL!, process.env.QA_DRIVER_PASSWORD!);

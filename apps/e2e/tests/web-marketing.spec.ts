@@ -69,7 +69,13 @@ test('WEB-MKT-03: "Get started" page is a static mockup with no signup form', as
 });
 
 test('WEB-MKT-04: "How it works" page is a static mockup', async ({ page }) => {
+  // Raniji test je proveravao SAMO da postoji jedan nav element ("Back home") negde na
+  // stranici — to ne kaže ništa o STVARNOM sadržaju stranice. Dodata provera naslova
+  // jedinstvenog za ovu stranicu potvrđuje da je prava "How it works" stranica renderovana.
   await page.goto('/how-it-works');
+  await expect(
+    page.getByRole('heading', { name: 'Routes, service visits, inventory, and reporting work together.' }),
+  ).toBeVisible();
   await expect(page.getByText('← Back home')).toBeVisible();
 });
 
