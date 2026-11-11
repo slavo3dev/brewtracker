@@ -575,7 +575,7 @@ $$;
 
 revoke all
 on function public.generate_routes_from_templates(date, uuid)
-from public;
+from public, anon, authenticated;
 
 revoke all
 on function public.generate_routes_from_templates(date, uuid)
