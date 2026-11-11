@@ -577,6 +577,14 @@ revoke all
 on function public.generate_routes_from_templates(date, uuid)
 from public;
 
+revoke all
+on function public.generate_routes_from_templates(date, uuid)
+from anon;
+
+revoke all
+on function public.generate_routes_from_templates(date, uuid)
+from authenticated;
+
 grant execute
 on function public.generate_routes_from_templates(date, uuid)
 to service_role;
