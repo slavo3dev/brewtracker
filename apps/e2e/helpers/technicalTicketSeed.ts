@@ -11,7 +11,7 @@ export async function resetTicketToOpen() {
     .eq('id', TICKET_ID);
 
   if (error) {
-    throw new Error(`Ne mogu da resetujem tiket na open: ${error.message}`);
+    throw new Error(`Unable to reset ticket to open: ${error.message}`);
   }
 }
 
@@ -23,7 +23,7 @@ export async function resetTicketToResolved() {
     .eq('id', TICKET_ID);
 
   if (error) {
-    throw new Error(`Ne mogu da resetujem tiket na resolved: ${error.message}`);
+    throw new Error(`Unable to reset ticket to resolved: ${error.message}`);
   }
 }
 
@@ -35,13 +35,13 @@ export async function resetTicketToInProgressAssigned() {
     .eq('id', TICKET_ID);
 
   if (error) {
-    throw new Error(`Ne mogu da resetujem tiket na in_progress: ${error.message}`);
+    throw new Error(`Unable to reset ticket to in_progress: ${error.message}`);
   }
 }
 
-// Rubni slučaj koji UI ne može prirodno da proizvede (dodela tehničara UVEK postavlja i
-// assigned_to i status zajedno) — direktno preko baze simuliramo in_progress tiket BEZ
-// dodeljenog tehničara, za WEB-TT-08.
+// Edge case the UI cannot naturally produce (assigning a technician ALWAYS sets both
+// assigned_to and status together) — we simulate an in_progress ticket WITHOUT an assigned
+// technician directly via the database, for WEB-TT-08.
 export async function resetTicketToInProgressNoAssignee() {
   const supabase = supabaseAdmin();
   const { error } = await supabase
@@ -50,14 +50,14 @@ export async function resetTicketToInProgressNoAssignee() {
     .eq('id', TICKET_ID);
 
   if (error) {
-    throw new Error(`Ne mogu da resetujem tiket na in_progress bez dodele: ${error.message}`);
+    throw new Error(`Unable to reset ticket to in_progress without an assignee: ${error.message}`);
   }
 }
 
-// "Istinit" broj tiketa po statusu za dati region klijenta — direktno preko servisne role
-// (bez RLS), koristi se kao referenca za WEB-TT-01 (status kartice na /dashboard/service
-// ne odgovaraju stvarnim podacima regiona zbog RLS filtriranja po TRENUTNOM regionu mašine,
-// umesto po regionu samog tiketa/klijenta — poznat, dokumentovan gap).
+// The "true" ticket count by status for a given client region — directly via the service
+// role (no RLS), used as a reference for WEB-TT-01 (the status cards on /dashboard/service
+// don't match the real region data, because RLS filters by the machine's CURRENT region
+// rather than the ticket's/client's own region — a known, documented gap).
 export async function getTrueTicketCountsByRegion(
   region: string,
 ): Promise<{ open: number; inProgress: number; resolved: number }> {
@@ -67,7 +67,7 @@ export async function getTrueTicketCountsByRegion(
     .select('status, client:clients!technical_tickets_client_id_fkey(region)');
 
   if (error) {
-    throw new Error(`Ne mogu da učitam tehničke tikete: ${error.message}`);
+    throw new Error(`Unable to load technical tickets: ${error.message}`);
   }
 
   const regionTickets = (data ?? []).filter((t) => (t.client as unknown as { region: string | null })?.region === region);

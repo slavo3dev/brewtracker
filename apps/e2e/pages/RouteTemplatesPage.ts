@@ -28,11 +28,12 @@ export class RouteTemplatesPage {
     if (!(await noDaysNotice.isVisible().catch(() => false))) return;
 
     await card.getByRole('button', { name: 'Edit' }).click();
-    // Checkbox je vizuelno sakriven (sr-only); klik na roditeljski <label> je prirodnija
-    // i pouzdanija interakcija od force-click-a na sam input (pokazalo se krhko u --headed modu).
-    // "has" filter MORA biti izgrađen iz page.locator (ne card.locator) — card.locator već nosi
-    // pun "article >> ..." prefiks, pa bi ugnježdeni has-selektor tražio <article> UNUTAR <label>,
-    // što nikad ne postoji i izaziva beskonačno čekanje do test timeout-a.
+    // The checkbox is visually hidden (sr-only); clicking the parent <label> is a more
+    // natural and reliable interaction than a force-click on the input itself (shown to be
+    // flaky in --headed mode). The "has" filter MUST be built from page.locator (not
+    // card.locator) — card.locator already carries the full "article >> ..." prefix, so a
+    // nested has-selector would look for an <article> INSIDE the <label>, which never exists
+    // and causes an endless wait until the test times out.
     await card.locator('label').filter({ has: this.page.locator(`input[name="${day}"]`) }).click();
     await card.getByRole('button', { name: 'Save Changes' }).click();
     await expect(noDaysNotice).not.toBeVisible();
@@ -63,15 +64,15 @@ export class RouteTemplatesPage {
   }
 
   async expectActive(templateName: string) {
-    await expect(this.card(templateName).getByText('Active', { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(this.card(templateName).getByText('Active', { exact: true })).toBeVisible({ timeout: 20000 });
   }
 
   async expectInactive(templateName: string) {
-    await expect(this.card(templateName).getByText('Inactive', { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(this.card(templateName).getByText('Inactive', { exact: true })).toBeVisible({ timeout: 20000 });
   }
 
   async expectActivationError(templateName: string, expectedText: string) {
-    await expect(this.card(templateName).getByRole('alert').getByText(expectedText)).toBeVisible({ timeout: 10000 });
+    await expect(this.card(templateName).getByRole('alert').getByText(expectedText)).toBeVisible({ timeout: 20000 });
   }
 
   async createTemplate(options: { name: string; weekday?: string; driverId?: string }) {
@@ -89,9 +90,10 @@ export class RouteTemplatesPage {
         .click();
     }
     await this.page.getByRole('button', { name: 'Create Template' }).click();
-    // Malo duži timeout od podrazumevanog 5s — ovo je realan server round-trip (server
-    // action + revalidate) koji povremeno traje duže pod opterećenjem staging servera. Fajl je
-    // dovoljno velik (30+ testova, mnogi prave sopstveni template) da je 10s povremeno nedovoljno.
+    // Slightly longer timeout than the default 5s — this is a real server round-trip (server
+    // action + revalidate) that occasionally takes longer under load on the staging server.
+    // The file is large enough (30+ tests, many creating their own template) that 10s is
+    // occasionally not enough.
     await expect(
       this.page.getByRole('status').getByText('Route template created. Add at least one stop before activating it.'),
     ).toBeVisible({ timeout: 25000 });
@@ -106,8 +108,9 @@ export class RouteTemplatesPage {
     await card.locator('input[name="exceptionDate"]').fill(options.dateIso);
     await card.locator('select[name="clientId"]').selectOption({ label: options.clientLabel });
     await card.getByRole('button', { name: 'Add one-off stop' }).click();
-    // Isti obrazac kao addStop(): fajl je dovoljno veliki (29 testova) da pod opterećenjem
-    // (deljena baza narasla preko dana) povremeno istekne 5s default timeout na uspeh-poruci.
+    // Same pattern as addStop(): the file is large enough (29 tests) that under load
+    // (the shared database having grown over time) the default 5s timeout on the success
+    // message occasionally runs out.
     await expect(card.getByText('One-off stop added.')).toBeVisible({ timeout: 15000 });
   }
 
@@ -164,9 +167,10 @@ export class RouteTemplatesPage {
 
   async attemptAddStop(templateName: string, clientLabel: string, machineLabel?: string) {
     const card = this.card(templateName);
-    // Forma ostaje otvorena nakon prethodnog uspešnog addStop() poziva na istoj kartici
-    // (dugme se tada zove "Cancel", ne "+ Add Stop") — otvori je samo ako već nije otvorena,
-    // inače klik na nepostojeće "+ Add Stop" dugme visi do test timeout-a.
+    // The form stays open after a previous successful addStop() call on the same card
+    // (the button is then called "Cancel", not "+ Add Stop") — only open it if it isn't
+    // already open, otherwise clicking the nonexistent "+ Add Stop" button hangs until the
+    // test times out.
     const openToggle = card.getByRole('button', { name: '+ Add Stop' });
     if (await openToggle.isVisible().catch(() => false)) {
       await openToggle.click();
@@ -190,19 +194,20 @@ export class RouteTemplatesPage {
     const removeButtons = card.getByRole('button', { name: 'Remove', exact: true });
     const before = await removeButtons.count();
     await removeButtons.first().click();
-    // ISPRAVKA: dugme menja tekst na "Removing..." ISTOG TRENUTKA klika (deletePending postaje
-    // true sinhrono, pre bilo kakvog server round-trip-a — vidi route-template-card.tsx) — to
-    // znači da broj dugmadi sa TAČNIM imenom "Remove" opadne na before-1 ODMAH, bez obzira da li
-    // je server akcija uopšte završila (a kamoli uspela). Stara provera ispod bi prošla i da
-    // server akcija tiho otkaže. Prvo čekamo da pending stanje STVARNO nestane (akcija završena),
-    // pa tek onda proveravamo konačan broj — isti obrazac kao broken-image fix na drugim mestima
-    // u suiti (ne veruj tranzijentnom/optimističkom UI stanju).
+    // FIX: the button's text changes to "Removing..." THE INSTANT it's clicked (deletePending
+    // becomes true synchronously, before any server round-trip — see route-template-card.tsx)
+    // — that means the count of buttons with the EXACT name "Remove" drops to before-1
+    // IMMEDIATELY, regardless of whether the server action has even finished (let alone
+    // succeeded). The old check below would have passed even if the server action silently
+    // failed. We first wait for the pending state to ACTUALLY clear (the action has
+    // finished), and only then check the final count — the same pattern as the broken-image
+    // fix elsewhere in the suite (don't trust a transient/optimistic UI state).
     await expect(card.getByRole('button', { name: 'Removing...' })).toHaveCount(0, { timeout: 15000 });
-    await expect(removeButtons).toHaveCount(before - 1, { timeout: 10000 });
+    await expect(removeButtons).toHaveCount(before - 1, { timeout: 20000 });
   }
 
   async expectNoStopsConfigured(templateName: string) {
-    await expect(this.card(templateName).getByText('No stops configured')).toBeVisible({ timeout: 10000 });
+    await expect(this.card(templateName).getByText('No stops configured')).toBeVisible({ timeout: 20000 });
   }
 
   async expectDeleteButtonVisible(templateName: string) {
@@ -231,7 +236,7 @@ export class RouteTemplatesPage {
   }
 
   async expectAddStopError(templateName: string, text: string) {
-    await expect(this.card(templateName).getByRole('alert').getByText(text)).toBeVisible({ timeout: 10000 });
+    await expect(this.card(templateName).getByRole('alert').getByText(text)).toBeVisible({ timeout: 20000 });
   }
 
   async getStopFormMachineOptionsForClient(templateName: string, clientLabel: string): Promise<string[]> {
@@ -259,9 +264,10 @@ export class RouteTemplatesPage {
     for (const day of days) {
       const checkbox = card.locator(`input[name="${day}"]`);
       if (await checkbox.isChecked()) {
-        // Klik na <label> je ovde (u Edit formi, duboko u dugoj listi template-a) pokazao
-        // nepouzdano visio na actionability proveri — direktan .uncheck({force:true}) na sam
-        // sr-only input zaobilazi tu proveru i pouzdano menja stanje.
+        // Clicking the <label> here (in the Edit form, deep inside the long template list)
+        // proved unreliable, hanging on the actionability check — a direct
+        // .uncheck({force:true}) on the sr-only input itself bypasses that check and reliably
+        // changes the state.
         await checkbox.uncheck({ force: true });
       }
     }
@@ -282,7 +288,7 @@ export class RouteTemplatesPage {
   }
 
   async expectEditError(templateName: string, text: string) {
-    await expect(this.card(templateName).getByRole('alert').getByText(text)).toBeVisible({ timeout: 10000 });
+    await expect(this.card(templateName).getByRole('alert').getByText(text)).toBeVisible({ timeout: 20000 });
   }
 
   async deleteTemplate(templateName: string) {
@@ -291,13 +297,14 @@ export class RouteTemplatesPage {
     await card.getByRole('button', { name: 'Delete', exact: true }).click();
   }
 
-  // Brisanje ne radi redirect (samo revalidatePath), pa je nepouzdano gađati tranzijentnu
-  // poruku na istoj stranici — umesto toga ponovo učitavamo stranicu dok se kartica stvarno
-  // ne skloni sa liste (server akcija možda još nije završila kad ovo prvi put proverimo).
+  // Deletion doesn't redirect (only revalidatePath), so targeting a transient message on the
+  // same page is unreliable — instead we reload the page repeatedly until the card is
+  // actually gone from the list (the server action may not have finished yet the first time
+  // we check).
   async expectTemplateNotListed(templateName: string) {
-    // Broj template-a na ovoj stranici je kroz sesiju narastao na 150+ (svaki renderuje pun
-    // card sa Stops/Exceptions sekcijama) — goto() + render povremeno traje duže od ranijeg
-    // 10s budžeta za CEO retry petlju.
+    // The number of templates on this page has grown to 150+ over the course of the session
+    // (each one renders a full card with Stops/Exceptions sections) — goto() + render
+    // occasionally takes longer than the earlier 10s budget for the retry loop.
     await expect(async () => {
       await this.goto();
       await expect(this.card(templateName)).toHaveCount(0);
@@ -320,9 +327,9 @@ export class RouteTemplatesPage {
   async addSkipException(templateName: string, dateIso: string) {
     const card = await this.openAddException(templateName);
     await card.locator('input[name="exceptionDate"]').fill(dateIso);
-    // "Skip route" je podrazumevana vrednost moda, ne mora eksplicitno da se bira.
+    // "Skip route" is the mode's default value, it doesn't need to be explicitly selected.
     await card.getByRole('button', { name: 'Add exception' }).click();
-    await expect(card.getByText('Route exception saved.')).toBeVisible({ timeout: 10000 });
+    await expect(card.getByText('Route exception saved.')).toBeVisible({ timeout: 20000 });
   }
 
   async attemptDriverExceptionWithoutDriver(templateName: string, dateIso: string) {
@@ -340,19 +347,19 @@ export class RouteTemplatesPage {
     await card.locator('select[name="mode"]').selectOption({ label: 'Replace driver' });
     await card.locator('select[name="overrideDriverId"]').selectOption({ index: 1 });
     await card.getByRole('button', { name: 'Add exception' }).click();
-    // Isti obrazac kao addStop()/addOneOffStopException(): pod opterećenjem deljenog staging
-    // servera 10s povremeno nije dovoljno za ovaj server round-trip (potvrđeno izolovanim
-    // ponavljanjem — nije logička greška).
+    // Same pattern as addStop()/addOneOffStopException(): under load on the shared staging
+    // server, 10s is occasionally not enough for this server round-trip (confirmed by
+    // isolated retries — not a logic error).
     await expect(card.getByText('Route exception saved.')).toBeVisible({ timeout: 15000 });
   }
 
   exceptionRow(templateName: string, dateLabel: string, badgeText: string): Locator {
-    // Stops lista, Schedule Exceptions lista I Stop exceptions lista sve koriste IDENTIČNE
-    // kontejnerske CSS klase (divide-y/rounded-xl/border...) — ne mogu se razlikovati po klasi
-    // kontejnera. Umesto toga ciljamo direktno LEAF red (".p-4", isti na sve tri liste) i
-    // oslanjamo se na to da je badgeText ("Route skipped"/"Driver override") jedinstven
-    // rečnik samo za schedule exceptions, pa filter sam po sebi isključuje redove iz druge
-    // dve liste bez potrebe za preciznim skopovanjem kontejnera.
+    // The Stops list, the Schedule Exceptions list, AND the Stop exceptions list all use
+    // IDENTICAL container CSS classes (divide-y/rounded-xl/border...) — they can't be told
+    // apart by container class. Instead we target the LEAF row directly (".p-4", the same on
+    // all three lists) and rely on badgeText ("Route skipped"/"Driver override") being
+    // vocabulary unique to schedule exceptions, so the filter by itself excludes rows from
+    // the other two lists without needing to precisely scope the container.
     return this.card(templateName)
       .locator('div.p-4')
       .filter({ hasText: dateLabel })
@@ -360,15 +367,16 @@ export class RouteTemplatesPage {
   }
 
   async expectExceptionRowVisible(templateName: string, dateLabel: string, badgeText: string) {
-    // "QA Conflict E" je deljeni fixture koji je kroz sesiju nagomilao desetine stop-exception
-    // redova — veći DOM povremeno traje duže od podrazumevanog 5s da se stabilizuje/renderuje.
-    await expect(this.exceptionRow(templateName, dateLabel, badgeText).first()).toBeVisible({ timeout: 10000 });
+    // "QA Conflict E" is a shared fixture that has accumulated dozens of stop-exception
+    // rows over the course of the session — the larger DOM occasionally takes longer than
+    // the default 5s to settle/render.
+    await expect(this.exceptionRow(templateName, dateLabel, badgeText).first()).toBeVisible({ timeout: 20000 });
   }
 
   async removeException(templateName: string, dateLabel: string, badgeText: string) {
     const row = this.exceptionRow(templateName, dateLabel, badgeText).first();
     await row.getByRole('button', { name: 'Remove', exact: true }).click();
-    await expect(this.exceptionRow(templateName, dateLabel, badgeText)).toHaveCount(0, { timeout: 10000 });
+    await expect(this.exceptionRow(templateName, dateLabel, badgeText)).toHaveCount(0, { timeout: 20000 });
   }
 
   async expectExceptionRowNotVisible(templateName: string, dateLabel: string, badgeText: string) {

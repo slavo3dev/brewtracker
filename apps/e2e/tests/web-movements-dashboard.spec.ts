@@ -17,7 +17,7 @@ test('WEB-MVMT-01: Filters (warehouse/driver/date) update the URL and results', 
   await expect(page).toHaveURL(new RegExp(`warehouse=${selectedValue}`));
   await expect(page.locator('tbody tr').first()).toBeVisible();
 
-  // Clear filters vraća na nefiltriranu URL (bez querystring-a).
+  // Clear filters returns to the unfiltered URL (no querystring).
   await page.getByRole('button', { name: 'Clear' }).click();
   await expect(page).toHaveURL(/\/dashboard\/inventory\/movements$/);
 });

@@ -1,11 +1,11 @@
 import { test, expect } from '../fixtures/test';
 
 test('the application loads', async ({ page }) => {
-  // Raniji test je proveravao SAMO da postoji NEKI naslov (/.+/ pogađa čak i generičku
-  // error/blank stranicu sa bilo kakvim <title>-om) — to ne dokazuje da je NAŠA app stvarno
-  // učitana. Sada se proverava tačan, poznat naslov ("BrewTracker", iz root layout.tsx) i da
-  // je stvaran sadržaj marketinške početne strane renderovan (ista hero naslov provera kao
-  // WEB-MKT-01), ne samo da je neki HTML dokument stigao.
+  // The earlier test only checked that SOME title exists (/.+/ matches even a generic
+  // error/blank page with any <title>) — that doesn't prove OUR app actually loaded. Now it
+  // checks an exact, known title ("BrewTracker", from root layout.tsx) and that real
+  // marketing homepage content is rendered (the same hero heading check as WEB-MKT-01), not
+  // just that some HTML document arrived.
   await page.goto('/');
   await expect(page).toHaveTitle('BrewTracker');
   await expect(

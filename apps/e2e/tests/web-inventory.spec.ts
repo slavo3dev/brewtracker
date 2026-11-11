@@ -9,7 +9,7 @@ test('WEB-INV-01: Movement history shows paginated results by default', async ({
 
   await page.goto('/dashboard/inventory');
 
-  // Ukupan broj je mnogo veći od 10 (stotine), ali se podrazumevano prikazuje samo prva stranica.
+  // The total is much greater than 10 (hundreds), but only the first page is shown by default.
   await expect(page.getByText(/^\d+ movements · Showing 1–10$/)).toBeVisible();
 });
 
@@ -37,25 +37,28 @@ test('WEB-INV-03: Search by visit ID or unit substring works', async ({ page }) 
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   await page.goto('/dashboard/inventory');
-  // Server action treba stvaran round-trip da primeni filter — zabeleži tekst PRE pretrage i
-  // sačekaj da se stvarno PROMENI (ne samo da ostane vidljiv) pre čitanja rezultata, inače
-  // ispod možemo pročitati stanje od PRE filtriranja (nefiltriranih 10 od 132 pokreta).
+  // The server action needs a real round-trip to apply the filter — record the text BEFORE
+  // searching and wait for it to actually CHANGE (not just remain visible) before reading
+  // the results, otherwise we might read the pre-filter state below (the unfiltered 10 of
+  // 132 movements).
   const resultsSummary = page.getByText(/^\d+ movements · Showing/);
   const beforeText = await resultsSummary.innerText();
 
-  // Substring trajno zasejanog source_visit_id fixture pokreta ("qa-fixture-visit-ndfec463") —
-  // ne oslanja se na slučajnu istorijsku vrednost koja može nestati kad se deljena baza menja.
+  // A substring of a permanently seeded source_visit_id fixture movement
+  // ("qa-fixture-visit-ndfec463") — doesn't rely on an incidental historical value that could
+  // disappear as the shared database changes.
   await page.getByPlaceholder('Search visit or unit').fill('ndfec463');
   await page.getByRole('button', { name: 'Search' }).click();
   await expect(resultsSummary).not.toHaveText(beforeText);
 
   await expect(page.locator('article').first()).toBeVisible();
-  // Raniji test je samo proveravao da se NEGDE na stranici pojavi generički tekst "Visit:" —
-  // to bi prošlo i da pretraga ne filtrira ništa (npr. da vraća sve pokrete). Vidljivi tekst
-  // kartice je zasečen (shortenId() seče na 18 karaktera + "…" za duže ID-jeve — za ovaj fixture
-  // to je TAČNO PRE "ndfec463" dela), pa se umesto vidljivog teksta provera radi na "title"
-  // atributu span-a (koji nosi CEO, nesečeno source_visit_id) — tako se stvarno potvrđuje da
-  // je rezultat pretrage povezan sa traženim substring-om, ne samo da je neka kartica prikazana.
+  // The earlier test only checked that the generic text "Visit:" appeared SOMEWHERE on the
+  // page — that would pass even if the search filtered nothing at all (e.g. returned every
+  // movement). The card's visible text is truncated (shortenId() cuts at 18 characters + "…"
+  // for longer IDs — for this fixture that's EXACTLY BEFORE the "ndfec463" part), so instead
+  // of the visible text the check is done on the span's "title" attribute (which carries the
+  // FULL, untruncated source_visit_id) — this actually confirms the search result is
+  // connected to the searched substring, not just that some card was displayed.
   const visitLabels = page.locator('article span[title]');
   const visitCount = await visitLabels.count();
   expect(visitCount).toBeGreaterThan(0);
@@ -71,8 +74,8 @@ test('WEB-INV-05: A loading error shows an error banner', async ({ page }) => {
 
   await page.goto('/dashboard/inventory');
 
-  // Server action za učitavanje pokreta ide POST na istu stranicu — presretni i simuliraj
-  // mrežni kvar samo za taj zahtev (abortuje se), ne za inicijalno učitavanje stranice.
+  // The server action for loading movements does a POST to the same page — intercept and
+  // simulate a network failure only for that request (it aborts), not the initial page load.
   await page.route('/dashboard/inventory', async (route) => {
     if (route.request().method() === 'POST') {
       await route.abort('failed');
@@ -93,8 +96,8 @@ test('WEB-INV-06: Products tab filters by search/category/status', async ({ page
   await page.goto('/dashboard/inventory');
   await page.getByRole('button', { name: 'Products' }).click();
 
-  // Nema neaktivnih proizvoda u trenutnim test podacima — filtriramo na "Active" (sigurno
-  // ima rezultata) da proverimo ISTI mehanizam filtriranja po statusu.
+  // There are no inactive products in the current test data — we filter on "Active" (which
+  // is guaranteed to have results) to check the SAME status-filtering mechanism.
   await page.getByLabel('Filter by product status').selectOption('true');
   const cards = page.locator('article');
   await expect(cards.first()).toBeVisible();
@@ -204,10 +207,11 @@ test('WEB-INVM-01: Machines page shows a "coming soon" stub with no functional U
   await expect(page.getByText('Machine management module coming soon.')).toBeVisible();
 });
 
-// NOVA FUNKCIONALNOST (app update, dev grana) — Inventory Product CRUD ("+ Add Product" /
-// "Edit" na Products tabu). NAPOMENA: u trenutku pisanja ovih testova, NI app kod NI DB
-// migracije nisu deployed/primenjeni na ovaj QA projekat — testovi ispod će pasti dok se
-// oba koraka ne završe. Pisano prema izvornom kodu kao priprema za kad bude gotovo.
+// NEW FUNCTIONALITY (app update, dev branch) — Inventory Product CRUD ("+ Add Product" /
+// "Edit" on the Products tab). NOTE: at the time these tests were written, NEITHER the app
+// code NOR the DB migrations had been deployed/applied to this QA project — the tests below
+// will fail until both steps are complete. Written against the source code in preparation
+// for when it's done.
 
 test('WEB-INVP-01: "+ Add Product" form creates a new product', async ({ page }) => {
   const login = new LoginPage(page);
@@ -229,15 +233,17 @@ test('WEB-INVP-01: "+ Add Product" form creates a new product', async ({ page })
     await page.getByLabel('OCS').check();
     await page.getByRole('button', { name: 'Create Product' }).click();
 
-    // Deljeni katalog je narastao dovoljno (50+ proizvoda) da nov proizvod ne mora pasti
-    // na prvu stranicu (10 po strani) — sačekaj da se forma zatvori (handleProductSaved
-    // već resetovao search na "") pre upisa, pa pretraži po imenu da izbegnemo tu zavisnost.
+    // The shared catalog has grown enough (50+ products) that a new product doesn't
+    // necessarily land on the first page (10 per page) — wait for the form to actually close
+    // (handleProductSaved has already reset search to "") before typing, then search by name
+    // to avoid that dependency.
     await expect(page.getByLabel('Product name *')).toHaveCount(0);
     await page.getByPlaceholder('Search products').fill(name);
     await expect(page.getByText(name)).toBeVisible();
   } finally {
-    // Bez ovoga, deljeni katalog trajno rase sa svakim zelenim run-om — i pomera pozicione
-    // izbore u WEB-XFER-10-tipa petljama koje prolaze kroz SVE aktivne proizvode.
+    // Without this, the shared catalog grows permanently with every green run — and shifts
+    // the positional choices in WEB-XFER-10-style loops that iterate over ALL active
+    // products.
     await deleteProductByName(name);
   }
 });
@@ -256,7 +262,7 @@ test('WEB-INVP-02: Creating a product is blocked without a selected business typ
   await page.getByLabel('Base unit *').fill('bag');
   await page.getByLabel('Issue unit *', { exact: true }).fill('case');
   await page.getByLabel('Base units per issue unit *').fill('6');
-  // OCS je defaultno čekiran — isključi ga da nijedan business type ne ostane izabran.
+  // OCS is checked by default — uncheck it so that no business type remains selected.
   await page.getByLabel('OCS').uncheck();
   await page.getByRole('button', { name: 'Create Product' }).click();
 
@@ -284,14 +290,15 @@ test('WEB-INVP-03: "Edit" button on a card opens a form with existing data and s
     await page.getByLabel('OCS').check();
     await page.getByRole('button', { name: 'Create Product' }).click();
 
-    // handleProductSaved() u app kodu BRIŠE search polje na "" posle SVAKOG uspešnog
-    // create/edit (i zatvara formu) — moramo sačekati da se forma stvarno zatvori (taj
-    // reset se već desio) PRE nego što upišemo search, inače app sam obriše ono što upišemo.
+    // handleProductSaved() in the app code CLEARS the search field to "" after EVERY
+    // successful create/edit (and closes the form) — we must wait for the form to actually
+    // close (that reset has already happened) BEFORE typing into search, otherwise the app
+    // itself clears what we just typed.
     await expect(page.getByLabel('Product name *')).toHaveCount(0);
 
-    // Deljeni katalog je dovoljno veliki da nov proizvod (alfabetski posle mnogih
-    // postojećih "C.../I.../M..." imena) ne mora pasti na prvu stranicu (10 po strani) —
-    // pretraga po imenu izbegava tu zavisnost od paginacije.
+    // The shared catalog is large enough that a new product (alphabetically after many
+    // existing "C.../I.../M..." names) doesn't necessarily land on the first page (10 per
+    // page) — searching by name avoids that pagination dependency.
     await page.getByPlaceholder('Search products').fill(originalName);
     await expect(page.getByText(originalName)).toBeVisible();
 
@@ -303,31 +310,33 @@ test('WEB-INVP-03: "Edit" button on a card opens a form with existing data and s
     await page.getByLabel('Product name *').fill(updatedName);
     await page.getByRole('button', { name: 'Save Changes' }).click();
 
-    // Sačekaj da se edit forma stvarno zatvori (server action + revalidate) PRE interakcije
-    // sa search input-om — inače fill() može pogoditi instancu polja koja se baš zamenjuje
-    // tokom re-rendera, pa se upisana vrednost izgubi (prazno polje, "Showing 57 of 57").
+    // Wait for the edit form to actually close (server action + revalidate) BEFORE
+    // interacting with the search input — otherwise fill() can hit a field instance that's
+    // being replaced during the re-render, losing the typed value (empty field, "Showing 57
+    // of 57").
     await expect(page.getByLabel('Product name *')).toHaveCount(0);
 
     await page.getByPlaceholder('Search products').fill(updatedName);
     await expect(page.getByText(updatedName)).toBeVisible();
     await expect(page.getByText(originalName)).toHaveCount(0);
   } finally {
-    // Proizvod sad postoji pod updatedName (preimenovan) — ili pod originalName ako je edit
-    // korak pao pre rename-a; pokušaj oba da ne ostavimo nijedan trag u deljenom katalogu.
+    // The product now exists under updatedName (renamed) — or under originalName if the edit
+    // step failed before the rename; try both so we don't leave any trace in the shared
+    // catalog.
     await deleteProductByName(updatedName);
     await deleteProductByName(originalName);
   }
 });
 
 test('WEB-INVP-04: Non-manager/CEO cannot manage inventory products', async ({ page }) => {
-  // requireInventoryManager() odbija svakog ko nije manager/CEO sa specifičnom porukom —
-  // razlikuje se od generičkog requireAdmin() koji se koristi za ostatak Inventory stranice.
-  // NAPOMENA (strukturno ograničenje, ne test bug): vozač se uopšte ne može ulogovati na web
-  // dashboard (vidi WEB-AUTH-05) — ovaj test zato stvarno proverava SAMO taj opštiji login gate,
-  // ne i requireInventoryManager()-ovu specifičnu manager-vs-generic-admin granu (ona grana je
-  // trenutno nedostižna dok god ne postoji ulogovan admin BEZ ove konkretne dozvole). Isti
-  // obrazac kao WEB-USR-14/WEB-TCREV-11/WEB-HOME-02/WEB-FLEET-07 — ne može se popraviti bez
-  // izmene permission modela u aplikaciji.
+  // requireInventoryManager() rejects anyone who isn't manager/CEO with a specific message —
+  // it differs from the generic requireAdmin() used for the rest of the Inventory page.
+  // NOTE (a structural limitation, not a test bug): a driver can't log into the web
+  // dashboard at all (see WEB-AUTH-05) — so this test actually only tests that more general
+  // login gate, not requireInventoryManager()'s specific manager-vs-generic-admin branch
+  // (that branch is currently unreachable as long as there's no logged-in admin WITHOUT this
+  // specific permission). The same pattern as WEB-USR-14/WEB-TCREV-11/WEB-HOME-02/WEB-FLEET-07
+  // — can't be fixed without changing the application's permission model.
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_DRIVER_EMAIL!, process.env.QA_DRIVER_PASSWORD!);

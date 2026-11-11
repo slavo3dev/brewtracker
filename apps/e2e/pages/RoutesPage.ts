@@ -28,9 +28,10 @@ export class RoutesPage {
     await expect(this.page.getByText(`of ${previousCount + increment} routes`)).toBeVisible();
   }
 
-  // Metrika kartice (Routes today, Scheduled, Completed, Stops today) su u fiksnom
-  // redosledu u jednom grid kontejneru — adresiramo po indeksu da izbegnemo konflikt
-  // sa istoimenim tekstom koji se pojavljuje i u listi ruta ispod (npr. status "Scheduled").
+  // The metric cards (Routes today, Scheduled, Completed, Stops today) are in a fixed
+  // order inside a single grid container — we address them by index to avoid colliding
+  // with identically-named text that also appears in the route list below (e.g. the
+  // "Scheduled" status).
   private metricCard(index: number) {
     return this.page.locator('.grid.gap-3.sm\\:grid-cols-2.xl\\:grid-cols-4 > div').nth(index);
   }
@@ -64,11 +65,12 @@ export class RoutesPage {
 
   async expandFirstRoute() {
     const buttons = this.page.getByRole('button', { name: 'View / manage' });
-    // Lista sortira SAMO po route_date (bez tiebreaker-a po created_at), pa "prva" kartica
-    // nije pouzdano novokreirana ruta kad ih ima više za isti dan — svaki pozivač MORA prvo
-    // da suzi listu na BAŠ svoju rutu (npr. searchRoutes(noteTag)) pre ovog poziva. Ova
-    // provera to sprovodi: ako suženje izostane, test pada glasno ovde, umesto da tiho
-    // mutira pogrešnu rutu.
+    // The list sorts ONLY by route_date (no tiebreaker on created_at), so the "first" card
+    // isn't reliably the newly-created route when there are several for the same day — every
+    // caller MUST first narrow the list down to EXACTLY its own route (e.g.
+    // searchRoutes(noteTag)) before this call. This check enforces that: if the narrowing is
+    // missing, the test fails loudly right here, instead of silently mutating the wrong
+    // route.
     await expect(buttons).toHaveCount(1);
     await buttons.first().click();
   }
@@ -80,9 +82,10 @@ export class RoutesPage {
     return text.trim();
   }
 
-  // Lista se sortira (verovatno) i po statusu, ne samo po vremenu kreiranja — čim se status
-  // promeni (npr. otkazivanjem), ta ruta se može pomeriti sa pozicije "prva". Zato pratimo
-  // KONKRETNU otvorenu karticu preko dugmeta "Hide details" (koje ima samo ona), ne poziciju.
+  // The list is (likely) also sorted by status, not just by creation time — as soon as the
+  // status changes (e.g. by cancelling), that route may move away from the "first" position.
+  // So we track the SPECIFIC expanded card via its "Hide details" button (which only it has),
+  // not its position.
   expandedRouteCard() {
     return this.page.locator('article').filter({ has: this.page.getByRole('button', { name: 'Hide details' }) });
   }
@@ -122,10 +125,11 @@ export class RoutesPage {
 
 
   async openAddStopForm() {
-    // Dugme za otvaranje forme ("Add stop" toggle, type="button") posle prvog dodavanja stanice
-    // ostaje otvoreno i menja oznaku na "Close form" — forma ima I SVOJ submit dugme sa tekstom
-    // "Add stop" (type="submit"), pa oslanjanje na sam tekst nekad pogodi pogrešno dugme.
-    // Ako je klijent-selekt već vidljiv, forma je već otvorena — ne diraj toggle (klik bi je zatvorio).
+    // The button that opens the form ("Add stop" toggle, type="button") stays open after the
+    // first stop is added and changes its label to "Close form" — the form ALSO has its OWN
+    // submit button with the text "Add stop" (type="submit"), so relying on the text alone
+    // sometimes hits the wrong button. If the client select is already visible, the form is
+    // already open — don't touch the toggle (clicking it would close it).
     if (await this.clientSelect().isVisible().catch(() => false)) {
       return;
     }
@@ -164,10 +168,11 @@ export class RoutesPage {
     await this.selectStopClient(clientLabel);
     await this.selectStopMachine(machineLabel);
     await this.submitAddStopForm();
-    // Čekanje da transientni tekst "Adding stop..." NESTANE je nepouzdano — assert može proći
-    // PRE nego što se taj tekst uopšte pojavi (klik još nije stigao do React re-rendera), pa test
-    // misli da je završeno dok zahtev tek kreće. Umesto toga čekamo da se BROJ stanica stvarno
-    // poveća (Remove dugme postoji po jedno za svaku stanicu).
+    // Waiting for the transient "Adding stop..." text to DISAPPEAR is unreliable — the
+    // assertion can pass BEFORE that text even appears (the click hasn't reached a React
+    // re-render yet), making the test think it's done while the request has only just
+    // started. Instead we wait for the stop COUNT to actually increase (there's one Remove
+    // button per stop).
     await expect(
       this.expandedRouteCard().getByRole('button', { name: /^Remove /, exact: false }),
     ).toHaveCount(stopsBefore + 1);
@@ -189,11 +194,12 @@ export class RoutesPage {
     await this.page.getByRole('combobox', { name: /status/i }).selectOption(status);
   }
 
-  // Cancel route dugme postoji u DOM-u SAMO kad je kartica razvijena (isExpanded) I kad je
-  // ruta "scheduled" (canCancel) — provera na SAMO prvoj kartici bi mogla da previdi regresiju
-  // koja je pogodila deo (ne sve) ruta tog statusa ako je baš "prva" kartica ispravna. Ova
-  // metoda razvija SVAKU vidljivu karticu (jednu po jednu, da izbegnemo ambigvitet oko
-  // "View / manage" dugmeta) i proverava odsustvo Cancel dugmeta na svakoj od njih.
+  // The Cancel route button exists in the DOM ONLY when the card is expanded (isExpanded)
+  // AND the route is "scheduled" (canCancel) — checking ONLY the first card could miss a
+  // regression that hit some (not all) routes of that status, if the "first" card happens
+  // to be a correct one. This method expands EVERY visible card (one at a time, to avoid
+  // ambiguity around the "View / manage" button) and checks that the Cancel button is
+  // absent from each of them.
   async expectNoCancelButtonOnAnyVisibleRoute() {
     const cards = this.page.locator('article');
     const count = await cards.count();
@@ -299,9 +305,10 @@ export class RoutesPage {
   }
 
   async expectStopRemoved() {
-    // Kad se ukloni POSLEDNJA stanica, "Stop removed." poruka živi unutar StopRow
-    // komponente koja se u istom trenutku uklanja iz DOM-a (sortedStops postaje praz),
-    // pa taj tekst nije pouzdano uhvatljiv — provera krajnjeg stanja umesto tranzientne poruke.
+    // When the LAST stop is removed, the "Stop removed." message lives inside the StopRow
+    // component, which is removed from the DOM at that same moment (sortedStops becomes
+    // empty), so that text can't be reliably caught — checking the final state instead of
+    // the transient message.
     await expect(
       this.expandedRouteCard().getByText('No stops yet. Add the first stop to this route.'),
     ).toBeVisible();
@@ -312,9 +319,10 @@ export class RoutesPage {
   }
 
   async expectAddStopDisabled() {
-    // Isto dugme za otvaranje/zatvaranje forme menja oznaku na osnovu lokalnog React stanja
-    // ("Add stop" / "Close form") — ako je forma ranije bila otvorena u istoj sesiji stranice,
-    // oznaka ostaje "Close form" i nakon što ruta pređe u stanje gde se stanicama ne može upravljati.
+    // The same open/close form button changes its label based on local React state ("Add
+    // stop" / "Close form") — if the form was previously opened during the same page
+    // session, the label stays "Close form" even after the route moves into a state where
+    // stops can no longer be managed.
     await expect(
       this.expandedRouteCard().getByRole('button', { name: /^(Add stop|Close form)$/ }),
     ).toBeDisabled();
@@ -352,8 +360,9 @@ export class RoutesPage {
   }
 
   async getStopClientNamesInOrder(): Promise<string[]> {
-    // "Route map preview" naslov deli iste CSS klase (text-sm font-medium text-espresso-950) sa
-    // imenom klijenta u StopRow-u, pa se locator mora suziti na kontejner liste stanica.
+    // The "Route map preview" heading shares the same CSS classes (text-sm font-medium
+    // text-espresso-950) with the client name in StopRow, so the locator must be narrowed to
+    // the stop-list container.
     return this.expandedRouteCard()
       .locator('div.mt-4.grid.gap-3 p.font-medium.text-espresso-950')
       .allInnerTexts();

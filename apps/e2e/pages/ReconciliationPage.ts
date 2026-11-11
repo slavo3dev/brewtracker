@@ -9,8 +9,8 @@ export class ReconciliationPage {
 
   async selectDriverByLabel(label: string) {
     await this.page.getByRole('combobox').selectOption({ label });
-    // "Calculating expected inventory…" računa balanse za SVE proizvode (teška agregacija
-    // preko inventory_movements) — povremeno traje duže od podrazumevanog 5s.
+    // "Calculating expected inventory…" computes balances for ALL products (a heavy
+    // aggregation over inventory_movements) — occasionally takes longer than the default 5s.
     await expect(this.page.getByText('Calculating expected inventory…')).toHaveCount(0, { timeout: 15000 });
   }
 
@@ -57,11 +57,12 @@ export class ReconciliationPage {
       .locator('.mt-2.text-sm.font-semibold')
       .nth(0)
       .innerText();
-    // formatQuantity() u UI koristi toLocaleString() (npr. "3,605 sleeve") — zarez mora
-    // biti uključen u match, inače regex staje na prvoj grupi cifara i "3,605" postaje 3.
+    // formatQuantity() in the UI uses toLocaleString() (e.g. "3,605 sleeve") — the comma
+    // must be included in the match, otherwise the regex stops at the first digit group and
+    // "3,605" becomes 3.
     const match = text.match(/-?[\d,]+/);
     if (!match) {
-      throw new Error(`Nema baseline za prvi proizvod ("${text}") — potrebna je prethodno potvrđena rekonsilijacija.`);
+      throw new Error(`No baseline for the first product ("${text}") — a previously confirmed reconciliation is required.`);
     }
     return parseInt(match[0].replace(/,/g, ''), 10);
   }
@@ -74,7 +75,7 @@ export class ReconciliationPage {
   async expectReviewBlockedWithNoCounts() {
     await this.clickReview();
     await expect(this.page.getByText('Enter at least one physical inventory count.')).toBeVisible();
-    // I dalje smo na formi za unos, nismo prešli na review korak.
+    // We're still on the entry form, we haven't moved on to the review step.
     await expect(this.page.getByRole('button', { name: 'Review reconciliation' })).toBeVisible();
   }
 
@@ -105,9 +106,9 @@ export class ReconciliationPage {
   }
 
   async expectReviewItemCount(count: number) {
-    // "Back to edit" postoji SAMO na review ekranu (submit dugme na formi ima isti tekst
-    // "Review reconciliation" kao i naslov review ekrana, pa taj tekst sam po sebi nije
-    // pouzdan indikator prelaska na review korak).
+    // "Back to edit" exists ONLY on the review screen (the form's submit button has the same
+    // text "Review reconciliation" as the review screen's heading, so that text alone isn't
+    // a reliable indicator of having moved to the review step).
     await expect(this.page.getByRole('button', { name: 'Back to edit' })).toBeVisible();
     await expect(this.reviewItems()).toHaveCount(count);
   }

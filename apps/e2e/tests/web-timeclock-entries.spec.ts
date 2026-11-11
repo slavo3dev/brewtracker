@@ -8,8 +8,8 @@ import {
 } from '../helpers/timeClockSeed';
 import { supabaseAdmin } from '../helpers/supabaseAdmin';
 
-// Deljeni vozač fiksture sa web-timeclock-review.spec.ts — rade jedan za drugim da izbegnu
-// trku oko istog "jedan otvoren unos po vozaču" reda.
+// A driver fixture shared with web-timeclock-review.spec.ts — they run one after another to
+// avoid a race on the same "one open entry per driver" row.
 test.describe.configure({ mode: 'serial' });
 
 test('WEB-TCENT-03: Empty state when there are no time entries', async () => {
@@ -24,11 +24,12 @@ test('WEB-TCENT-01: Entry list shows all fields correctly', async ({ page }) => 
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
   await resolveExistingPendingEntries(driverId);
-  // Podrazumevani QA magacin (QA_WAREHOUSE_ID) ima region "Global", koji RLS politika na
-  // "warehouses" tabeli ne prepoznaje kao poseban slučaj (vidi napomenu u WEB-TCREV-03/WEB-SV-07)
-  // — manager iz regiona Italy bi dobio PRAZAN join za njega, pa bi "Warehouse" legitimno
-  // prikazao "—" bez obzira da li kolona uopšte radi ispravno. Genova magacin (region Italy) je
-  // STVARNO vidljiv manageru, pa test može da potvrdi da se pravo ime magacina renderuje.
+  // The default QA warehouse (QA_WAREHOUSE_ID) has region "Global", which the RLS policy on
+  // the "warehouses" table doesn't recognize as a special case (see the note in
+  // WEB-TCREV-03/WEB-SV-07) — a manager in the Italy region would get a BLANK join for it, so
+  // "Warehouse" would legitimately show "—" regardless of whether the column works correctly
+  // at all. The Genova warehouse (region Italy) is ACTUALLY visible to the manager, so the
+  // test can confirm the real warehouse name is rendered.
   await createPendingClockInEntry(driverId, { leaveOpen: true, warehouseId: process.env.QA_GENOVA_TEST_WAREHOUSE_ID! });
 
   const login = new LoginPage(page);
@@ -40,10 +41,11 @@ test('WEB-TCENT-01: Entry list shows all fields correctly', async ({ page }) => 
 
   const card = entries.cardForDriverEmail(driverEmail);
   await expect(card).toBeVisible();
-  // expectFieldsPopulated() samo proverava da nijedno polje nije PRAZNO — to bi prošlo i da
-  // Warehouse/Review/Auto closed/Reason prikažu POGREŠNU (ali ne-praznu) vrednost. Ova fiksturna
-  // (createPendingClockInEntry sa leaveOpen:true, bez ikakvih reason polja) ima POTPUNO
-  // determinističke vrednosti za ta 4 polja — proveravamo ih konkretno, ne samo "nije prazno".
+  // expectFieldsPopulated() only checks that no field is BLANK — that would pass even if
+  // Warehouse/Review/Auto closed/Reason showed a WRONG (but non-blank) value. This fixture
+  // (createPendingClockInEntry with leaveOpen:true, no reason fields at all) has FULLY
+  // deterministic values for those 4 fields — we check them specifically, not just "isn't
+  // blank".
   await entries.expectFieldsPopulated(card);
 
   const supabase = supabaseAdmin();
@@ -53,18 +55,19 @@ test('WEB-TCENT-01: Entry list shows all fields correctly', async ({ page }) => 
     .eq('id', process.env.QA_GENOVA_TEST_WAREHOUSE_ID!)
     .single();
   if (warehouseError || !warehouse) {
-    throw new Error(`Ne mogu da pročitam ime magacina: ${warehouseError?.message}`);
+    throw new Error(`Unable to read warehouse name: ${warehouseError?.message}`);
   }
 
   expect(await entries.getFieldText(card, 'Warehouse')).toBe(warehouse.name);
-  // <dd class="capitalize"> — innerText() odražava CSS text-transform, pa je renderovan tekst
-  // "Pending" (veliko P), iako je sirova DB vrednost "pending".
+  // <dd class="capitalize"> — innerText() reflects the CSS text-transform, so the rendered
+  // text is "Pending" (capital P), even though the raw DB value is "pending".
   expect(await entries.getFieldText(card, 'Review')).toBe('Pending');
-  // Mobilni clock-in nikad ne postavlja auto_closed_at, a resolveExistingPendingEntries/
-  // createPendingClockInEntry ovde ga ne diraju — "No" je jedina moguća vrednost za OVU fiksturu.
+  // A mobile clock-in never sets auto_closed_at, and resolveExistingPendingEntries/
+  // createPendingClockInEntry don't touch it here — "No" is the only possible value for THIS
+  // fixture.
   expect(await entries.getFieldText(card, 'Auto closed')).toBe('No');
-  // Nijedno od 4 reason polja nije postavljeno za ovu fiksturu — fallback na "—"
-  // (isti lanac prioriteta koji WEB-TCENT-04 testira eksplicitno, korak po korak).
+  // None of the 4 reason fields are set for this fixture — falls back to "—" (the same
+  // priority chain WEB-TCENT-04 tests explicitly, step by step).
   expect(await entries.getFieldText(card, 'Reason')).toBe('—');
 });
 
@@ -88,10 +91,11 @@ test('WEB-TCENT-02: Open entry shows "Still open" for clock out', async ({ page 
 });
 
 test('WEB-TCENT-04: Reason column goes through the correct fallback chain', async ({ page }) => {
-  // Stranica nema paginaciju i renderuje CELU istoriju unosa (800+ u deljenoj bazi, raste kroz
-  // sesije) — ovaj test zove entries.goto() TRI puta zaredom, pa čak i blago sporiji load (pod
-  // opterećenjem) lako premaši podrazumevani 30s budžet za ceo test. Potvrđeno snimkom ekrana iz
-  // stvarnog pada: sama navigacija je istekla, ne neki lokator/race unutar stranice.
+  // The page has no pagination and renders the ENTIRE entry history (800+ in the shared
+  // database, growing across sessions) — this test calls entries.goto() THREE times in a
+  // row, so even a slightly slower load (under load) easily exceeds the default 30s budget
+  // for the whole test. Confirmed by a screenshot of a real failure: the navigation itself
+  // timed out, not some locator/race inside the page.
   test.setTimeout(90000);
 
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
@@ -101,27 +105,28 @@ test('WEB-TCENT-04: Reason column goes through the correct fallback chain', asyn
 
   await resolveExistingPendingEntries(driverId);
 
-  // review_note ima najviši prioritet — postavljen zajedno sa ostalima, mora da se prikaže ON.
+  // review_note has the highest priority — set together with the others, IT must be the one
+  // shown.
   const entryId1 = await createPendingClockInEntry(driverId, { leaveOpen: false });
   await setTimeEntryReasonFields(entryId1, {
-    review_note: 'Review note tekst',
-    review_reason: 'Review reason tekst',
-    override_reason: 'Override reason tekst',
-    auto_close_reason: 'Auto close reason tekst',
+    review_note: 'Review note text',
+    review_reason: 'Review reason text',
+    override_reason: 'Override reason text',
+    auto_close_reason: 'Auto close reason text',
   });
 
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
   await entries.goto();
-  expect(await entries.getReasonValue(entries.cardForDriverEmail(driverEmail))).toBe('Review note tekst');
+  expect(await entries.getReasonValue(entries.cardForDriverEmail(driverEmail))).toBe('Review note text');
 
-  // Samo auto_close_reason postavljen (najniži prioritet u lancu) — i on treba da se prikaže
-  // kad je jedini dostupan.
+  // Only auto_close_reason is set (the lowest priority in the chain) — it should still be
+  // shown when it's the only one available.
   const entryId2 = await createPendingClockInEntry(driverId, { leaveOpen: false });
-  await setTimeEntryReasonFields(entryId2, { auto_close_reason: 'Samo auto close reason' });
+  await setTimeEntryReasonFields(entryId2, { auto_close_reason: 'Only auto close reason' });
 
   await entries.goto();
-  expect(await entries.getReasonValue(entries.cardForDriverEmail(driverEmail))).toBe('Samo auto close reason');
+  expect(await entries.getReasonValue(entries.cardForDriverEmail(driverEmail))).toBe('Only auto close reason');
 
   // Nijedno od 4 polja nije postavljeno — fallback na "—".
   const entryId3 = await createPendingClockInEntry(driverId, { leaveOpen: false });
@@ -152,8 +157,8 @@ test('WEB-TCENT-06: Entry card shows the clock-in selfie when one exists', async
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
 
   await resolveExistingPendingEntries(driverId);
-  // Ista stvarna storage putanja korišćena u WEB-TCREV-04 (fajl u bucket-u nezavisan od
-  // time_entries reda, može se ponovo potpisati za drugi unos).
+  // The same real storage path used in WEB-TCREV-04 (the file in the bucket is independent
+  // of the time_entries row, it can be re-signed for a different entry).
   await createPendingClockInEntry(driverId, {
     clockInSelfieUrl: `${process.env.QA_DRIVER_TRANSFERS_ID}/qa-fixture-entry/clock-in-qa-fixture.jpg`,
   });

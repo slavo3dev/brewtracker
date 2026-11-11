@@ -42,9 +42,9 @@ export class ServiceVisitsPage {
     return dd.innerText();
   }
 
-  // "Completed"/"In Progress" tekst se javlja i kao dt labela polja ("Completed: ...") pored
-  // samog status bedža — bedž se skopuje preko njegove specifične CSS klase da se izbegne ta
-  // dvosmislenost.
+  // "Completed"/"In Progress" text also appears as a dt field label ("Completed: ...")
+  // next to the status badge itself — the badge is scoped via its specific CSS class to
+  // avoid that ambiguity.
   statusBadge(clientName: string, driverName: string): Locator {
     return this.visitCard(clientName, driverName).locator('span.shrink-0.rounded-full.px-3.py-1');
   }

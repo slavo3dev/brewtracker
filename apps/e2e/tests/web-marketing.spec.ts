@@ -14,15 +14,15 @@ test('WEB-MKT-02: Feature grid cards link to the correct destinations', async ({
     await expect(page).toHaveURL(expectedUrl);
   }
 
-  // AI quality gate je JAVNA stranica — anoniman korisnik tamo ostaje, bez redirecta na /login.
+  // The AI quality gate is a PUBLIC page — an anonymous user stays there, no redirect to /login.
   await page.goto('/');
   await page.getByRole('heading', { name: 'AI quality gate', exact: true }).click();
   await expect(page).toHaveURL(/\/ai-quality$/);
 });
 
 test('WEB-MKT-05: Header shows Sign in/Get started when logged out, name/Sign out when logged in', async ({ page }) => {
-  // Scoped na <header> — hero sekcija IMA sopstveno "Get started" dugme (vodi na
-  // /get-started), pa bi globalni getByRole uhvatio oba i izazvao strict mode grešku.
+  // Scoped to <header> — the hero section HAS its own "Get started" button (leading to
+  // /get-started), so a global getByRole would match both and trigger a strict mode error.
   const header = page.locator('header');
 
   await page.goto('/');
@@ -46,12 +46,13 @@ test('WEB-MKT-01: Home page shows the hero and CTA buttons', async ({ page }) =>
     page.getByRole('heading', { name: 'Every machine. Every stop. Counted.' }),
   ).toBeVisible();
 
-  // Hero "Get started" vodi na /get-started — <header> dolazi PRE hero sekcije u DOM-u, pa
-  // ".first()" bez skopovanja pogađa header-ov link (koji vodi na /login) umesto hero-ovog.
+  // The hero "Get started" leads to /get-started — <header> comes BEFORE the hero section in
+  // the DOM, so ".first()" without scoping hits the header's link (which leads to /login)
+  // instead of the hero's.
   await page.locator('main').getByRole('link', { name: 'Get started', exact: true }).click();
   await expect(page).toHaveURL(/\/get-started$/);
 
-  // Header "Get started" vodi na /login.
+  // The header "Get started" leads to /login.
   await page.goto('/');
   const header = page.locator('header');
   await header.getByRole('link', { name: 'Get started' }).click();
@@ -69,9 +70,9 @@ test('WEB-MKT-03: "Get started" page is a static mockup with no signup form', as
 });
 
 test('WEB-MKT-04: "How it works" page is a static mockup', async ({ page }) => {
-  // Raniji test je proveravao SAMO da postoji jedan nav element ("Back home") negde na
-  // stranici — to ne kaže ništa o STVARNOM sadržaju stranice. Dodata provera naslova
-  // jedinstvenog za ovu stranicu potvrđuje da je prava "How it works" stranica renderovana.
+  // The earlier test only checked that one nav element ("Back home") existed somewhere on
+  // the page — that says nothing about the page's ACTUAL content. A check for a heading
+  // unique to this page was added, confirming the real "How it works" page is rendered.
   await page.goto('/how-it-works');
   await expect(
     page.getByRole('heading', { name: 'Routes, service visits, inventory, and reporting work together.' }),
@@ -89,9 +90,9 @@ test('WEB-MKT-06: Footer legal links are placeholders', async ({ page }) => {
 });
 
 test('WEB-AUTH-06: Button shows "Signing in…" while the request is in progress', async ({ page }) => {
-  // Veštački usporavamo POST na /login da bismo pouzdano uhvatili tranzijentno stanje —
-  // na brzom staging serveru zahtev bi inače mogao da se završi pre nego što Playwright
-  // stigne da proveri dugme.
+  // We artificially slow down the POST to /login to reliably catch the transient state —
+  // on a fast staging server the request could otherwise finish before Playwright gets a
+  // chance to check the button.
   await page.route('**/login', async (route) => {
     if (route.request().method() === 'POST') {
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -114,7 +115,8 @@ test('WEB-HOME-01: Dashboard greets the logged-in admin by name', async ({ page 
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
-  // "Welcome back, {ime}." je paragraf ispod H1 naslova "Dashboard", ne sama heading.
+  // "Welcome back, {name}." is a paragraph below the H1 "Dashboard" heading, not the heading
+  // itself.
   const fullName = 'QA Manager Fixture';
   await expect(page.getByText(`Welcome back, ${fullName}.`)).toBeVisible();
 });

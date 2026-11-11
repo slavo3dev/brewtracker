@@ -2,11 +2,11 @@ import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 
 test('WEB-HOME-02: "Users" card is shown to a user with canManageUsers', async ({ page }) => {
-  // AŽURIRANO (app update): kartica "User management" je preimenovana u "Users" i sada živi
-  // pod "Management" grupom (vidi navigation.config.ts) umesto u pljosnatoj listi kartica.
-  // Pozitivan slučaj — negativan (admin BEZ canManageUsers) se ne može postaviti jer u
-  // kodu canManageUsers() = canAccessAdminApp() za svakog aktivnog manager/CEO naloga
-  // (nema uže uloge); isto ograničenje kao WEB-AUTH-14/USR-14.
+  // UPDATED (app update): the "User management" card was renamed to "Users" and now lives
+  // under the "Management" group (see navigation.config.ts) instead of a flat list of cards.
+  // Positive case only — the negative case (an admin WITHOUT canManageUsers) can't be set up
+  // because in the code canManageUsers() = canAccessAdminApp() for every active manager/CEO
+  // account (there's no narrower role); the same limitation as WEB-AUTH-14/USR-14.
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -17,12 +17,12 @@ test('WEB-HOME-02: "Users" card is shown to a user with canManageUsers', async (
 });
 
 test('WEB-HOME-03: All dashboard navigation cards (grouped) link to the correct pages', async ({ page }) => {
-  // AŽURIRANO (app update): dashboard home je prepravljen — kartice su sad grupisane u 4
-  // sekcije (Operations/Inventory/Management/Reports) umesto jedne pljosnate liste. Dodate
-  // su i potpuno nove kartice: "Service" i "Inventory Overview" (Operations/Inventory grupe)
-  // i "Clients" (Management grupa, nova funkcionalnost). NAPOMENA: deo ovoga (Clients) još
-  // NIJE deployed na produkciju u trenutku pisanja — verifikovati čim dev grana bude
-  // deployed.
+  // UPDATED (app update): the dashboard home was reworked — cards are now grouped into 4
+  // sections (Operations/Inventory/Management/Reports) instead of one flat list. Entirely
+  // new cards were also added: "Service" and "Inventory Overview" (Operations/Inventory
+  // groups) and "Clients" (Management group, new functionality). NOTE: part of this
+  // (Clients) was NOT YET deployed to production at the time of writing — verify once the
+  // dev branch is deployed.
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -60,8 +60,8 @@ test('WEB-HOME-03: All dashboard navigation cards (grouped) link to the correct 
 
   for (const { group, cards } of groups) {
     await page.goto('/dashboard');
-    // level: 2 — grupe su <h2>, kartice su <h3> (neke grupe sa jednom karticom dele isti
-    // tekst, npr. "Reports" grupa + "Reports" kartica).
+    // level: 2 — groups are <h2>, cards are <h3> (some single-card groups share the same
+    // text, e.g. the "Reports" group + "Reports" card).
     await expect(page.getByRole('heading', { name: group, exact: true, level: 2 })).toBeVisible();
 
     for (const [title, expectedUrl] of cards) {
@@ -73,10 +73,11 @@ test('WEB-HOME-03: All dashboard navigation cards (grouped) link to the correct 
 });
 
 test('WEB-HOME-04: "Warehouses" card links to the correct page', async ({ page }) => {
-  // AŽURIRANO (app update): raniji latentni bug (relativni href bez vodeće kose crte, koji
-  // je slučajno ispravno radio samo kad se klikne sa tačno /dashboard) više NE postoji —
-  // navigation.config.ts sada koristi apsolutan "/dashboard/inventory/warehouses" href za
-  // SVE kartice, uključujući Warehouses. Ovo je sad običan, robustan test bez te zamke.
+  // UPDATED (app update): the earlier latent bug (a relative href without a leading slash,
+  // which happened to work correctly only when clicked from exactly /dashboard) no longer
+  // exists — navigation.config.ts now uses an absolute "/dashboard/inventory/warehouses"
+  // href for ALL cards, including Warehouses. This is now a plain, robust test without that
+  // trap.
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);

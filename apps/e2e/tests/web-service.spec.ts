@@ -10,9 +10,9 @@ import {
 } from '../helpers/technicalTicketSeed';
 import { createTestUser, deleteTestUser } from '../helpers/userSeed';
 
-// Postojeći Open/Unassigned tiket iz test podataka.
+// An existing Open/Unassigned ticket from the test data.
 const TICKET_DESCRIPTION = 'QA TT-05 ticket without photo';
-// Postojeći tiket sa priloženom fotografijom.
+// An existing ticket with an attached photo.
 const PHOTO_TICKET_DESCRIPTION = 'QA TT-06 ticket with photo';
 
 test('WEB-TT-10: Empty state when there are no technical tickets', async () => {
@@ -23,13 +23,14 @@ test('WEB-TT-10: Empty state when there are no technical tickets', async () => {
 });
 
 test('WEB-TT-01: Status cards match the real data for the region', async ({ page }) => {
-  // Dokumentovan, već potvrđen defekt (regresioni plan): loadTechnicalTickets() izbacuje
-  // svaki tiket čiji klijent/mašina nije čitljiva pod RLS-om, a vidljivost mašine koristi
-  // NJEN TRENUTNI region klijenta — ne region klijenta samog tiketa. Tiketi za klijente iz
-  // menadžerovog regiona se tiho sakriju ako je mašina u međuvremenu preseljena na klijenta
-  // iz DRUGOG regiona. Test ispod ne koristi test.fail() — namerno PADA (crveno) dok god je
-  // ovaj defekt prisutan u aplikaciji. Namerno van serial grupe ispod (čisto čitanje, ne
-  // dira deljeni TICKET_DESCRIPTION fiksturu) da njegov pad ne blokira ostale TT-* testove.
+  // A documented, already-confirmed defect (regression plan): loadTechnicalTickets() drops
+  // every ticket whose client/machine isn't readable under RLS, and machine visibility uses
+  // the client's CURRENT region — not the region of the ticket's own client. Tickets for
+  // clients in the manager's region get silently hidden if the machine has since been moved
+  // to a client in a DIFFERENT region. The test below doesn't use test.fail() — it
+  // intentionally FAILS (red) for as long as this defect is present in the application.
+  // Deliberately kept outside the serial group below (a pure read, doesn't touch the shared
+  // TICKET_DESCRIPTION fixture) so its failure doesn't block the other TT-* tests.
   test.info().annotations.push({
     type: 'note',
     description:
@@ -51,10 +52,10 @@ test('WEB-TT-01: Status cards match the real data for the region', async ({ page
   expect(shown.resolved).toBe(expected.resolved);
 });
 
-// Preostali testovi dele ISTI tiket fixture (resetuju ga na poznato stanje pre svakog
-// testa) — rade jedan za drugim da izbegnu trku oko istog reda. Izdvojeni u sopstvenu
-// describe grupu (umesto file-wide serial) da WEB-TT-01 (gore) ne bude deo ovog lanca —
-// njegov namerni crveni pad ne sme da poskipuje testove ispod.
+// The remaining tests share the SAME ticket fixture (resetting it to a known state before
+// each test) — they run one after another to avoid a race on the same row. Split into their
+// own describe group (instead of a file-wide serial) so WEB-TT-01 (above) isn't part of this
+// chain — its intentional red failure must not skip the tests below.
 test.describe(() => {
   test.describe.configure({ mode: 'serial' });
 
@@ -124,10 +125,11 @@ test('WEB-TT-02: Ticket card shows the signed photo when one exists', async ({ p
 });
 
 test('WEB-TT-04: Only active tech users are available for assignment', async ({ page }) => {
-  // Novootkriveno: dropdown tehničara je (neočekivano, nedokumentovano) region-scoped —
-  // RLS na "users" tabeli vraća samo tehničare IZ REGIONA ulogovanog menadžera, bez ikakve
-  // naznake u UI-ju da ih ima još. Koristimo isti region kao QA_MANAGER (Italy) da izbegnemo
-  // tu nepovezanu pojavu i testiramo tačno ono što WEB-TT-04 opisuje (aktivan/neaktivan).
+  // Newly discovered: the technician dropdown is (unexpectedly, undocumented) region-scoped
+  // — RLS on the "users" table returns only technicians FROM the logged-in manager's region,
+  // with no indication in the UI that more exist. We use the same region as QA_MANAGER
+  // (Italy) to avoid that unrelated behavior and test exactly what WEB-TT-04 describes
+  // (active/inactive).
   const stamp = Date.now();
   const activeTechId = await createTestUser({
     email: `qa-tt-04-active-${stamp}@brewtracker.com`,
@@ -176,8 +178,9 @@ test('WEB-TT-05: Changing the technician on an in-progress ticket works', async 
   await service.goto();
   await service.expectAssignedTo(TICKET_DESCRIPTION, 'Test');
 
-  // "Test Now" je u istom (Italy) regionu kao QA_MANAGER — "OneTest" ima region=null i zato
-  // je nevidljiv u dropdown-u (vidi napomenu u WEB-TT-04 o region-scoping nalazu).
+  // "Test Now" is in the same (Italy) region as QA_MANAGER — "OneTest" has region=null and
+  // is therefore invisible in the dropdown (see the note in WEB-TT-04 about the
+  // region-scoping finding).
   await service.reassignTechnician(TICKET_DESCRIPTION, 'Test Now');
   await service.expectAssignedTo(TICKET_DESCRIPTION, 'Test Now');
 });

@@ -6,11 +6,12 @@ const WAREHOUSE_LAT = 44.6579212712334;
 const WAREHOUSE_LNG = 20.936239461265;
 
 /**
- * Prethodno ostavljeni pending unosi od ranijih pokretanja testa bi inače ostali u review
- * queue-u zauvek (ništa ih ne rešava) i pokvarili bi locator-e koji očekuju TAČNO one
- * "fresh" pending unose koje test upravo seeduje. Pozvati JEDNOM na početku testa —
- * ne pre svakog createPendingClockInEntry poziva (to bi "rešilo" i unos iz prethodnog
- * poziva u ISTOM testu ako test seeduje više unosa za istog vozača).
+ * Pending entries left over from earlier test runs would otherwise stay in the review
+ * queue forever (nothing resolves them) and would break locators that expect EXACTLY the
+ * "fresh" pending entries the test is seeding right now. Call this ONCE at the start of the
+ * test — not before every createPendingClockInEntry call (that would also "resolve" an
+ * entry from an earlier call in the SAME test if the test seeds multiple entries for the
+ * same driver).
  */
 export async function resolveExistingPendingEntries(driverId: string) {
   const supabase = supabaseAdmin();
@@ -34,8 +35,8 @@ export async function createPendingClockInEntry(
 ): Promise<string> {
   const supabase = supabaseAdmin();
 
-  // Samo jedan OTVOREN unos po vozaču je dozvoljen (DB constraint) — zatvori eventualni
-  // postojeći pre nego što napravimo novi, kako bi seeding bio ponovljiv.
+  // Only one OPEN entry per driver is allowed (DB constraint) — close any existing one
+  // before creating a new one, so seeding stays repeatable.
   await supabase
     .from('time_entries')
     .update({ clock_out_at: new Date().toISOString(), status: 'closed' })
@@ -43,7 +44,8 @@ export async function createPendingClockInEntry(
     .in('status', ['open', 'manager_override'])
     .is('clock_out_at', null);
 
-  // "outside" pomera klik-in ~3.3km severno od magacina — jasno van svih test radijusa.
+  // "outside" moves the clock-in ~3.3km north of the warehouse — clearly outside every test
+  // radius.
   const latOffset = options?.geofence === 'outside' ? 0.03 : 0.0001;
   const leaveOpen = options?.leaveOpen ?? true;
   const warehouseLat = options?.warehouseLat ?? WAREHOUSE_LAT;
@@ -57,8 +59,8 @@ export async function createPendingClockInEntry(
       clock_in_at: new Date().toISOString(),
       clock_in_latitude: warehouseLat + latOffset,
       clock_in_longitude: warehouseLng,
-      // Drugi (ne-otvoren) unos za istog vozača mora da ima clock_out_at da ne bi
-      // probio "jedan otvoren unos po vozaču" constraint.
+      // A second (non-open) entry for the same driver must have clock_out_at set, or it
+      // would violate the "one open entry per driver" constraint.
       ...(leaveOpen
         ? { status: 'open' }
         : { status: 'closed', clock_out_at: new Date().toISOString() }),
@@ -69,7 +71,7 @@ export async function createPendingClockInEntry(
     .single();
 
   if (error || !data) {
-    throw new Error(`Ne mogu da napravim pending clock-in: ${error?.message}`);
+    throw new Error(`Unable to create a pending clock-in: ${error?.message}`);
   }
   return data.id;
 }
@@ -90,15 +92,16 @@ export async function getReviewOutcome(timeEntryId: string): Promise<ReviewOutco
     .single();
 
   if (error || !data) {
-    throw new Error(`Ne mogu da pročitam review ishod: ${error?.message}`);
+    throw new Error(`Unable to read review outcome: ${error?.message}`);
   }
   return data;
 }
 
 /**
- * Otvoren unos čiji je shift_end_at u prošlosti — mobilni clock-in nikad ne postavlja ovo
- * polje (zato precondition eksplicitno kaže "set via SQL"), pa ovo mora direktno preko
- * service-role klijenta. Koristi se za testiranje "Run auto-close check" funkcije.
+ * An open entry whose shift_end_at is in the past — a mobile clock-in never sets this
+ * field (that's why the precondition explicitly says "set via SQL"), so this must go
+ * directly through the service-role client. Used to test the "Run auto-close check"
+ * function.
  */
 export async function createOpenEntryWithPastShiftEnd(driverId: string): Promise<string> {
   const supabase = supabaseAdmin();
@@ -128,14 +131,14 @@ export async function createOpenEntryWithPastShiftEnd(driverId: string): Promise
     .single();
 
   if (error || !data) {
-    throw new Error(`Ne mogu da napravim otvoren unos sa prošlim shift_end_at: ${error?.message}`);
+    throw new Error(`Unable to create an open entry with a past shift_end_at: ${error?.message}`);
   }
   return data.id;
 }
 
 /**
- * Otvoren unos čiji je shift_end_at u BUDUĆNOSTI — koristi se za WEB-TCSET-02 (smena još
- * nije završena, auto-close ga ne sme dirati).
+ * An open entry whose shift_end_at is in the FUTURE — used by WEB-TCSET-02 (the shift
+ * hasn't ended yet, auto-close must not touch it).
  */
 export async function createOpenEntryWithFutureShiftEnd(driverId: string): Promise<string> {
   const supabase = supabaseAdmin();
@@ -165,14 +168,14 @@ export async function createOpenEntryWithFutureShiftEnd(driverId: string): Promi
     .single();
 
   if (error || !data) {
-    throw new Error(`Ne mogu da napravim otvoren unos sa budućim shift_end_at: ${error?.message}`);
+    throw new Error(`Unable to create an open entry with a future shift_end_at: ${error?.message}`);
   }
   return data.id;
 }
 
 /**
- * Otvoren unos BEZ shift_end_at (kakav normalni mobilni clock-in i pravi) — koristi se za
- * WEB-TCSET-05 (auto-close pokriva samo unose koji IMAJU shift_end_at).
+ * An open entry WITHOUT a shift_end_at (what a normal mobile clock-in actually produces) —
+ * used by WEB-TCSET-05 (auto-close only covers entries that HAVE a shift_end_at).
  */
 export async function createOpenEntryWithoutShiftEnd(driverId: string): Promise<string> {
   const supabase = supabaseAdmin();
@@ -201,7 +204,7 @@ export async function createOpenEntryWithoutShiftEnd(driverId: string): Promise<
     .single();
 
   if (error || !data) {
-    throw new Error(`Ne mogu da napravim otvoren unos bez shift_end_at: ${error?.message}`);
+    throw new Error(`Unable to create an open entry without a shift_end_at: ${error?.message}`);
   }
   return data.id;
 }
@@ -225,7 +228,7 @@ export async function setTimeEntryReasonFields(
   const supabase = supabaseAdmin();
   const { error } = await supabase.from('time_entries').update(fields).eq('id', timeEntryId);
   if (error) {
-    throw new Error(`Ne mogu da postavim reason polja: ${error.message}`);
+    throw new Error(`Unable to set reason fields: ${error.message}`);
   }
 }
 
@@ -238,7 +241,7 @@ export async function getTimeEntry(timeEntryId: string): Promise<TimeEntryRow> {
     .single();
 
   if (error || !data) {
-    throw new Error(`Ne mogu da pročitam unos: ${error?.message}`);
+    throw new Error(`Unable to read entry: ${error?.message}`);
   }
   return data;
 }

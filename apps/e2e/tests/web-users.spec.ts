@@ -4,11 +4,12 @@ import { UsersPage } from '../pages/UsersPage';
 import { createTestUser, deleteTestUser, getUserIdByEmail, setUserEmailToNull } from '../helpers/userSeed';
 
 test('WEB-USR-01: Creating a user with all fields succeeds and sends the setup email', async ({ page }) => {
-  // Dokumentovan, već potvrđen defekt (regresioni plan, Critical Fail): createUserAction()
-  // poziva sendAppUserPasswordReset() ODMAH posle createAppUser(), u ISTOM try bloku — kad taj
-  // poziv udari u Supabase rate-limit za reset-password email (uobičajeno u ovom deljenom QA
-  // projektu), cela akcija vraća grešku umesto success poruke, iako je korisnik VEĆ kreiran u
-  // bazi. Test ispod ne koristi test.fail() — namerno PADA (crveno) kad god rate limit udari.
+  // A documented, already-confirmed defect (regression plan, Critical Fail): createUserAction()
+  // calls sendAppUserPasswordReset() IMMEDIATELY after createAppUser(), in the SAME try
+  // block — when that call hits the Supabase rate limit for reset-password emails (common on
+  // this shared QA project), the whole action returns an error instead of a success message,
+  // even though the user was ALREADY created in the database. The test below doesn't use
+  // test.fail() — it intentionally FAILS (red) whenever the rate limit is hit.
   test.info().annotations.push({
     type: 'note',
     description:
@@ -38,8 +39,9 @@ test('WEB-USR-01: Creating a user with all fields succeeds and sends the setup e
 
     await users.expectUserCreatedAndEmailSent();
   } finally {
-    // Dokumentovan defekt gore: nalog se pravi u bazi i kad finalna poruka ne uspe (rate
-    // limit na email), pa čistimo bez obzira na ishod — da reruns ne gomilaju naloge.
+    // The documented defect above: the account is created in the database even when the
+    // final message fails (an email rate limit), so we clean up regardless of the outcome —
+    // so reruns don't pile up accounts.
     const userId = await getUserIdByEmail(email);
     if (userId) {
       await deleteTestUser(userId);
@@ -66,9 +68,9 @@ test('WEB-USR-06: Empty state when the filter combination matches nobody', async
 
   const users = new UsersPage(page);
   await users.goto();
-  // Filter by region je <select> sa opcijama izvedenim iz postojećih korisnika — ne može
-  // se birati region koji ne postoji nijednom korisniku. Search je slobodan tekst (AND sa
-  // ostalim filterima) — garantovano nepostojeća pretraga pouzdano daje nula rezultata.
+  // "Filter by region" is a <select> with options derived from existing users — you can't
+  // select a region that no user has. Search is free text (ANDed with the other filters) —
+  // a guaranteed-nonexistent search reliably gives zero results.
   await users.search(`qa-usr-06-nonexistent-${Date.now()}`);
 
   await users.expectNoUsersMessage();
@@ -76,11 +78,13 @@ test('WEB-USR-06: Empty state when the filter combination matches nobody', async
 });
 
 test('WEB-USR-07: Pagination shows 10 users per page', async ({ page }) => {
-  // Test SAM seeduje dovoljno korisnika (umesto da se oslanja na ambijentalni broj u
-  // deljenoj bazi) — garantuje bar 2 pune strane bez obzira koliko trenutno ima korisnika.
+  // The test seeds enough users ITSELF (instead of relying on the ambient count in the
+  // shared database) — guarantees at least 2 full pages regardless of how many users
+  // currently exist.
   const stamp = Date.now();
-  // allSettled (ne all) + push u try — ako JEDAN od 15 zahteva odbije, ostali koji su uspeli
-  // moraju ostati zabeleženi za cleanup ispod, umesto da se trajno izgube u deljenoj bazi.
+  // allSettled (not all) + push inside the try — if ONE of the 15 requests is rejected, the
+  // others that succeeded must still be recorded for cleanup below, instead of being
+  // permanently lost in the shared database.
   const userIds: string[] = [];
   try {
     const results = await Promise.allSettled(
@@ -157,8 +161,8 @@ test('WEB-USR-03: Creating a user is blocked without a full name', async ({ page
 
   await users.attemptSubmitWithoutFullName(`qa-usr-03-${Date.now()}@brewtracker.com`);
 
-  // "fullName" ima HTML required atribut — browser blokira submit pre nego što ikada
-  // stigne do servera (nema "User created..." poruke).
+  // "fullName" has an HTML required attribute — the browser blocks submission before it ever
+  // reaches the server (no "User created..." message).
   const fullNameField = users.fullNameField();
   await expect.poll(() => fullNameField.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
   await expect(page.getByText('User created and password setup email sent.')).toHaveCount(0);
@@ -221,12 +225,12 @@ test('WEB-USR-08: Editing and saving user data persists', async ({ page }) => {
     };
     await users.editUserDetails(email, updated);
 
-    // Rola selecta se ažurira ODMAH na ekranu posle snimanja, bez reload-a — pre popravke
-    // (router.refresh() + key na <select>) uncontrolled select je i dalje prikazivao STARU
-    // rolu dok se stranica ručno ne učita ponovo.
+    // The role select updates IMMEDIATELY on screen after saving, without a reload — before
+    // the fix (router.refresh() + a key on <select>) the uncontrolled select kept showing the
+    // OLD role until the page was manually reloaded.
     expect((await users.getUserDetails(email)).role).toBe(updated.role);
 
-    // Perzistencija — ponovo učitaj stranicu i proveri da izmene ostaju.
+    // Persistence — reload the page and check the changes remain.
     await users.goto();
     await users.expandUser(email);
     const persisted = await users.getUserDetails(email);
@@ -293,13 +297,13 @@ test('WEB-USR-05: Role/Status/Region filters combine with AND', async ({ page })
     await users.filterByStatus('true');
     await users.filterByRegion(uniqueRegion);
 
-    // Region je jedinstven (timestamp) — kombinacija sva tri filtera mora dati TAČNO ovog
-    // korisnika.
+    // The region is unique (a timestamp) — the combination of all three filters must give
+    // EXACTLY this user.
     await expect(users.userCard(email)).toBeVisible();
     expect(await users.getVisibleUserCount()).toBe(1);
 
-    // Promena SAMO statusa (role+region ostaju isti) mora da isključi ovog (aktivnog)
-    // korisnika — potvrđuje da se filteri kombinuju sa AND, ne OR.
+    // Changing ONLY the status (role+region stay the same) must exclude this (active) user
+    // — confirms the filters combine with AND, not OR.
     await users.filterByStatus('false');
     expect(await users.getVisibleUserCount()).toBe(0);
   } finally {
@@ -326,8 +330,8 @@ test('WEB-USR-09: Full name is required when saving an edit', async ({ page }) =
     await users.goto();
     await users.expandUser(email);
 
-    // "fullName" ima HTML required atribut — browser blokira submit pre nego što ikada
-    // stigne do servera.
+    // "fullName" has an HTML required attribute — the browser blocks submission before it
+    // ever reaches the server.
     await users.attemptClearFullNameAndSave(email);
     const fullNameInput = users.userCard(email).locator('input[name="fullName"]');
     await expect.poll(() => fullNameInput.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
@@ -338,9 +342,9 @@ test('WEB-USR-09: Full name is required when saving an edit', async ({ page }) =
 });
 
 test('WEB-USR-10: "Send password reset" asks for confirmation and requires an email on the account', async ({ page }) => {
-  // Napomena: sendAppUserPasswordReset() podleže istom Supabase rate-limitu kao WEB-USR-01/
-  // WEB-AUTH-07 na ovom deljenom QA projektu — povremeno može pasti sa generičkom greškom
-  // umesto "Password reset email sent." čak i kad je kod ispravan.
+  // Note: sendAppUserPasswordReset() is subject to the same Supabase rate limit as
+  // WEB-USR-01/WEB-AUTH-07 on this shared QA project — it can occasionally fail with a
+  // generic error instead of "Password reset email sent." even when the code is correct.
   test.info().annotations.push({
     type: 'note',
     description:
@@ -374,11 +378,11 @@ test('WEB-USR-10: "Send password reset" asks for confirmation and requires an em
 });
 
 test('WEB-USR-14: /dashboard/users is unreachable for non-user-manager accounts', async ({ page }) => {
-  // canManageUsers() dozvoljava svakom aktivnom admin-u (manager/CEO) — u ovom kodu ne
-  // postoji "admin bez te dozvole". Driver/tech nalozi se uopšte ne mogu ulogovati na web
-  // dashboard (vidi WEB-AUTH-05), pa je requireUserManager()-ov redirect("/dashboard")
-  // trenutno nedostižan kod; krajnji, korisniku vidljiv ishod je ipak isti — driver ne
-  // može da vidi /dashboard/users.
+  // canManageUsers() allows every active admin (manager/CEO) — in this code there's no
+  // "admin without this permission". Driver/tech accounts can't log into the web dashboard
+  // at all (see WEB-AUTH-05), so requireUserManager()'s redirect("/dashboard") is currently
+  // unreachable code; the final, user-visible outcome is still the same — a driver can't see
+  // /dashboard/users.
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_DRIVER_EMAIL!, process.env.QA_DRIVER_PASSWORD!);

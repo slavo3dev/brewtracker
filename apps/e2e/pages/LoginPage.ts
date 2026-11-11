@@ -11,8 +11,8 @@ export class LoginPage {
     await this.page.locator('#email').fill(email);
     await this.page.locator('#password').fill(password);
     await this.page.getByRole('button', { name: 'Sign in' }).click();
-    // Sačekaj da URL stvarno PREĐE na /dashboard (uspeh), ili istekne vreme (znači login nije uspeo —
-    // ostajemo na /login, što testovi za neuspešan login sami proveravaju).
+    // Wait for the URL to actually CHANGE to /dashboard (success), or for this to time out
+    // (meaning login failed — we stay on /login, which the failed-login tests check themselves).
     await this.page.waitForURL(/\/dashboard/, { timeout: 10000 }).catch(() => {});
   }
 

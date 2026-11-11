@@ -3,10 +3,10 @@ import WebSocket from 'ws';
 import { supabaseAdmin } from './supabaseAdmin';
 
 /**
- * Prijavljuje se kao dati korisnik (pravi signInWithPassword, ne service role) i vraća
- * listu email-ova vozača koje TA osoba stvarno vidi na Fleet mapi — direktno preko iste
- * RLS-zaštićene tabele koju UI koristi, bez klikanja po Leaflet markerima/popup-ovima
- * (ti su nepouzdani za automatizaciju kad ima više markera blizu jedan drugom).
+ * Logs in as the given user (a real signInWithPassword, not service role) and returns
+ * the list of driver emails THAT person actually sees on the Fleet map — directly through
+ * the same RLS-protected table the UI uses, without clicking Leaflet markers/popups
+ * (those are unreliable to automate when several markers are close together).
  */
 export async function getVisibleFleetDriverEmailsAs(email: string, password: string): Promise<string[]> {
   const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!, {
@@ -16,22 +16,22 @@ export async function getVisibleFleetDriverEmailsAs(email: string, password: str
 
   const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
   if (signInError) {
-    throw new Error(`Ne mogu da se ulogujem kao ${email}: ${signInError.message}`);
+    throw new Error(`Unable to log in as ${email}: ${signInError.message}`);
   }
 
   const { data, error } = await supabase.from('active_fleet_locations').select('driver_email');
   if (error) {
-    throw new Error(`Ne mogu da pročitam active_fleet_locations: ${error.message}`);
+    throw new Error(`Unable to read active_fleet_locations: ${error.message}`);
   }
 
   return (data ?? []).map((row) => row.driver_email).filter((email): email is string => !!email);
 }
 
 /**
- * Osigurava da je dati vozač "live" na Fleet mapi: ima otvorenu smenu (time_entries)
- * i svežu lokaciju (location_pings, u poslednjih 10 minuta, kako Fleet mapa zahteva).
- * Koristi service role ključ da zaobiđe RLS (ista pravila koja bi inače zahtevala
- * pravi mobilni clock-in).
+ * Ensures the given driver is "live" on the Fleet map: has an open shift (time_entries)
+ * and a fresh location (location_pings, within the last 10 minutes, as the Fleet map
+ * requires). Uses the service role key to bypass RLS (the same rules that would otherwise
+ * require a real mobile clock-in).
  */
 export async function ensureDriverIsLiveOnFleetMap(driverEmail: string) {
   const supabase = supabaseAdmin();
@@ -43,7 +43,7 @@ export async function ensureDriverIsLiveOnFleetMap(driverEmail: string) {
     .single();
 
   if (userError || !user) {
-    throw new Error(`Ne mogu da nađem vozača sa email-om ${driverEmail}: ${userError?.message}`);
+    throw new Error(`Unable to find driver with email ${driverEmail}: ${userError?.message}`);
   }
 
   const driverId = user.id;
@@ -63,12 +63,12 @@ export async function ensureDriverIsLiveOnFleetMap(driverEmail: string) {
       status: 'open',
     });
     if (clockInError) {
-      throw new Error(`Ne mogu da otvorim smenu za vozača: ${clockInError.message}`);
+      throw new Error(`Unable to open a shift for the driver: ${clockInError.message}`);
     }
   }
 
-  // Mali nasumični pomeraj po vozaču da markeri na mapi ne budu tačno jedan na drugom
-  // (olakšava UI testovima da kliknu na konkretan marker).
+  // Small random offset per driver so markers on the map aren't stacked exactly on top of
+  // each other (makes it easier for UI tests to click a specific marker).
   const jitter = () => (Math.random() - 0.5) * 0.05;
 
   const { error: pingError } = await supabase.from('location_pings').insert({
@@ -79,15 +79,15 @@ export async function ensureDriverIsLiveOnFleetMap(driverEmail: string) {
   });
 
   if (pingError) {
-    throw new Error(`Ne mogu da pošaljem lokaciju za vozača: ${pingError.message}`);
+    throw new Error(`Unable to send a location for the driver: ${pingError.message}`);
   }
 }
 
 /**
- * Uklanja vozača sa Fleet mape (zatvara otvorenu smenu), bez obzira na to da li je
- * trenutno "live". Koristi se da se test-vozač garantovano NE prikazuje na mapi
- * pre testiranja "pojavio se uživo" scenarija — čini test ponovljivim bez obzira
- * na to da li je isti vozač nedavno već bio korišćen u prethodnom pokretanju testa.
+ * Removes a driver from the Fleet map (closes any open shift), regardless of whether they
+ * are currently "live". Used to guarantee the test driver does NOT show up on the map
+ * before testing the "just went live" scenario — makes the test repeatable regardless of
+ * whether the same driver was recently used by a previous test run.
  */
 export async function removeDriverFromFleetMap(driverEmail: string) {
   const supabase = supabaseAdmin();
@@ -99,7 +99,7 @@ export async function removeDriverFromFleetMap(driverEmail: string) {
     .single();
 
   if (userError || !user) {
-    throw new Error(`Ne mogu da nađem vozača sa email-om ${driverEmail}: ${userError?.message}`);
+    throw new Error(`Unable to find driver with email ${driverEmail}: ${userError?.message}`);
   }
 
   const { error } = await supabase
@@ -110,6 +110,6 @@ export async function removeDriverFromFleetMap(driverEmail: string) {
     .is('clock_out_at', null);
 
   if (error) {
-    throw new Error(`Ne mogu da zatvorim smenu vozača: ${error.message}`);
+    throw new Error(`Unable to close the driver's shift: ${error.message}`);
   }
 }

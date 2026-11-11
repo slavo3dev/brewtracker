@@ -22,17 +22,17 @@ test('WEB-RT-13: Add stop requires a client; the machine list is client-scoped',
     await routes.expandFirstRoute();
     await routes.openAddStopForm();
 
-    // Pre izbora klijenta, polje za mašinu je zaključano na "Select a client first".
+    // Before a client is selected, the machine field is locked to "Select a client first".
     await routes.expectMachineRequiresClientFirst();
 
-    // Posle izbora klijenta, lista mašina se puni SAMO mašinama tog klijenta.
+    // After a client is selected, the machine list is populated with ONLY that client's machines.
     await routes.selectStopClient('Italija');
     const machineOptions = await routes.getMachineOptionLabels();
     expect(machineOptions).toContain('Italija Machine');
     expect(machineOptions).not.toContain('Select a client first');
   } finally {
-    // Po noteTag-u, ne "najnovija zakazana" — ako kreiranje nije uspelo (pre try bloka),
-    // "najnovija zakazana ruta za ovog vozača" može biti neka tuđa, nepovezana ruta.
+    // By noteTag, not "latest scheduled" — if creation failed (before the try block), the
+    // "latest scheduled route for this driver" could be someone else's unrelated route.
     const routeId = await getRouteIdByNotes(noteTag);
     if (routeId) await deleteRoute(routeId);
   }

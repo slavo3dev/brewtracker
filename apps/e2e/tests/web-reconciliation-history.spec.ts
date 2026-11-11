@@ -32,7 +32,7 @@ test('WEB-RECH-02: Filtering by driver and date range updates the URL and result
 
   await expect(page).toHaveURL(new RegExp(`driverId=${driverId}.*from=2026-01-01.*to=2026-12-31`));
 
-  // Clear vraća na nefiltriranu listu/URL.
+  // Clear returns to the unfiltered list/URL.
   await page.getByRole('link', { name: 'Clear' }).click();
   await expect(page).toHaveURL(/\/dashboard\/inventory\/reconciliation\/history$/);
 });
@@ -44,18 +44,19 @@ test('WEB-RECH-04: Opening a card shows the full count detail', async ({ page })
 
   await page.goto('/dashboard/inventory/reconciliation/history');
 
-  // Header navigacija (Operations/Inventory/...) TAKOĐE koristi <details> za dropdown meni —
-  // moramo skopirati na listu rekonsilijacija (<section>), inače page.locator('details').first()
-  // pogađa PRVI nav dropdown umesto prve kartice.
+  // The header navigation (Operations/Inventory/...) ALSO uses <details> for its dropdown
+  // menu — we need to scope to the reconciliation list (<section>), otherwise
+  // page.locator('details').first() hits the FIRST nav dropdown instead of the first card.
   const firstCard = page.locator('section').locator('details').first();
   await firstCard.locator('summary').click();
 
-  // Raniji test je proveravao SAMO da labela postoji negde na kartici — to bi prošlo i da je
-  // vrednost pored nje prazna/nedefinisana (npr. da server vrati null gde treba string).
-  // Labela i vrednost su susedni elementi u DOM-u (vidi ReconciliationCard/Metric u
-  // reconciliation/history/page.tsx) — ispod se, pored vidljivosti labele, čita i tekst
-  // SLEDEĆEG sibling elementa i provera da nije prazan. "Confirmed by"/"Confirmed" legitimno
-  // mogu biti "—" (nepotvrđeno) — zato se provera "nije prazan string", ne konkretna vrednost.
+  // The earlier test only checked that a label existed somewhere on the card — that would
+  // pass even if the value next to it were blank/undefined (e.g. if the server returned null
+  // where a string was expected). The label and value are adjacent elements in the DOM (see
+  // ReconciliationCard/Metric in reconciliation/history/page.tsx) — below, in addition to
+  // the label's visibility, we also read the text of the NEXT sibling element and check it
+  // isn't blank. "Confirmed by"/"Confirmed" can legitimately be "—" (unconfirmed) — that's
+  // why we check "isn't a blank string", not a specific value.
   const summaryFieldValue = (label: string) =>
     firstCard.getByText(label, { exact: true }).locator('xpath=following-sibling::div[1]');
 
@@ -68,8 +69,8 @@ test('WEB-RECH-04: Opening a card shows the full count detail', async ({ page })
   await expect(firstCard.getByText('Confirmed', { exact: true })).toBeVisible();
   await expect(summaryFieldValue('Confirmed')).not.toHaveText('');
 
-  // Metric (Expected/Physical/Variance) i Reason su po stavci (proizvodu) — proveravamo PRVU
-  // stavku, isto skopovanje kao u originalnom testu.
+  // Metric (Expected/Physical/Variance) and Reason are per-item (per product) — we check the
+  // FIRST item, the same scoping as in the original test.
   const itemFieldValue = (label: string) =>
     firstCard.getByText(label, { exact: true }).first().locator('xpath=following-sibling::div[1]');
 
@@ -93,7 +94,7 @@ test('WEB-RECH-05: Discrepancy badge and summary totals reflect the variances', 
 
   await page.goto('/dashboard/inventory/reconciliation/history');
 
-  // Summary "Discrepancies" kartica je crvena kad je ukupan broj > 0.
+  // The summary "Discrepancies" card is red when the total is > 0.
   const summaryCards = page.locator('.grid.gap-4.sm\\:grid-cols-3 > div');
   const discrepanciesCard = summaryCards.filter({ hasText: 'Discrepancies' });
   const discrepanciesValue = await discrepanciesCard.locator('div').last().innerText();
@@ -101,18 +102,18 @@ test('WEB-RECH-05: Discrepancy badge and summary totals reflect the variances', 
 
   if (totalDiscrepancies > 0) {
     await expect(discrepanciesCard.locator('div').last()).toHaveClass(/text-red-700/);
-    // Bar jedan bedž na stranici mora da pokazuje crveni "N discrepancy/discrepancies".
+    // At least one badge on the page must show a red "N discrepancy/discrepancies".
     await expect(page.locator('span.bg-red-50', { hasText: /discrepanc/ }).first()).toBeVisible();
   } else {
     await expect(discrepanciesCard.locator('div').last()).not.toHaveClass(/text-red-700/);
   }
 
-  // Raniji test je samo poredio summary broj sa SOPSTVENIM stilom/CSS klasom — nikad nije
-  // nezavisno preračunao ukupan broj iz pojedinačnih bedževa po kartici, pa bi pogrešan
-  // SUMMARY broj (dok su pojedinačni bedževi na karticama ispravni) prošao neopaženo. Svaka
-  // kartica (čak i nerazvijena — bedž je u <summary>, ne u skrivenom delu) nosi SVOJ
-  // "N discrepancy/discrepancies" ili "No discrepancies" bedž; zbir tih brojeva mora da se
-  // poklopi sa summary karticom.
+  // The earlier test only compared the summary number against ITS OWN style/CSS class — it
+  // never independently recomputed the total from the individual per-card badges, so a wrong
+  // SUMMARY number (while the individual card badges were correct) would have gone
+  // unnoticed. Every card (even collapsed — the badge is in the <summary>, not the hidden
+  // part) carries its OWN "N discrepancy/discrepancies" or "No discrepancies" badge; the sum
+  // of those numbers must match the summary card.
   const perCardBadges = page.locator('section details summary span.rounded-full');
   const badgeTexts = await perCardBadges.allInnerTexts();
   expect(badgeTexts.length).toBeGreaterThan(0);
@@ -124,7 +125,7 @@ test('WEB-RECH-05: Discrepancy badge and summary totals reflect the variances', 
   }, 0);
   expect(recomputedTotal).toBe(totalDiscrepancies);
 
-  // Bar jedna kartica sa 0 varijansi mora da pokaže zeleni "No discrepancies" bedž.
+  // At least one card with 0 variances must show a green "No discrepancies" badge.
   await expect(page.getByText('No discrepancies').first()).toBeVisible();
 });
 
@@ -135,8 +136,8 @@ test('WEB-RECH-03: Empty state when filters match nothing', async ({ page }) => 
 
   await page.goto('/dashboard/inventory/reconciliation/history');
 
-  // Opseg datuma iz daleke prošlosti (pre nego što je ova app uopšte postojala) — garantovano
-  // nula poklapanja bez obzira na trenutne podatke.
+  // A date range from the distant past (before this app even existed) — guaranteed zero
+  // matches regardless of the current data.
   await page.locator('input[name="from"]').fill('2000-01-01');
   await page.locator('input[name="to"]').fill('2000-01-02');
   await page.getByRole('button', { name: 'Apply filters' }).click();

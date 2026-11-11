@@ -4,8 +4,8 @@ export class TimeClockReviewPage {
   constructor(private page: Page) {}
 
   async goto() {
-    // Isti razlog kao TimeClockEntriesPage.goto() — ne čekaj da SVE selfie slike završe
-    // učitavanje, samo DOM.
+    // Same reason as TimeClockEntriesPage.goto() — don't wait for ALL selfie images to
+    // finish loading, just the DOM.
     await this.page.goto('/dashboard/time-clock/review', { waitUntil: 'domcontentloaded' });
   }
 
@@ -21,8 +21,8 @@ export class TimeClockReviewPage {
     await expect(this.cardForDriverEmail(email)).toHaveCount(0);
   }
 
-  // Kad isti vozač ima više pending kartica (npr. jedna unutar, jedna van geofence-a),
-  // dodatni tekst (npr. "Outside by") izdvaja TU konkretnu karticu.
+  // When the same driver has several pending cards (e.g. one inside, one outside the
+  // geofence), extra text (e.g. "Outside by") singles out THAT specific card.
   cardForDriverMatching(email: string, extraText: string | RegExp): Locator {
     return this.cardForDriverEmail(email).filter({ hasText: extraText });
   }
@@ -71,8 +71,9 @@ export class TimeClockReviewPage {
     await expect(card.getByText('Clock-in selfie', { exact: true })).toBeVisible();
     const image = card.locator('img');
     await expect(image).toBeVisible();
-    // toBeVisible() prolazi i za pokvarenu sliku (broken img je i dalje "visible" u DOM-u) —
-    // provera da je stvarno učitana (signed URL radi), ne samo da postoji <img> element.
+    // toBeVisible() also passes for a broken image (a broken img is still "visible" in the
+    // DOM) — check that it actually loaded (the signed URL works), not just that an <img>
+    // element exists.
     await expect
       .poll(() => image.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
       .toBe(true);

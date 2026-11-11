@@ -2,8 +2,9 @@ import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 import { WarehousesPage } from '../pages/WarehousesPage';
 
-// Dedicated QA fixture, ne deljen sa drugim test fajlovima (lat/lng/radius mutacije ovde
-// ne utiču na geofence testove u web-timeclock-review.spec.ts, koji koriste Smederevo Warehouse).
+// A dedicated QA fixture, not shared with other test files (the lat/lng/radius mutations
+// here don't affect the geofence tests in web-timeclock-review.spec.ts, which use the
+// Smederevo Warehouse).
 const WAREHOUSE_NAME = 'Genova Test Warehouse';
 const OTHER_WAREHOUSE_NAME = 'Aleksa QA Warehouse';
 
@@ -15,10 +16,11 @@ test('WEB-WH-02: Empty state when there are no warehouses', async () => {
 });
 
 test('WEB-WH-01: Warehouse geofence can be updated and saved', async ({ page }) => {
-  // Istražio sam direktno: menjanje geofence vrednosti na bilo koju NOVU vrednost (probano
-  // i necela, 212.5 ft) ruši stranicu ("This page couldn't load — A server error occurred");
-  // re-submit ISTE, već postojeće necele vrednosti ne ruši. Isti koren problema kao WEB-WH-03.
-  // Test ispod ne koristi test.fail() — namerno PADA (crveno) dok god je ovaj defekt prisutan.
+  // Investigated directly: changing the geofence value to any NEW value (tried with a
+  // fractional one too, 212.5 ft) crashes the page ("This page couldn't load — A server
+  // error occurred"); re-submitting the SAME, already-existing fractional value doesn't
+  // crash. Same root cause as WEB-WH-03. The test below doesn't use test.fail() —
+  // intentionally FAILS (red) for as long as this defect is present.
   test.info().annotations.push({
     type: 'note',
     description:
@@ -32,10 +34,11 @@ test('WEB-WH-01: Warehouse geofence can be updated and saved', async ({ page }) 
   const warehouses = new WarehousesPage(page);
   await warehouses.goto();
 
-  // Radius se bira u odnosu na TRENUTNO upisanu vrednost (ne fiksna konstanta) — inače, čim
-  // se neki run jednom uspešno sačuva na 212.5, svaki sledeći run samo re-submituje ISTU
-  // vrednost i test prestaje da testira update (vidi napomenu gore: resubmit iste vrednosti
-  // ne ruši stranicu, pa bi test lažno prolazio bez stvarne provere).
+  // The radius is chosen relative to the CURRENTLY stored value (not a fixed constant) —
+  // otherwise, once some run successfully saves 212.5, every subsequent run would just
+  // re-submit the SAME value and the test would stop testing the update (see the note above:
+  // resubmitting the same value doesn't crash the page, so the test would falsely pass
+  // without a real check).
   const current = await warehouses.getGeofenceValues(WAREHOUSE_NAME);
   const newValues = {
     latitude: 44.4056,
@@ -52,11 +55,11 @@ test('WEB-WH-01: Warehouse geofence can be updated and saved', async ({ page }) 
 });
 
 test('WEB-WH-03: Invalid geofence values (non-numeric/negative radius) are rejected', async ({ page }) => {
-  // Negativan radijus se ispravno blokira NATIVNOM HTML validacijom (input ima min="1") —
-  // taj deo već radi ispravno. Ali čuvanje VALJANOG, IZMENJENOG radijusa i dalje ruši
-  // stranicu ("This page couldn't load — A server error occurred") — isti koren problema
-  // već dokumentovan u WEB-WH-01. Test ispod ne koristi test.fail() — namerno PADA (crveno)
-  // dok god je ovaj defekt prisutan.
+  // A negative radius is correctly blocked by NATIVE HTML validation (the input has
+  // min="1") — that part already works correctly. But saving a VALID, CHANGED radius still
+  // crashes the page ("This page couldn't load — A server error occurred") — the same root
+  // cause already documented in WEB-WH-01. The test below doesn't use test.fail() —
+  // intentionally FAILS (red) for as long as this defect is present.
   test.info().annotations.push({
     type: 'note',
     description:
@@ -70,11 +73,11 @@ test('WEB-WH-03: Invalid geofence values (non-numeric/negative radius) are rejec
   const warehouses = new WarehousesPage(page);
   await warehouses.goto();
 
-  // 1) Negativan radijus se odbija pre slanja na server.
+  // 1) A negative radius is rejected before being sent to the server.
   await warehouses.attemptNegativeRadius(OTHER_WAREHOUSE_NAME, -50);
   await warehouses.expectRadiusFieldInvalid(OTHER_WAREHOUSE_NAME);
 
-  // 2) Valjan, IZMENJEN radijus se stvarno čuva (ne samo da ne ruši stranicu).
+  // 2) A valid, CHANGED radius is actually saved (not just that it doesn't crash the page).
   const current = await warehouses.getGeofenceValues(OTHER_WAREHOUSE_NAME);
   const newRadius = Number(current.radiusFeet) === 99 ? 101 : 99;
   await warehouses.updateGeofence(OTHER_WAREHOUSE_NAME, {

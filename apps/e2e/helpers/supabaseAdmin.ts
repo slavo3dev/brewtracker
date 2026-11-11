@@ -4,11 +4,12 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { parse as parseEnv } from 'dotenv';
 
-// Ovaj klijent (service-role) zaobilazi SVE RLS provere — testovi rade region-wide auto-close,
-// menjaju globalni review URL, čuvaju inventory baseline-ove itd. Protiv deljenog/pogrešnog
-// projekta ovo bi mogao da pipne tuđe podatke/korisnike. Jedini odobreni projekat je onaj na
-// kom je ova suita stvarno razvijana i verifikovana — fail-closed ako SUPABASE_URL cilja nešto
-// drugo, ili ako se ne poklapa sa projektom koji web app (apps/web) stvarno koristi.
+// This client (service-role) bypasses ALL RLS checks — tests perform region-wide auto-close,
+// change the global review URL, write inventory baselines, etc. Against a shared or wrong
+// project, this could touch other people's data/users. The only approved project is the one
+// this suite was actually developed and verified against — fail-closed if SUPABASE_URL
+// targets something else, or if it doesn't match the project the web app (apps/web) actually
+// uses.
 const ALLOWED_TEST_PROJECT_REF = 'ybsrvlwgnxkutqhmcvdu';
 
 let verified = false;
@@ -50,9 +51,10 @@ export function supabaseAdmin() {
 
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { persistSession: false },
-    // Mi samo upisujemo redove, ne koristimo realtime — ali Supabase klijent inicijalizuje
-    // WebSocket deo čim se napravi, pa mu eksplicitno dajemo 'ws' implementaciju da ne zavisi
-    // od toga koja je verzija Node-a instalirana na mašini koja pokreće testove.
+    // We only write rows here, we don't use realtime — but the Supabase client initializes
+    // its WebSocket part as soon as it's created, so we explicitly give it a 'ws'
+    // implementation so it doesn't depend on which Node version is installed on the machine
+    // running the tests.
     realtime: { transport: WebSocket as unknown as typeof globalThis.WebSocket },
   });
 }

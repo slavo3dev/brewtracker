@@ -26,10 +26,11 @@ export class TechnicalIssuesPage {
     await expect(card.getByRole('button', { name: 'Mark as Resolved' })).toBeDisabled();
   }
 
-  // Čim status postane "resolved", ceo akcioni blok (uključujući i samu "Technical ticket
-  // resolved." poruku) se uklanja iz DOM-a ({ if (isClosed) return null }) — poruka zna da
-  // nestane pre nego što stignemo da je uhvatimo. Krajnje stanje (status + nestale kontrole)
-  // se proverava odvojeno, umesto da se oslanjamo na tu tranzijentnu poruku.
+  // As soon as the status becomes "resolved", the entire action block (including the
+  // "Technical ticket resolved." message itself) is removed from the DOM
+  // ({ if (isClosed) return null }) — the message can disappear before we manage to catch
+  // it. The end state (status + controls gone) is checked separately, instead of relying on
+  // that transient message.
   async resolveTicket(ticketDescription: string) {
     const card = this.ticketCard(ticketDescription);
     await card.getByRole('button', { name: 'Mark as Resolved' }).click();
@@ -63,8 +64,9 @@ export class TechnicalIssuesPage {
   async expectPhotoVisible(ticketDescription: string) {
     const image = this.ticketCard(ticketDescription).locator('img');
     await expect(image).toBeVisible();
-    // Isti razlog kao TimeClockReviewPage/TimeClockEntriesPage: toBeVisible() ne garantuje
-    // da je slika STVARNO učitana (pokvaren signed URL je i dalje "visible" u DOM-u).
+    // Same reason as TimeClockReviewPage/TimeClockEntriesPage: toBeVisible() doesn't
+    // guarantee the image actually LOADED (a broken signed URL is still "visible" in the
+    // DOM).
     await expect
       .poll(() => image.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
       .toBe(true);

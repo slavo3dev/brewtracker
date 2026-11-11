@@ -7,9 +7,9 @@ const QA_DRIVER_ID = process.env.QA_DRIVER_ID!;
 const CLIENT_NAME = 'Genova Test Client';
 const DRIVER_NAME = 'QA Driver Fixture';
 
-// Testovi dele isti client+driver par (jedini garantovano čist od postojeće istorije) za
-// svoje fixture-e — paralelno izvršavanje bi privremeno stvorilo više kartica istovremeno
-// i polomilo lociranje "tačno jedne" kartice.
+// Tests share the same client+driver pair (the only one guaranteed clean of existing
+// history) for their fixtures — running in parallel would temporarily create multiple cards
+// at once and break locating "exactly one" card.
 test.describe.configure({ mode: 'serial' });
 
 test('WEB-SV-05: Empty state when there are no service visits', async () => {
@@ -34,8 +34,9 @@ test('WEB-SV-01: List shows only stops with a recorded arrival', async ({ page }
     const visits = new ServiceVisitsPage(page);
     await visits.goto();
 
-    // "Genova Test Client" nema drugih stanica u ovom fidu (proveren prazan presek pre pisanja
-    // testa) — tačno jedna kartica se očekuje, za upravo kreiranu (dolazak zabeležen) stanicu.
+    // "Genova Test Client" has no other stops in this feed (an empty intersection was
+    // verified before writing the test) — exactly one card is expected, for the
+    // just-created (arrival recorded) stop.
     await expect(visits.visitCard(CLIENT_NAME, DRIVER_NAME)).toHaveCount(1);
   } finally {
     await deleteServiceVisitRoute(arrivedRoute.routeId);
@@ -131,8 +132,8 @@ test('WEB-SV-06: List does not expose photo/signature/drink-count details (docum
     await visits.goto();
     await expect(visits.visitCard(CLIENT_NAME, DRIVER_NAME)).toBeVisible();
 
-    // ServiceVisitCard prikazuje samo Driver/Arrived/Completed/Time on location — nema
-    // slika, potpisa ni drink-count UI-ja nigde na ovoj listi stranici.
+    // ServiceVisitCard only displays Driver/Arrived/Completed/Time on location — there are
+    // no images, signature, or drink-count UI anywhere on this list page.
     await expect(page.locator('article img')).toHaveCount(0);
     await expect(page.getByText('Signature', { exact: false })).toHaveCount(0);
     await expect(page.getByText('Drink Count', { exact: false })).toHaveCount(0);
@@ -142,12 +143,13 @@ test('WEB-SV-06: List does not expose photo/signature/drink-count details (docum
 });
 
 test('WEB-SV-07: A visit is not shown to the manager when the route\'s warehouse has no region set', async ({ page }) => {
-  // Regresiona tabela (napomena uz WEB-TT-10) eksplicitno potvrđuje ovo kao OČEKIVANO
-  // ponašanje, ne kao defekt: "The other 8 are hidden by region rules because the route's
+  // The regression table (note next to WEB-TT-10) explicitly confirms this as EXPECTED
+  // behavior, not a defect: "The other 8 are hidden by region rules because the route's
   // warehouse is outside Italy (...QA Test Warehouse - MOB-CLK-02 with region 'N/A'...)."
-  // RLS politika "Managers can read routes in their region" poredi warehouses.region =
-  // current_user_region() — skladište bez podešenog regiona (NULL) se tretira kao "izvan
-  // regiona" (NULL = 'Italy' nikad nije true), pa menadžer ne vidi tu rutu/stanicu uopšte.
+  // The "Managers can read routes in their region" RLS policy compares warehouses.region =
+  // current_user_region() — a warehouse with no region set (NULL) is treated as "outside
+  // the region" (NULL = 'Italy' is never true), so the manager doesn't see that route/stop
+  // at all.
   const NO_REGION_WAREHOUSE_ID = process.env.QA_NO_REGION_WAREHOUSE_ID!; // "QA Test Warehouse", region: null
   const route = await createServiceVisitStop({
     driverId: QA_DRIVER_ID,

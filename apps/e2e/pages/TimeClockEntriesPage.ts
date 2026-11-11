@@ -4,17 +4,19 @@ export class TimeClockEntriesPage {
   constructor(private page: Page) {}
 
   async goto() {
-    // Stranica NEMA limit (vidi napomenu ispod) i mnogi unosi imaju namerno nepostojeću
-    // selfie putanju (WEB-TCENT-07/WEB-TCREV-05 fixture-i) — default 'load' čeka da SVAKA
-    // slika na stranici završi (ili ne uspe), što raste sa brojem takvih unosa u deljenoj
-    // bazi. Testu treba samo DOM, ne i da sve slike završe učitavanje.
+    // The page has NO limit (see the note below) and many entries have a deliberately
+    // nonexistent selfie path (WEB-TCENT-07/WEB-TCREV-05 fixtures) — the default 'load' waits
+    // for EVERY image on the page to finish (or fail), which grows with the number of such
+    // entries in the shared database. The test only needs the DOM, not for every image to
+    // finish loading.
     try {
       await this.page.goto('/dashboard/time-clock/entries', { waitUntil: 'domcontentloaded' });
     } catch (error) {
-      // WEB-TCENT-04 zove goto() više puta brzo zaredom (DB upis pa odmah ponovo goto, bez UI
-      // interakcije između) — povremeno pogodi poznat Playwright/Chromium kvirk (ERR_ABORTED)
-      // kad nova navigacija na ISTI URL stigne dok prethodna još nije potpuno "slegla". Jedan
-      // retry je dovoljan — ne znači da je stranica stvarno pokvarena.
+      // WEB-TCENT-04 calls goto() several times in quick succession (a DB write, then
+      // immediately goto() again, with no UI interaction in between) — this occasionally hits
+      // a known Playwright/Chromium quirk (ERR_ABORTED) when a new navigation to the SAME URL
+      // arrives before the previous one has fully settled. One retry is enough — it doesn't
+      // mean the page is actually broken.
       if (error instanceof Error && error.message.includes('ERR_ABORTED')) {
         await this.page.goto('/dashboard/time-clock/entries', { waitUntil: 'domcontentloaded' });
       } else {
@@ -23,9 +25,10 @@ export class TimeClockEntriesPage {
     }
   }
 
-  // Stranica NEMA limit — prikazuje CELU istoriju unosa za sve vozače, sortiranu po
-  // clock_in_at opadajuće. Vozač koga koristimo ima stotine starih unosa iz ove sesije, pa
-  // ".first()" (najnoviji clock-in za tog vozača) pouzdano pogađa TEK kreiranu fikstur.
+  // The page has NO limit — it shows the ENTIRE entry history for all drivers, sorted by
+  // clock_in_at descending. The driver we use has hundreds of old entries from this session,
+  // so ".first()" (the most recent clock-in for that driver) reliably matches the
+  // just-created fixture.
   cardForDriverEmail(email: string): Locator {
     return this.page.locator('article').filter({ hasText: email }).first();
   }
@@ -62,8 +65,8 @@ export class TimeClockEntriesPage {
     await expect(card.getByText('Clock-in selfie', { exact: true })).toBeVisible();
     const image = card.locator('img');
     await expect(image).toBeVisible();
-    // Isti razlog kao TimeClockReviewPage: toBeVisible() ne garantuje da je slika STVARNO
-    // učitana (pokvaren signed URL je i dalje "visible" u DOM-u).
+    // Same reason as TimeClockReviewPage: toBeVisible() doesn't guarantee the image
+    // actually LOADED (a broken signed URL is still "visible" in the DOM).
     await expect
       .poll(() => image.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
       .toBe(true);

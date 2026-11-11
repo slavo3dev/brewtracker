@@ -4,9 +4,9 @@ import { ReconciliationPage } from '../pages/ReconciliationPage';
 import { TransfersPage } from '../pages/TransfersPage';
 import { supabaseAdmin } from '../helpers/supabaseAdmin';
 
-// Reconciliation testovi dele iste vozače/baseline-ove u bazi — server ne podnosi
-// dobro konkurentnu potvrdu iste rekonsilijacije (puca umesto čiste greške), pa ovi
-// testovi rade jedan za drugim, ne paralelno.
+// Reconciliation tests share the same drivers/baselines in the database — the server
+// doesn't handle a concurrent confirmation of the same reconciliation well (it crashes
+// instead of a clean error), so these tests run one after another, not in parallel.
 test.describe.configure({ mode: 'serial' });
 
 test('WEB-RECON-01: Reconciliation page loads with a driver selector', async ({ page }) => {
@@ -43,11 +43,12 @@ test('WEB-RECON-09: Confirming a reconciliation saves it as the new baseline', a
   await recon.clickConfirm();
   await recon.expectConfirmed();
 
-  // Sveža provera: ponovo učitaj stranicu, izaberi istog vozača i potvrdi da je EXPECTED ažuriran.
+  // Fresh check: reload the page, select the same driver, and confirm EXPECTED was updated.
   await recon.goto();
   await recon.selectDriverByLabel(`QA Driver Fixture — ${process.env.QA_DRIVER_EMAIL}`);
-  // Jedinica (case/box/bag...) zavisi od toga koji proizvod trenutno sortira prvi u
-  // deljenom katalogu — bitno je da se BROJ 5 perzistira kao nova osnova, ne konkretna jedinica.
+  // The unit (case/box/bag...) depends on which product currently sorts first in the shared
+  // catalog — what matters is that the NUMBER 5 persists as the new baseline, not the
+  // specific unit.
   await recon.expectExpectedValueForFirstProduct(/^5 \S+$/);
 });
 
@@ -58,11 +59,12 @@ test('WEB-RECON-04: Variance is computed live as physical minus expected', async
 
   const recon = new ReconciliationPage(page);
 
-  // Koristi DRUGOG vozača od WEB-RECON-09 (ne driveraleksa) da izbegnemo konkurentnu
-  // potvrdu iste rekonsilijacije kad testovi rade paralelno (server ne podnosi to dobro).
+  // Use a DIFFERENT driver than WEB-RECON-09 (not driveraleksa) to avoid a concurrent
+  // confirmation of the same reconciliation when tests run in parallel (the server doesn't
+  // handle that well).
   const driverLabel = `QA Driver Other Region Fixture — ${process.env.QA_DRIVER_OTHER_REGION_EMAIL}`;
 
-  // Osiguraj da prvi proizvod ima baseline (preduslov za ovaj test).
+  // Make sure the first product has a baseline (a precondition for this test).
   await recon.goto();
   await recon.selectDriverByLabel(driverLabel);
   await recon.enterFirstPhysicalCount('5');
@@ -74,8 +76,8 @@ test('WEB-RECON-04: Variance is computed live as physical minus expected', async
   await recon.selectDriverByLabel(driverLabel);
   const expected = await recon.getFirstProductExpectedQuantity();
 
-  // Unesi fizičko stanje koje je za 2 veće od očekivanog i proveri da se varijansa
-  // odmah prikaže (bez slanja forme) kao razlika physical - expected.
+  // Enter a physical count that's 2 greater than expected and check that the variance
+  // displays immediately (without submitting the form) as physical - expected.
   await recon.enterFirstPhysicalCount(String(expected + 2));
   await recon.expectVarianceForFirstProduct(/^\+2 \S+$/);
 });
@@ -97,7 +99,7 @@ test('WEB-RECON-10: Expected quantity becomes the confirmed count after confirma
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   const recon = new ReconciliationPage(page);
-  // Treći, zaseban vozač (ne koristi se u RECON-09/04) da izbegnemo konkurentnu potvrdu.
+  // A third, separate driver (not used in RECON-09/04) to avoid a concurrent confirmation.
   const driverLabel = `QA Driver Refresh Fixture — ${process.env.QA_DRIVER_REFRESH_TEST_EMAIL}`;
   const confirmedCount = '9';
 
@@ -122,7 +124,7 @@ test('WEB-RECON-11: Later movements change the expected quantity', async ({ page
   const recon = new ReconciliationPage(page);
   const driverLabel = `QA Driver Fixture — ${process.env.QA_DRIVER_EMAIL}`;
 
-  // 1) Uspostavi poznatu osnovu (baseline).
+  // 1) Establish a known baseline.
   await recon.goto();
   await recon.selectDriverByLabel(driverLabel);
   await recon.enterFirstPhysicalCount('5');
@@ -135,7 +137,7 @@ test('WEB-RECON-11: Later movements change the expected quantity', async ({ page
   const baseline = await recon.getFirstProductExpectedQuantity();
   expect(baseline).toBe(5);
 
-  // 2) Nova isporuka vozaču POSLE potvrđene osnove (bez nove rekonsilijacije).
+  // 2) A new delivery to the driver AFTER the confirmed baseline (without a new reconciliation).
   const transfers = new TransfersPage(page);
   await transfers.goto();
   await transfers.selectWarehouse('Milano Warehouse — Italy');
@@ -145,9 +147,10 @@ test('WEB-RECON-11: Later movements change the expected quantity', async ({ page
   await transfers.submit();
   await transfers.expectProductsIssuedSuccessfully(1);
 
-  // "Expected" je u BAZNIM jedinicama (npr. sleeve), dok se transfer unosi u issue
-  // jedinicama (npr. box) — moramo pomnožiti sa units_per_issue_unit tog proizvoda
-  // (prvi proizvod po istom sort_order/name redosledu kao i na reconciliation/transfer stranicama).
+  // "Expected" is in BASE units (e.g. sleeve), while the transfer is entered in issue
+  // units (e.g. box) — we need to multiply by that product's units_per_issue_unit
+  // (the first product, in the same sort_order/name order as on the reconciliation/transfer
+  // pages).
   const supabase = supabaseAdmin();
   const { data: firstProduct } = await supabase
     .from('inventory_products')
@@ -159,7 +162,8 @@ test('WEB-RECON-11: Later movements change the expected quantity', async ({ page
     .single();
   const unitsPerIssueUnit = firstProduct!.units_per_issue_unit as number;
 
-  // 3) Expected na reconciliation stranici treba da odražava bazu + novi pokret, bez nove potvrde.
+  // 3) Expected on the reconciliation page should reflect the baseline + the new movement,
+  // without a new confirmation.
   await recon.goto();
   await recon.selectDriverByLabel(driverLabel);
   const expectedAfterTransfer = await recon.getFirstProductExpectedQuantity();
@@ -172,7 +176,8 @@ test('WEB-RECON-03: A product with no baseline shows "No baseline"', async ({ pa
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
   const recon = new ReconciliationPage(page);
-  // Dedikovan vozač za koji NIKADA ne potvrđujemo rekonsilijaciju — ostaje trajno bez osnove.
+  // A dedicated driver for whom we NEVER confirm a reconciliation — remains permanently
+  // without a baseline.
   const driverLabel = `QA USR-01 Test User — ${process.env.QA_DRIVER_RECON_NOBASELINE_EMAIL}`;
 
   await recon.goto();
@@ -194,7 +199,7 @@ test('WEB-RECON-06: Only counted products are included in the review', async ({ 
 
   await recon.goto();
   await recon.selectDriverByLabel(driverLabel);
-  // Unesi count za TAČNO 2 proizvoda, ostale ostavi prazne.
+  // Enter a count for EXACTLY 2 products, leave the rest blank.
   await recon.enterPhysicalCountForRow(0, '4');
   await recon.enterPhysicalCountForRow(1, '2');
   await recon.clickReview();
@@ -215,15 +220,15 @@ test('WEB-RECON-07: Invalid physical quantity is rejected', async ({ page }) => 
 
   const { blockedNatively } = await recon.attemptNegativePhysicalCount('-5');
   if (blockedNatively) {
-    // Browser (min="0") je blokirao submit pre nego što je ikada stigao do JS validacije.
+    // The browser (min="0") blocked submission before it ever reached JS validation.
     expect(blockedNatively).toBe(true);
   } else {
-    // JS validacija u formi je uhvatila negativnu vrednost.
+    // The form's JS validation caught the negative value.
     await expect(page.getByText('enter a valid physical quantity.', { exact: false })).toBeVisible();
   }
-  // Review ekran se ne prikazuje u oba slučaja — "Back to edit" postoji SAMO na review
-  // ekranu (submit dugme na formi takođe ima tekst "Review reconciliation", pa taj tekst
-  // sam po sebi nije pouzdan indikator da li smo prešli na review korak).
+  // The review screen doesn't appear in either case — "Back to edit" exists ONLY on the
+  // review screen (the form's submit button also has the text "Review reconciliation", so
+  // that text alone isn't a reliable indicator of whether we moved to the review step).
   await expect(page.getByRole('button', { name: 'Back to edit' })).toHaveCount(0);
 });
 
@@ -249,7 +254,7 @@ test('WEB-RECON-12: Reason and notes are saved with the reconciliation', async (
   await recon.expectConfirmed();
   await recon.expectReviewContainsReason(reasonText);
 
-  // Istorija: razlog i napomene se vide i tamo.
+  // History: the reason and notes are also visible there.
   await page.goto('/dashboard/inventory/reconciliation/history');
   const card = page.locator('details').filter({ hasText: 'QA USR-01 Test User' }).first();
   await card.locator('summary').click();

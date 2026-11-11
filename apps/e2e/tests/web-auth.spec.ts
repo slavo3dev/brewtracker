@@ -49,8 +49,9 @@ test('WEB-AUTH-02: Login is blocked with empty fields', async ({ page }) => {
   await login.goto();
   await page.getByRole('button', { name: 'Sign in' }).click();
 
-  // "email"/"password" imaju HTML required atribut — browser blokira submit pre nego
-  // što ikada stigne do servera (ista "Select a warehouse."-tipa provera kao na drugim formama).
+  // "email"/"password" have an HTML required attribute — the browser blocks submission
+  // before it ever reaches the server (the same "Select a warehouse."-type check as on
+  // other forms).
   const emailInput = page.locator('#email');
   await expect.poll(() => emailInput.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
   await expect(page).toHaveURL(/\/login/);
@@ -78,7 +79,7 @@ test('WEB-AUTH-08: Forgot password is blocked with an empty email', async ({ pag
   const emailField = page.locator('input[type="email"]');
   await page.getByRole('button', { name: 'Send reset link' }).click();
 
-  // "email" ima HTML required atribut — ista client-side blokada kao na login formi.
+  // "email" has an HTML required attribute — the same client-side block as on the login form.
   await expect.poll(() => emailField.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
 });
 
@@ -93,9 +94,10 @@ test('WEB-AUTH-14: Active manager can access /dashboard/users', async ({ page })
 });
 
 test('WEB-AIQ-02: /ai-quality is accessible without authentication', async ({ page }) => {
-  // Raniji test je bio ČISTO negativan (samo "nije /login") — to bi prošlo i da je stranica
-  // vratila 404/prazan odgovor, dokle god URL ne sadrži "/login". Dodata je i pozitivna provera
-  // da je STVARAN sadržaj stranice renderovan (naslov jedinstven za ovu stranicu).
+  // The earlier test was PURELY negative (only "isn't /login") — that would pass even if the
+  // page returned a 404/empty response, as long as the URL didn't contain "/login". A
+  // positive check was added to verify REAL page content is rendered (a heading unique to
+  // this page).
   await page.goto('/ai-quality');
   await expect(page).not.toHaveURL(/\/login/);
   await expect(
@@ -112,8 +114,9 @@ test('WEB-AIQ-01: /ai-quality shows static cards with no functional queue', asyn
 });
 
 test('WEB-AUTH-16: /api/users endpoints reject non-user-manager accounts', async ({ page }) => {
-  // Driver: pokušaj logina ga odjavljuje (ne može na web dashboard uopšte), pa je ovo i test
-  // da poziv bez validne admin sesije ne vraća korisničke podatke.
+  // Driver: attempting to log in signs them back out (they can't reach the web dashboard at
+  // all), so this also tests that a call without a valid admin session doesn't return user
+  // data.
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_DRIVER_EMAIL!, process.env.QA_DRIVER_PASSWORD!);
@@ -122,7 +125,7 @@ test('WEB-AUTH-16: /api/users endpoints reject non-user-manager accounts', async
   expect(deniedResponse.headers()['content-type']).not.toContain('application/json');
   expect(deniedResponse.url()).toContain('/login');
 
-  // Kontrola: manager ISTIM pozivom dobija prave JSON podatke.
+  // Control: a manager gets real JSON data back from the SAME call.
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
@@ -142,20 +145,20 @@ test('WEB-NA-02: No admin UI exists to configure the Google review URL (document
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
-  // Jedina "settings"-tipa administrativna stranica u čitavom dashboard-u je Clock Rules
-  // (/dashboard/time-clock/settings) — nigde u kodu (grep po celom apps/web/src) ne postoji
-  // UI komponenta koja referenciše app_settings.google_review_url, samo read-only
-  // getGoogleReviewUrl() na javnoj survey stranici. Vrednost se trenutno menja isključivo
-  // direktno u Supabase-u.
+  // The only "settings"-type administrative page in the entire dashboard is Clock Rules
+  // (/dashboard/time-clock/settings) — nowhere in the code (grepping all of apps/web/src) is
+  // there a UI component that references app_settings.google_review_url, only the read-only
+  // getGoogleReviewUrl() on the public survey page. The value is currently changed only
+  // directly in Supabase.
   await page.goto('/dashboard/time-clock/settings');
   await expect(page.getByText(/google review/i)).toHaveCount(0);
 });
 
 test('WEB-AUTH-07: Forgot password sends a reset email for a valid address', async ({ page }) => {
-  // Napomena: resetPasswordForEmail() stvarno šalje email, pa podleže istom Supabase
-  // rate-limitu na ovom deljenom QA projektu kao WEB-USR-01 — povremeno može pasti sa
-  // "Unable to send reset email." čak i kad je kod ispravan (regresioni plan ovo vodi
-  // kao Pass, za razliku od WEB-USR-01 koji je dokumentovan kao stvaran defekt).
+  // Note: resetPasswordForEmail() actually sends an email, so it's subject to the same
+  // Supabase rate limit on this shared QA project as WEB-USR-01 — it can occasionally fail
+  // with "Unable to send reset email." even when the code is correct (the regression plan
+  // tracks this as a Pass, unlike WEB-USR-01 which is documented as a real defect).
   test.info().annotations.push({
     type: 'note',
     description:
@@ -170,8 +173,9 @@ test('WEB-AUTH-07: Forgot password sends a reset email for a valid address', asy
 });
 
 test('WEB-AUTH-10: New password shorter than 8 characters is rejected', async ({ page }) => {
-  // Validacija dužine se dešava u server akciji PRE bilo kakvog Supabase auth poziva — forma
-  // je dostupna i bez aktivne recovery sesije, pa ne treba pravi reset link za ovaj slučaj.
+  // Length validation happens in the server action BEFORE any Supabase auth call — the form
+  // is accessible even without an active recovery session, so a real reset link isn't needed
+  // for this case.
   await page.goto('/reset-password/update');
   await page.locator('input[name="password"]').fill('short1');
   await page.locator('input[name="confirmPassword"]').fill('short1');
@@ -190,12 +194,12 @@ test('WEB-AUTH-11: Password confirmation mismatch is rejected', async ({ page })
 });
 
 test('WEB-AUTH-09: Reset link routes through /auth/recovery to /reset-password/update', async ({ page }) => {
-  // AŽURIRANO (app update): redirectTo za recovery link promenjen sa
-  // /auth/callback?next=/reset-password/update na /auth/recovery — nova ruta čita
-  // token_hash iz query stringa, upisuje ga u HttpOnly kolačić, i redirektuje na
-  // /reset-password/update (vidi apps/web/src/app/auth/recovery/route.ts).
-  // NAPOMENA: ova ruta još NIJE deployed na produkciju u trenutku pisanja ovog testa —
-  // vraća 404 dok se dev grana ne deployuje.
+  // UPDATED (app update): redirectTo for the recovery link changed from
+  // /auth/callback?next=/reset-password/update to /auth/recovery — the new route reads
+  // token_hash from the query string, writes it to an HttpOnly cookie, and redirects to
+  // /reset-password/update (see apps/web/src/app/auth/recovery/route.ts).
+  // NOTE: this route was NOT YET deployed to production at the time this test was written —
+  // returns 404 until the dev branch is deployed.
   const email = `qa-auth-09-${Date.now()}@brewtracker.com`;
   const userId = await createTestUser({
     email,
@@ -216,13 +220,14 @@ test('WEB-AUTH-09: Reset link routes through /auth/recovery to /reset-password/u
 });
 
 test('WEB-AUTH-12: Successful password reset shows confirmation and the new password works on next login', async ({ page }) => {
-  // AŽURIRANO (app update): ceo recovery mehanizam je prepravljen — token_hash sada stiže
-  // kao query parametar (ne URL hash fragment) preko /auth/recovery, čuva se u HttpOnly
-  // kolačiću, i server akcija ga razmenjuje za sesiju preko verifyOtp() — STARI poznati
-  // defekt (hash fragment se nikad nije obrađivao) je ovim rešen u korenu. Redirect posle
-  // uspešnog čuvanja lozinke je takođe promenjen: sa /login na /reset-password/success.
-  // NAPOMENA: još NIJE deployed na produkciju u trenutku pisanja ovog testa — 404 dok se
-  // dev grana ne deployuje; verifikovati empirijski čim bude dostupno.
+  // UPDATED (app update): the entire recovery mechanism was reworked — token_hash now
+  // arrives as a query parameter (not a URL hash fragment) via /auth/recovery, is stored in
+  // an HttpOnly cookie, and the server action exchanges it for a session via verifyOtp() —
+  // the OLD known defect (the hash fragment was never processed) is fixed at the root by
+  // this. The redirect after successfully saving the password also changed: from /login to
+  // /reset-password/success.
+  // NOTE: NOT YET deployed to production at the time this test was written — 404 until the
+  // dev branch is deployed; verify empirically once it's available.
   const email = `qa-auth-12-${Date.now()}@brewtracker.com`;
   const userId = await createTestUser({
     email,
@@ -244,8 +249,9 @@ test('WEB-AUTH-12: Successful password reset shows confirmation and the new pass
     await expect(page).toHaveURL(/\/reset-password\/success/);
     await expect(page.getByText('Password saved')).toBeVisible();
 
-    // Nova lozinka stvarno radi za sledeći login (i korisnik je odjavljen, ne i dalje ulogovan
-    // u staroj sesiji — recovery sesija se eksplicitno gasi sa signOut({scope:'local'})).
+    // The new password actually works for the next login (and the user is signed out, not
+    // still logged into the old session — the recovery session is explicitly ended with
+    // signOut({scope:'local'})).
     const login = new LoginPage(page);
     await login.goto();
     await login.login(email, 'NewValidPass123');

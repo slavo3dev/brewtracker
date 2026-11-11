@@ -7,13 +7,14 @@ import {
   setGoogleReviewUrl,
 } from '../helpers/surveySeed';
 
-// Testovi koji STVARNO šalju ocenu (SURV-05/06/08) rade sa svežim, jednokratnim
-// fixture tokenom — isti summary ne sme da se deli sa WEB-SURV-01 jer bi submit
-// trajno "potrošio" taj token (postaje "already answered").
+// Tests that ACTUALLY submit a rating (SURV-05/06/08) run with a fresh, one-time
+// fixture token — the same summary must not be shared with WEB-SURV-01, because
+// submitting would permanently "consume" that token (it becomes "already answered").
 test.describe.configure({ mode: 'serial' });
 
 test('WEB-SURV-01: Valid survey token shows the rating form', async ({ page }) => {
-  // Ne šalje ocenu, pa je token bezbedno koristiti samo za ovaj test (ne mora deljeni fixture).
+  // Doesn't submit a rating, so it's safe to use this token for just this test (no shared
+  // fixture needed).
   const token = await createFreshSurveyToken();
   const survey = new SurveyPage(page);
   await survey.goto(token);
@@ -22,7 +23,7 @@ test('WEB-SURV-01: Valid survey token shows the rating form', async ({ page }) =
 
 test('WEB-SURV-02: Non-existent token is rejected on submit', async ({ page }) => {
   const survey = new SurveyPage(page);
-  // Nepostojeći token se odbija odmah na učitavanju stranice (ne tek na submit-u).
+  // A nonexistent token is rejected immediately on page load (not only on submit).
   await survey.goto('00000000-0000-4000-8000-000000000000');
   await survey.expectInvalidTokenError();
 });
@@ -64,8 +65,8 @@ test('WEB-SURV-08: Resubmitting an already-answered survey link shows the "alrea
   await survey.submitRating();
   await survey.expectThankYouWithoutGoogleReview();
 
-  // Ponovna poseta istom linku i pokušaj slanja DRUGE ocene — mora da se ponaša
-  // identično bez obzira na novoizabranu ocenu.
+  // Revisiting the same link and attempting to submit a DIFFERENT rating — must behave
+  // identically regardless of the newly selected rating.
   await survey.revisit();
   await survey.selectRating(5);
   await survey.submitRating();
@@ -84,21 +85,22 @@ test('WEB-SURV-04: Each star click correctly highlights the stars and updates ar
 });
 
 test('WEB-SURV-10: Rating outside the 1-5 range is rejected at the database level (forged request)', async () => {
-  // Regresiona tabela sama priznaje da ovo nikad nije direktno probano ("not exercised
-  // separately") — UI onemogućava bilo koju vrednost osim 1-5 (vidi WEB-SURV-04), pa
-  // umesto pokušaja da se replicira fragilan Next.js server-action poziv, ovo direktno
-  // testira CHECK constraint (rating between 1 and 5) na service_visit_surveys tabeli —
-  // stvarna krajnja linija odbrane, koja važi bez obzira na to odakle zahtev stiže.
+  // The regression table itself admits this was never directly exercised ("not exercised
+  // separately") — the UI prevents any value other than 1-5 (see WEB-SURV-04), so instead of
+  // trying to replicate a fragile Next.js server-action call, this directly tests the CHECK
+  // constraint (rating between 1 and 5) on the service_visit_surveys table — the real last
+  // line of defense, which holds regardless of where the request comes from.
   //
-  // NAPOMENA (poznato ograničenje, ne test bug): ovaj test NE pokriva da li submitSurvey()
-  // server akcija (apps/web/src/app/survey/[token]/actions.ts) i dalje sama validira
-  // 1-5 opseg — samo poslednju liniju odbrane (DB constraint). submitSurvey() je Next.js
-  // server akcija ("use server") pozvana direktno iz klijentske komponente — ne postoji
-  // dostupan HTTP endpoint koji bi se mogao gađati nezavisno od UI-ja bez reverse-engineering-a
-  // Next-ovog internog "Next-Action" wire formata (nestabilno između verzija Next.js-a, loša
-  // inženjerska praksa za regresioni test). Dok god se ne doda testabilan hook u app kodu (van
-  // dozvoljenog opsega ove izmene — menja se samo test kod), app-layer validacija ostaje
-  // pokrivena SAMO indirektno, kroz UI nemogućnost da se uopšte pošalje van-opsega vrednost.
+  // NOTE (a known limitation, not a test bug): this test does NOT cover whether the
+  // submitSurvey() server action (apps/web/src/app/survey/[token]/actions.ts) still validates
+  // the 1-5 range itself — only the last line of defense (the DB constraint). submitSurvey()
+  // is a Next.js server action ("use server") called directly from a client component —
+  // there's no available HTTP endpoint that could be targeted independently of the UI without
+  // reverse-engineering Next's internal "Next-Action" wire format (unstable across Next.js
+  // versions, poor engineering practice for a regression test). Until a testable hook is
+  // added in the app code (outside the allowed scope of this change — only test code is
+  // being changed), app-layer validation remains covered ONLY indirectly, through the UI's
+  // inability to submit an out-of-range value at all.
   const token = await createFreshSurveyToken();
 
   for (const invalidRating of [0, 6, -1]) {
@@ -108,9 +110,9 @@ test('WEB-SURV-10: Rating outside the 1-5 range is rejected at the database leve
 });
 
 test('WEB-SURV-03: Submit is blocked with no rating selected', async ({ page }) => {
-  // "Submit rating" ima disabled={!selectedRating || pending} — dugme je NATIVNO
-  // onemogućeno dok ocena nije izabrana (ne može se ni kliknuti), umesto da se klikom
-  // tek na submit-u pokaže greška.
+  // "Submit rating" has disabled={!selectedRating || pending} — the button is NATIVELY
+  // disabled until a rating is selected (it can't even be clicked), instead of showing an
+  // error only after clicking submit.
   const token = await createFreshSurveyToken();
   const survey = new SurveyPage(page);
   await survey.goto(token);
@@ -147,14 +149,14 @@ test('WEB-SURV-09: Concurrent duplicate submission is handled without crashing',
     await survey1.selectRating(4);
     await survey2.selectRating(5);
 
-    // Skoro istovremeno slanje za ISTI token — DB unique constraint je poslednja
-    // odbrana; jedan zahtev uspeva ("created"), drugi se gracefully tretira kao
-    // already_submitted (ne tvrd pad/generic error).
+    // Near-simultaneous submission for the SAME token — the DB unique constraint is the
+    // last line of defense; one request succeeds ("created"), the other is gracefully
+    // treated as already_submitted (not a hard crash/generic error).
     await Promise.all([survey1.submitRating(), survey2.submitRating()]);
 
-    // Sačekaj da obe strane STVARNO završe (React state + re-render posle server akcije) —
-    // čitanje innerText() odmah posle klika može uhvatiti stranicu pre nego što je odgovor
-    // stigao, pre bilo kog od dva krajnja stanja.
+    // Wait for both sides to ACTUALLY finish (React state + re-render after the server
+    // action) — reading innerText() right after the click can catch the page before the
+    // response has arrived, before either of the two final states.
     const outcomeVisible = (p: typeof page) =>
       expect(
         p.getByText('Thank you.', { exact: true }).or(p.getByText('Feedback already received')),

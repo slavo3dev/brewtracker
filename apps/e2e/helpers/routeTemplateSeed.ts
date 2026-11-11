@@ -1,12 +1,12 @@
 import { supabaseAdmin } from './supabaseAdmin';
 
 /**
- * Direktno (preko baze) deaktivira i briše sve route_templates čiji naziv počinje
- * datim prefiksom. Koristi se kao garantovani cleanup (u finally bloku) za testove
- * koji namerno prave driver+day+machine konflikte — ako test padne NA POLA (npr. zbog
- * pogrešnog očekivanog teksta), UI-bazirani cleanup na kraju testa se nikad ne izvrši i
- * aktivan template ostaje trajno "zauzet", blokirajući SVAKO naredno pokretanje istog
- * test slučaja istom greškom.
+ * Directly (via the database) deactivates and deletes all route_templates whose name
+ * starts with the given prefix. Used as a guaranteed cleanup (in a finally block) for
+ * tests that deliberately create driver+day+machine conflicts — if a test fails PARTWAY
+ * through (e.g. due to a wrong expected text), the UI-based cleanup at the end of the test
+ * never runs, and an active template stays permanently "occupied", blocking EVERY
+ * subsequent run of the same test case with the same error.
  */
 export async function forceCleanupTemplates(namePrefixes: string[]) {
   const supabase = supabaseAdmin();
@@ -20,7 +20,7 @@ export async function getTemplateIdByName(name: string): Promise<string> {
   const supabase = supabaseAdmin();
   const { data, error } = await supabase.from('route_templates').select('id').eq('name', name).single();
   if (error || !data) {
-    throw new Error(`Ne mogu da nađem route template: ${error?.message}`);
+    throw new Error(`Unable to find route template: ${error?.message}`);
   }
   return data.id;
 }
@@ -33,14 +33,16 @@ type GeneratedRoute = {
   stops_created: number;
 };
 
-// RPC koji inače pokreće dnevni cron — poziva se direktno (preko servisne role) da bi se
-// deterministički testiralo ROUTE-6 pravilo (generisanje se preskače kad već postoji
-// nepotkazana operativna ruta za istog vozača/datum sa istom mašinom ili istim klijentom).
+// The RPC that normally powers the daily cron job — called directly (via the service role)
+// so that the ROUTE-6 rule can be tested deterministically (generation is skipped when a
+// non-cancelled operational route already exists for the same driver/date with the same
+// machine or client).
 //
-// p_template_id je opcioni parametar (migracija 20261104171218) — kad se prosledi, RPC
-// generiše SAMO za taj template, ne za sve aktivne template-e tog dana (što bi inače,
-// pozvano iz testa, pokretalo realno generisanje ruta i za tuđe, nepovezane template-e).
-// Cron i dalje zove RPC sa samo datumom — default null čuva identično ponašanje za njega.
+// p_template_id is an optional parameter (migration 20261104171218) — when passed, the RPC
+// generates ONLY for that template, not for every active template that day (which, if
+// called from a test, would otherwise trigger real route generation for other, unrelated
+// templates too). The cron job still calls the RPC with only a date — the default null
+// preserves identical behavior for it.
 export async function generateRoutesFromTemplates(
   routeDateIso: string,
   templateId?: string,
@@ -51,7 +53,7 @@ export async function generateRoutesFromTemplates(
     p_template_id: templateId ?? null,
   });
   if (error) {
-    throw new Error(`RPC generate_routes_from_templates nije uspeo: ${error.message}`);
+    throw new Error(`RPC generate_routes_from_templates failed: ${error.message}`);
   }
   return (data ?? []) as GeneratedRoute[];
 }

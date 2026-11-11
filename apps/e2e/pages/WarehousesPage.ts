@@ -20,8 +20,9 @@ export class WarehousesPage {
     await form.locator('input[name="longitude"]').fill(String(values.longitude));
     await form.locator('input[name="radiusFeet"]').fill(String(values.radiusFeet));
 
-    // Server action submit (action={updateWarehouseGeofenceAction}) ne menja URL — čekamo
-    // na POST da se ne vrati PRE nego što je čuvanje (ili server greška) stvarno gotovo.
+    // Server action submit (action={updateWarehouseGeofenceAction}) doesn't change the URL —
+    // we wait for the POST so we don't return BEFORE saving (or a server error) has actually
+    // finished.
     const saved = this.page.waitForResponse(
       (response) => response.request().method() === 'POST' && response.url().includes('/dashboard/inventory/warehouses'),
     );

@@ -12,8 +12,8 @@ export class TimeClockSettingsPage {
   }
 
   async expectResultMessage(expectedText: string | RegExp) {
-    // Server akcija + redirect + re-render pod opterećenjem (naročito --headed) ponekad
-    // traje duže od podrazumevanog 5s.
+    // The server action + redirect + re-render under load (especially in --headed mode)
+    // sometimes takes longer than the default 5s.
     await expect(this.page.getByText(expectedText)).toBeVisible({ timeout: 10000 });
   }
 }

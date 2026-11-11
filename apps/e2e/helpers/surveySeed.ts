@@ -2,9 +2,9 @@ import { randomUUID } from 'crypto';
 import { supabaseAdmin } from './supabaseAdmin';
 
 /**
- * Pravi svež service_visit_summaries red sa jedinstvenim survey_token-om, tako da
- * testovi koji STVARNO šalju ocenu (SURV-05/06/08...) ne troše deljeni fixture token
- * korišćen od strane testova koji samo proveravaju da forma renderuje (SURV-01).
+ * Creates a fresh service_visit_summaries row with a unique survey_token, so that tests
+ * which ACTUALLY submit a rating (SURV-05/06/08...) don't consume the shared fixture token
+ * used by tests that only check the form renders (SURV-01).
  */
 export async function createFreshSurveyToken(): Promise<string> {
   const supabase = supabaseAdmin();
@@ -19,7 +19,7 @@ export async function createFreshSurveyToken(): Promise<string> {
     .single();
 
   if (stopError || !stop) {
-    throw new Error(`Ne mogu da nađem stanicu za survey fixture: ${stopError?.message}`);
+    throw new Error(`Unable to find a stop for the survey fixture: ${stopError?.message}`);
   }
 
   const { error } = await supabase.from('service_visit_summaries').insert({
@@ -34,16 +34,17 @@ export async function createFreshSurveyToken(): Promise<string> {
   });
 
   if (error) {
-    throw new Error(`Ne mogu da napravim survey fixture: ${error.message}`);
+    throw new Error(`Unable to create the survey fixture: ${error.message}`);
   }
 
   return token;
 }
 
 /**
- * Simulira forged request koji zaobilazi UI/server akciju i pokušava direktan insert u
- * service_visit_surveys sa proizvoljnim rating-om — koristi se da provери da je rating
- * ograničenje (1-5) sprovedeno na nivou baze (CHECK constraint), ne samo u formi.
+ * Simulates a forged request that bypasses the UI/server action and attempts a direct
+ * insert into service_visit_surveys with an arbitrary rating — used to verify that the
+ * rating constraint (1-5) is enforced at the database level (CHECK constraint), not just
+ * in the form.
  */
 export async function attemptForgedSurveyInsert(token: string, rating: number): Promise<{ error: string | null }> {
   const supabase = supabaseAdmin();
@@ -55,7 +56,7 @@ export async function attemptForgedSurveyInsert(token: string, rating: number): 
     .single();
 
   if (summaryError || !summary) {
-    throw new Error(`Ne mogu da nađem summary za token: ${summaryError?.message}`);
+    throw new Error(`Unable to find summary for token: ${summaryError?.message}`);
   }
 
   const { error } = await supabase.from('service_visit_surveys').insert({
@@ -67,8 +68,9 @@ export async function attemptForgedSurveyInsert(token: string, rating: number): 
 }
 
 /**
- * app_settings je JEDAN deljeni red za celu aplikaciju — čita trenutnu vrednost da bi
- * test mogao da je vrati nazad nakon što završi (ne ostavlja trajnu promenu globalnog podešavanja).
+ * app_settings is a SINGLE shared row for the whole application — reads the current value
+ * so the test can restore it afterward (doesn't leave a permanent change to a global
+ * setting).
  */
 export async function getGoogleReviewUrl(): Promise<string | null> {
   const supabase = supabaseAdmin();
@@ -79,7 +81,7 @@ export async function getGoogleReviewUrl(): Promise<string | null> {
     .maybeSingle();
 
   if (error) {
-    throw new Error(`Ne mogu da pročitam app_settings: ${error.message}`);
+    throw new Error(`Unable to read app_settings: ${error.message}`);
   }
   return data?.google_review_url ?? null;
 }
@@ -92,6 +94,6 @@ export async function setGoogleReviewUrl(url: string | null) {
     .eq('id', true);
 
   if (error) {
-    throw new Error(`Ne mogu da postavim app_settings.google_review_url: ${error.message}`);
+    throw new Error(`Unable to set app_settings.google_review_url: ${error.message}`);
   }
 }

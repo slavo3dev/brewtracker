@@ -2,10 +2,10 @@ import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 import { createTestClient, deleteTestClient } from '../helpers/clientSeed';
 
-// NOVA FUNKCIONALNOST (app update, dev grana) — /dashboard/clients. Server zahteva da
-// manager kreira/menja klijente ISKLJUČIVO u svom dodeljenom regionu (vidi client-actions.ts
-// "You can only create/edit clients in your assigned region") — svi fixture-i koje manager
-// treba da vidi/menja moraju imati region='Italy' (isti kao QA_MANAGER).
+// NEW FUNCTIONALITY (app update, dev branch) — /dashboard/clients. The server requires that
+// a manager create/edit clients ONLY in their assigned region (see client-actions.ts
+// "You can only create/edit clients in your assigned region") — every fixture the manager
+// needs to see/edit must have region='Italy' (the same as QA_MANAGER).
 
 test('WEB-CLI-01: /dashboard/clients requires inventory manager access (manager/CEO)', async ({ page }) => {
   await page.goto('/dashboard/clients');
@@ -15,10 +15,11 @@ test('WEB-CLI-01: /dashboard/clients requires inventory manager access (manager/
   await login.goto();
   await login.login(process.env.QA_DRIVER_EMAIL!, process.env.QA_DRIVER_PASSWORD!);
   await page.goto('/dashboard/clients');
-  // Prethodno: /\/login|\/dashboard$/ — ta OR regularna varijanta bi i dalje PROŠLA da je
-  // regresija pustila vozača na /dashboard umesto da ga odbije na /login (requireInventoryManager()
-  // prvo zove requireAdmin(), koji vozača UVEK vraća na /login, isto kao WEB-AUTH-05) — ovde
-  // tražimo ISKLJUČIVO /login, da test stvarno padne ako ta zaštita ikad popusti.
+  // Previously: /\/login|\/dashboard$/ — that OR regex variant would still have PASSED if a
+  // regression let the driver reach /dashboard instead of being rejected to /login
+  // (requireInventoryManager() first calls requireAdmin(), which ALWAYS sends a driver back
+  // to /login, same as WEB-AUTH-05) — here we require ONLY /login, so the test actually
+  // fails if that protection is ever weakened.
   await expect(page).toHaveURL(/\/login/);
 });
 
@@ -31,7 +32,7 @@ test('WEB-CLI-02: Creating a client with required fields succeeds and goes to th
   const name = `QA CLI-02 Test Client ${Date.now()}`;
   await page.locator('input[name="name"]').fill(name);
   await page.locator('select[name="business_type"]').selectOption('ocs');
-  // Manager sme da kreira klijenta SAMO u svom dodeljenom regionu (server-side provera).
+  // A manager may only create a client in their OWN assigned region (server-side check).
   await page.locator('input[name="region"]').fill('Italy');
   await page.getByRole('button', { name: 'Create Client' }).click();
 
@@ -47,7 +48,8 @@ test('WEB-CLI-03: Creating a client is blocked without a name', async ({ page })
   await page.goto('/dashboard/clients/new');
   await page.getByRole('button', { name: 'Create Client' }).click();
 
-  // "name" ima HTML required atribut — browser blokira submit pre nego što stigne do servera.
+  // "name" has an HTML required attribute — the browser blocks submission before it reaches
+  // the server.
   const nameInput = page.locator('input[name="name"]');
   await expect.poll(() => nameInput.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
   await expect(page).toHaveURL(/\/dashboard\/clients\/new$/);
@@ -91,19 +93,21 @@ test('WEB-CLI-05: Manager sees only clients in their own region, CEO sees all', 
     await login.goto();
     await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
-    // QA_MANAGER je u regionu Italy — klijent iz Florida regiona ne sme da se vidi.
+    // QA_MANAGER is in the Italy region — a client from the Florida region must not be
+    // visible.
     await page.goto('/dashboard/clients');
     await expect(page.getByText(`QA CLI-05 Other Region ${stamp}`)).toHaveCount(0);
 
-    // Odjava pre prelaska na CEO nalog — middleware preusmerava ULOGOVANOG korisnika sa
-    // /login nazad na /dashboard, pa bi login.goto() bez prethodne odjave propustio formu.
+    // Sign out before switching to the CEO account — middleware redirects a LOGGED-IN user
+    // from /login back to /dashboard, so login.goto() without first signing out would miss
+    // the form.
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(page).toHaveURL(/\/login(?:\?|$)/);
 
     await login.goto();
     await login.login(process.env.QA_CEO_EMAIL!, process.env.QA_CEO_PASSWORD!);
 
-    // CEO vidi klijente iz SVIH regiona.
+    // The CEO sees clients from ALL regions.
     await page.goto('/dashboard/clients');
     await expect(page.getByText(`QA CLI-05 Other Region ${stamp}`)).toBeVisible();
   } finally {
@@ -122,8 +126,8 @@ test('WEB-CLI-06: Manager cannot open a client detail page from another region d
     await login.goto();
     await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
 
-    // Server-side notFound() provera, ne samo UI sakrivanje — direktan URL pristup mora
-    // takođe biti blokiran.
+    // A server-side notFound() check, not just UI hiding — direct URL access must also be
+    // blocked.
     const response = await page.goto(`/dashboard/clients/${otherRegionClientId}`);
     expect(response?.status()).toBe(404);
   } finally {
@@ -144,8 +148,9 @@ test('WEB-CLI-07: Editing a client persists', async ({ page }) => {
     await page.locator('input[name="name"]').fill(updatedName);
     await page.getByRole('button', { name: 'Save Changes' }).click();
 
-    // Default 5s timeout povremeno istekne pod opterećenjem dok je dugme još "Saving changes..."
-    // (server action + redirect nije stigao) — isti obrazac kao drugde u suiti.
+    // The default 5s timeout occasionally runs out under load while the button still reads
+    // "Saving changes..." (the server action + redirect hasn't arrived yet) — the same
+    // pattern as elsewhere in the suite.
     await expect(page).toHaveURL(`/dashboard/clients/${clientId}`, { timeout: 15000 });
     await expect(page.getByRole('heading', { name: updatedName, exact: true })).toBeVisible();
   } finally {

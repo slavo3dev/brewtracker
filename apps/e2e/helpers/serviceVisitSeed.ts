@@ -2,15 +2,15 @@ import { supabaseAdmin } from './supabaseAdmin';
 import { todayLocalIso } from './date';
 
 const WAREHOUSE_ID = process.env.QA_GENOVA_TEST_WAREHOUSE_ID!; // Genova Test Warehouse (region: Italy)
-// "Genova Test Client" (za razliku od "Italija") nema NIJEDNU postojeću stanicu sa arrived_at
-// za QA_DRIVER_ID (71+ postojećih za Italija, vrv iz simulirane mobilne aktivnosti) — bez
-// ovoga, pronalaženje TAČNO naše test kartice na /dashboard/service/visits bilo bi dvosmisleno.
+// "Genova Test Client" (unlike "Italija") has NO existing stop with an arrived_at
+// for QA_DRIVER_ID (71+ exist for Italija, likely from simulated mobile activity) — without
+// this, finding EXACTLY our test card on /dashboard/service/visits would be ambiguous.
 const CLIENT_ID = process.env.QA_GENOVA_TEST_CLIENT_ID!; // Genova Test Client
 const MACHINE_ID = process.env.QA_GENOVA_TEST_MACHINE_ID!; // Genova Test Machine
 
-// Kreira jednokratnu rutu + jednu stanicu sa KONTROLISANIM arrived_at/completed_at
-// vremenima, direktno preko baze — UI nema put da precizno podesi "vreme provedeno na
-// lokaciji", a WEB-SV-02/03 zahtevaju tačno poznato trajanje da bi se verifikovao račun.
+// Creates a one-off route + a single stop with CONTROLLED arrived_at/completed_at
+// times, directly via the database — the UI has no way to precisely set "time spent on
+// location", and WEB-SV-02/03 need a precisely known duration to verify the computation.
 export async function createServiceVisitStop(params: {
   driverId: string;
   arrivedAt: Date;
@@ -32,7 +32,7 @@ export async function createServiceVisitStop(params: {
     .single();
 
   if (routeError || !route) {
-    throw new Error(`Ne mogu da napravim rutu za service visit fixture: ${routeError?.message}`);
+    throw new Error(`Unable to create a route for the service visit fixture: ${routeError?.message}`);
   }
 
   const { data: stop, error: stopError } = await supabase
@@ -50,22 +50,23 @@ export async function createServiceVisitStop(params: {
     .single();
 
   if (stopError || !stop) {
-    throw new Error(`Ne mogu da napravim stanicu za service visit fixture: ${stopError?.message}`);
+    throw new Error(`Unable to create a stop for the service visit fixture: ${stopError?.message}`);
   }
 
   return { routeId: route.id, stopId: stop.id };
 }
 
-// Baza ima zaštitu (23514, "Closed stops cannot be deleted") koja blokira .delete() na
-// stanici čim je status 'completed'/'in_progress' sa arrived_at postavljenim — tačno stanje
-// u kom WEB-SV-* testovi ostavljaju svoje fixture stanice. Umesto brisanja: ukloni
-// arrived_at/completed_at (to kontroliše vidljivost na listi) i otkaži rutu.
+// The database has a guard (23514, "Closed stops cannot be deleted") that blocks .delete()
+// on a stop as soon as its status is 'completed'/'in_progress' with arrived_at set — exactly
+// the state WEB-SV-* tests leave their fixture stops in. Instead of deleting: clear
+// arrived_at/completed_at (that's what controls visibility on the list) and cancel the route.
 //
-// WEB-SV-03 ostavlja svoju fixture stanicu 'in_progress' — inv_v3_guard_machine_transfer()
-// i dalje blokira transfer deljene mašine dok god POSTOJI 'in_progress' stanica na njoj, bez
-// obzira da li je roditeljska ruta otkazana. Zato prvo resetujemo 'in_progress' na 'pending'
-// (to ne dira completed — taj status se ne blokira istim trigerom), PA tek onda otkazujemo
-// rutu — nakon čega ni 'pending' stanica na otkazanoj ruti ne blokira transfer.
+// WEB-SV-03 leaves its fixture stop 'in_progress' — inv_v3_guard_machine_transfer() still
+// blocks transferring a shared machine while an 'in_progress' stop EXISTS on it, regardless
+// of whether the parent route is cancelled. So we first reset 'in_progress' to 'pending'
+// (this doesn't touch completed — that status isn't blocked by the same trigger), and ONLY
+// THEN cancel the route — after which even a 'pending' stop on a cancelled route no longer
+// blocks the transfer.
 export async function deleteServiceVisitRoute(routeId: string) {
   const supabase = supabaseAdmin();
 
@@ -75,7 +76,7 @@ export async function deleteServiceVisitRoute(routeId: string) {
     .eq('route_id', routeId)
     .eq('status', 'in_progress');
   if (statusError) {
-    throw new Error(`Ne mogu da resetujem status fixture stanica: ${statusError.message}`);
+    throw new Error(`Unable to reset fixture stop status: ${statusError.message}`);
   }
 
   const { error: stopError } = await supabase
@@ -83,7 +84,7 @@ export async function deleteServiceVisitRoute(routeId: string) {
     .update({ arrived_at: null, completed_at: null })
     .eq('route_id', routeId);
   if (stopError) {
-    throw new Error(`Ne mogu da očistim vremena fixture stanica: ${stopError.message}`);
+    throw new Error(`Unable to clear fixture stop timestamps: ${stopError.message}`);
   }
 
   const { error: routeError } = await supabase
@@ -91,6 +92,6 @@ export async function deleteServiceVisitRoute(routeId: string) {
     .update({ status: 'cancelled' })
     .eq('id', routeId);
   if (routeError) {
-    throw new Error(`Ne mogu da otkažem fixture rutu: ${routeError.message}`);
+    throw new Error(`Unable to cancel the fixture route: ${routeError.message}`);
   }
 }
