@@ -26,29 +26,30 @@ async function requireReviewerContext() {
   return { supabase, reviewer };
 }
 
-async function createSelfieSignedUrl(
-  storagePath: string | null,
-): Promise<string | null> {
-  if (!storagePath) {
-    return null;
+async function createSelfieSignedUrls(
+  storagePaths: string[],
+): Promise<Map<string, string | null>> {
+  if (storagePaths.length === 0) {
+    return new Map();
   }
 
   const supabase = await createClient();
 
   const { data, error } = await supabase.storage
     .from(TIME_ENTRY_SELFIES_BUCKET)
-    .createSignedUrl(storagePath, 60 * 10);
+    .createSignedUrls(storagePaths, 60 * 10);
 
   if (error) {
-    console.error("Unable to create clock-in selfie signed URL:", {
-      storagePath,
+    console.error("Unable to create clock-in selfie signed URLs:", {
       error: error.message,
     });
 
-    return null;
+    return new Map();
   }
 
-  return data.signedUrl;
+  return new Map(
+    data.map((result) => [result.path ?? "", result.signedUrl ?? null]),
+  );
 }
 
 export type TimeEntryReviewStatus =
@@ -128,12 +129,22 @@ export async function getTimeEntryReviewQueue(): Promise<ReviewQueueItem[]> {
 
   const entries = data as Omit<ReviewQueueItem, "clock_in_selfie_signed_url">[];
 
+  const selfiePaths = [
+    ...new Set(
+      entries
+        .map((entry) => entry.clock_in_selfie_url)
+        .filter((path): path is string => !!path),
+    ),
+  ];
+
+  const signedUrlByPath = await createSelfieSignedUrls(selfiePaths);
+
   return Promise.all(
     entries.map(async (entry) => ({
       ...entry,
-      clock_in_selfie_signed_url: await createSelfieSignedUrl(
-        entry.clock_in_selfie_url,
-      ),
+      clock_in_selfie_signed_url: entry.clock_in_selfie_url
+        ? signedUrlByPath.get(entry.clock_in_selfie_url) ?? null
+        : null,
     })),
   );
 }
@@ -227,14 +238,25 @@ export async function getTimeEntries(): Promise<TimeEntryListItem[]> {
     "clock_in_selfie_signed_url"
   >[];
 
-  return Promise.all(
-    entries.map(async (entry) => ({
-      ...entry,
-      clock_in_selfie_signed_url: await createSelfieSignedUrl(
-        entry.clock_in_selfie_url,
-      ),
-    })),
-  );
+  // One batch request for every selfie path instead of one signed-url request per
+  // entry — this page shows the full, unpaginated history, and a per-row request was
+  // taking the whole page down as the number of selfie-bearing entries grew.
+  const selfiePaths = [
+    ...new Set(
+      entries
+        .map((entry) => entry.clock_in_selfie_url)
+        .filter((path): path is string => !!path),
+    ),
+  ];
+
+  const signedUrlByPath = await createSelfieSignedUrls(selfiePaths);
+
+  return entries.map((entry) => ({
+    ...entry,
+    clock_in_selfie_signed_url: entry.clock_in_selfie_url
+      ? signedUrlByPath.get(entry.clock_in_selfie_url) ?? null
+      : null,
+  }));
 }
 
 export async function autoCloseForgottenClockOuts(input: {
