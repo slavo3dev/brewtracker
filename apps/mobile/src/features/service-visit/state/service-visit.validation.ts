@@ -2,16 +2,8 @@ import {
   BEFORE_PHOTO_KINDS,
   getRequiredServiceVisitSteps,
   SERVICE_VISIT_STEPS,
-  type MachineRefillZeroReason,
   type ServiceVisit,
 } from "../service-visit.types";
-
-const MACHINE_REFILL_ZERO_REASONS = new Set<MachineRefillZeroReason>([
-  "refill_not_required",
-  "product_unavailable",
-  "machine_issue",
-  "other",
-]);
 
 function migratePreFlow18Visit(visit: ServiceVisit): ServiceVisit {
   if (!Array.isArray(visit.steps)) {
@@ -479,121 +471,113 @@ export function validateRestoredVisit(
    * zeroReason / zeroReasonNote. Missing values
    * are normalized to null for compatibility.
    */
+
+  /*
+   * INV-V3-04:
+   * Machine Service Confirmation.
+   *
+   * No product quantities or inventory movements
+   * are recorded by this workflow.
+   */
   const restoredMachineRefill = visit.machineRefill ?? null;
 
-  const normalizedMachineRefill = restoredMachineRefill
-    ? {
-        ...restoredMachineRefill,
+  let normalizedMachineRefill = restoredMachineRefill;
 
-        items: Array.isArray(restoredMachineRefill.items)
-          ? restoredMachineRefill.items.map((item) => ({
-              ...item,
+  if (restoredMachineRefill) {
+    const record = restoredMachineRefill as unknown as Record<string, unknown>;
 
-              zeroReason: item.zeroReason ?? null,
+    const validSyncStatuses = ["pending_sync", "synced", "failed"];
 
-              zeroReasonNote: item.zeroReasonNote ?? null,
-            }))
-          : restoredMachineRefill.items,
-      }
-    : null;
-
-  if (normalizedMachineRefill) {
-    const hasValidItems =
-      Array.isArray(normalizedMachineRefill.items) &&
-      normalizedMachineRefill.items.every((item) => {
-        const hasValidBaseFields =
-          typeof item.productId === "string" &&
-          item.productId.trim().length > 0 &&
-          (item.sku === null || typeof item.sku === "string") &&
-          typeof item.name === "string" &&
-          typeof item.unitLabel === "string" &&
-          Number.isFinite(item.issueQuantity) &&
-          item.issueQuantity >= 0 &&
-          Number.isInteger(item.issueQuantity) &&
-          Number.isFinite(item.looseQuantity) &&
-          item.looseQuantity >= 0 &&
-          Number.isFinite(item.actualQuantity) &&
-          item.actualQuantity >= 0 &&
-          typeof item.normalizedUnit === "string" &&
-          item.normalizedUnit.trim().length > 0;
-
-        if (!hasValidBaseFields) {
-          return false;
-        }
-
-        const hasValidZeroReason =
-          item.zeroReason === null ||
-          MACHINE_REFILL_ZERO_REASONS.has(item.zeroReason);
-
-        if (!hasValidZeroReason) {
-          return false;
-        }
-
-        const hasValidZeroReasonNote =
-          item.zeroReasonNote === null ||
-          typeof item.zeroReasonNote === "string";
-
-        if (!hasValidZeroReasonNote) {
-          return false;
-        }
-
-        /*
-         * Positive refill quantities cannot
-         * carry zero-refill metadata.
-         */
-        if (
-          item.actualQuantity > 0 &&
-          (item.zeroReason !== null || item.zeroReasonNote !== null)
-        ) {
-          return false;
-        }
-
-        /*
-         * A note only belongs to the "other"
-         * reason.
-         */
-        if (item.zeroReason !== "other" && item.zeroReasonNote !== null) {
-          return false;
-        }
-
-        /*
-         * Selecting Other requires a
-         * meaningful explanation.
-         */
-        if (
-          item.zeroReason === "other" &&
-          (item.zeroReasonNote === null ||
-            item.zeroReasonNote.trim().length === 0)
-        ) {
-          return false;
-        }
-
-        return true;
-      });
-
-    const hasValidSyncStatus = ["pending_sync", "synced", "failed"].includes(
-      normalizedMachineRefill.syncStatus,
-    );
+    const validOutcomes = ["refilled", "not_needed", "unable_to_refill"];
 
     const hasValidDatabaseId =
-      normalizedMachineRefill.databaseId === null ||
-      (typeof normalizedMachineRefill.databaseId === "string" &&
-        normalizedMachineRefill.databaseId.trim().length > 0);
+      record.databaseId === null ||
+      (typeof record.databaseId === "string" &&
+        record.databaseId.trim().length > 0);
+
+    const hasValidSourceVisitId = record.sourceVisitId === visit.id;
+
+    const hasValidConfirmedAt =
+      typeof record.confirmedAt === "string" &&
+      !Number.isNaN(Date.parse(record.confirmedAt));
+
+    const hasValidSyncStatus = validSyncStatuses.includes(
+      record.syncStatus as string,
+    );
 
     const hasValidSyncError =
-      normalizedMachineRefill.syncError === null ||
-      typeof normalizedMachineRefill.syncError === "string";
+      record.syncError === null || typeof record.syncError === "string";
 
     if (
       !hasValidDatabaseId ||
-      typeof normalizedMachineRefill.sourceVisitId !== "string" ||
-      normalizedMachineRefill.sourceVisitId.trim().length === 0 ||
-      typeof normalizedMachineRefill.confirmedAt !== "string" ||
-      !hasValidItems ||
+      !hasValidSourceVisitId ||
+      !hasValidConfirmedAt ||
       !hasValidSyncStatus ||
       !hasValidSyncError
     ) {
       return null;
+    }
+
+    /*
+     * Legacy FLOW-18 records contain items instead
+     * of an explicit outcome.
+     *
+     * Only already-synchronized records are accepted.
+     * Pending legacy records require a separate
+     * recovery strategy to avoid losing stock movements.
+     */
+    if (Array.isArray(record.items) && record.outcome === undefined) {
+      if (
+        record.syncStatus !== "synced" ||
+        typeof record.databaseId !== "string"
+      ) {
+        return null;
+      }
+
+      const wasRefilled = record.items.some(
+        (item) =>
+          item !== null &&
+          typeof item === "object" &&
+          "actualQuantity" in item &&
+          typeof item.actualQuantity === "number" &&
+          item.actualQuantity > 0,
+      );
+
+      normalizedMachineRefill = {
+        databaseId: record.databaseId,
+        sourceVisitId: visit.id,
+        confirmedAt: record.confirmedAt as string,
+        outcome: wasRefilled ? "refilled" : "not_needed",
+        reason: null,
+        syncStatus: "synced",
+        syncError: null,
+      };
+    } else {
+      if (!validOutcomes.includes(record.outcome as string)) {
+        return null;
+      }
+
+      const hasValidReason =
+        record.outcome === "unable_to_refill"
+          ? typeof record.reason === "string" && record.reason.trim().length > 0
+          : record.reason === null;
+
+      if (!hasValidReason) {
+        return null;
+      }
+
+      normalizedMachineRefill = {
+        databaseId: record.databaseId as string | null,
+        sourceVisitId: visit.id,
+        confirmedAt: record.confirmedAt as string,
+        outcome: record.outcome as
+          | "refilled"
+          | "not_needed"
+          | "unable_to_refill",
+        reason: record.reason as string | null,
+        syncStatus: record.syncStatus as "pending_sync" | "synced" | "failed",
+        syncError: record.syncError as string | null,
+      };
     }
   }
 

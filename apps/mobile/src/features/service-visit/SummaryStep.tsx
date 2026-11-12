@@ -20,7 +20,6 @@ import {
 import { useServiceVisit } from "./ServiceVisitProvider";
 
 import {
-  wasMachineRefilled,
   type ServiceVisit,
   type ServiceVisitStepId,
 } from "./service-visit.types";
@@ -150,7 +149,16 @@ export default function SummaryStep({
 
   const completedTasks = visit.steps.filter((step) => step.id !== "summary");
 
-  const machineRefilled = wasMachineRefilled(visit.machineRefill);
+  const machineService = visit.machineRefill;
+
+  const machineServiceLabel =
+    machineService?.outcome === "refilled"
+      ? "Refilled"
+      : machineService?.outcome === "not_needed"
+        ? "Not needed"
+        : machineService?.outcome === "unable_to_refill"
+          ? "Unable to refill"
+          : "Not confirmed";
 
   const signature = visit.clientConfirmation.signature;
 
@@ -255,7 +263,7 @@ export default function SummaryStep({
         return "Client delivery completed";
 
       case "machine_refill":
-        return "Machine refill completed";
+        return "Machine service confirmed";
 
       case "after_service":
         return "After-service photo added";
@@ -265,20 +273,11 @@ export default function SummaryStep({
     }
   }
 
-  function getMachineRefillQuantity(productId: string): number {
-    return (
-      visit.machineRefill?.items.find((item) => item.productId === productId)
-        ?.actualQuantity ?? 0
-    );
-  }
-
   function getProductName(productId: string): string {
     return (
       visit.inventoryAudit?.items.find((item) => item.productId === productId)
         ?.name ??
       visit.restockDrop?.items.find((item) => item.productId === productId)
-        ?.name ??
-      visit.machineRefill?.items.find((item) => item.productId === productId)
         ?.name ??
       "Product"
     );
@@ -301,29 +300,36 @@ export default function SummaryStep({
       </View>
 
       <View style={styles.summaryCard}>
-        <Text style={styles.summaryLabel}>Machine refilled</Text>
+        <Text style={styles.summaryLabel}>Machine service</Text>
 
         <Text
           style={[
             styles.summaryValue,
-            machineRefilled ? styles.summaryValueYes : styles.summaryValueNo,
+            machineService?.outcome === "refilled"
+              ? styles.summaryValueYes
+              : styles.summaryValueNo,
           ]}
         >
-          {machineRefilled ? "Yes" : "No"}
+          {machineServiceLabel}
         </Text>
+
+        {machineService?.outcome === "unable_to_refill" &&
+        machineService.reason ? (
+          <Text style={styles.summaryLabel}>
+            Reason: {machineService.reason}
+          </Text>
+        ) : null}
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Inventory summary</Text>
 
         <Text style={styles.sectionDescription}>
-          Review the client reserve and machine refill quantities before
+          Review the client reserve quantities and delivered products before
           confirmation.
         </Text>
 
         {visit.reserveAfter?.items.map((item) => {
-          const machineQuantity = getMachineRefillQuantity(item.productId);
-
           return (
             <View key={item.productId} style={styles.inventoryCard}>
               <Text style={styles.productName}>
@@ -353,16 +359,6 @@ export default function SummaryStep({
 
                 <Text style={styles.reserveAfterValue}>
                   {item.reserveAfterQuantity} {item.normalizedUnit}
-                </Text>
-              </View>
-
-              <View style={styles.inventoryDivider} />
-
-              <View style={styles.inventoryRow}>
-                <Text style={styles.inventoryLabel}>Added to machine</Text>
-
-                <Text style={styles.inventoryValue}>
-                  {machineQuantity} {item.normalizedUnit}
                 </Text>
               </View>
             </View>
