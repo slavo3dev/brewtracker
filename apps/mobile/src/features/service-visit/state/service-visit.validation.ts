@@ -2,6 +2,9 @@ import {
   BEFORE_PHOTO_KINDS,
   getRequiredServiceVisitSteps,
   SERVICE_VISIT_STEPS,
+  type LegacyMachineRefillRecord,
+  type MachineRefillRecord,
+  type MachineRefillItemRecord,
   type ServiceVisit,
 } from "../service-visit.types";
 
@@ -481,14 +484,17 @@ export function validateRestoredVisit(
    */
   const restoredMachineRefill = visit.machineRefill ?? null;
 
-  let normalizedMachineRefill = restoredMachineRefill;
+  let normalizedMachineRefill: MachineRefillRecord | null = null;
 
   if (restoredMachineRefill) {
     const record = restoredMachineRefill as unknown as Record<string, unknown>;
 
-    const validSyncStatuses = ["pending_sync", "synced", "failed"];
-
-    const validOutcomes = ["refilled", "not_needed", "unable_to_refill"];
+    const validSyncStatuses = ["pending_sync", "synced", "failed"] as const;
+    const validOutcomes = [
+      "refilled",
+      "not_needed",
+      "unable_to_refill",
+    ] as const;
 
     const hasValidDatabaseId =
       record.databaseId === null ||
@@ -501,8 +507,8 @@ export function validateRestoredVisit(
       typeof record.confirmedAt === "string" &&
       !Number.isNaN(Date.parse(record.confirmedAt));
 
-    const hasValidSyncStatus = validSyncStatuses.includes(
-      record.syncStatus as string,
+    const hasValidSyncStatus = validSyncStatuses.some(
+      (status) => status === record.syncStatus,
     );
 
     const hasValidSyncError =
@@ -518,42 +524,104 @@ export function validateRestoredVisit(
       return null;
     }
 
+    // A synchronized record must reference its database row.
+    if (record.syncStatus === "synced" && record.databaseId === null) {
+      return null;
+    }
+
     /*
-     * Legacy FLOW-18 records contain items instead
-     * of an explicit outcome.
+     * Historical FLOW-18 quantity-based machine refill.
      *
-     * Only already-synchronized records are accepted.
-     * Pending legacy records require a separate
-     * recovery strategy to avoid losing stock movements.
+     * Preserve the complete item array and synchronization
+     * status. Never infer a confirmation outcome from quantities.
      */
     if (Array.isArray(record.items) && record.outcome === undefined) {
+      if (record.recordType !== undefined && record.recordType !== "legacy") {
+        return null;
+      }
+
+      const validZeroReasons = [
+        "refill_not_required",
+        "product_unavailable",
+        "machine_issue",
+        "other",
+      ];
+
+      const hasValidItems = record.items.every((rawItem) => {
+        if (
+          rawItem === null ||
+          typeof rawItem !== "object" ||
+          Array.isArray(rawItem)
+        ) {
+          return false;
+        }
+
+        const item = rawItem as Record<string, unknown>;
+
+        const validText = (value: unknown) =>
+          typeof value === "string" && value.trim().length > 0;
+
+        const validQuantity = (value: unknown) =>
+          typeof value === "number" &&
+          Number.isSafeInteger(value) &&
+          value >= 0;
+
+        return (
+          validText(item.productId) &&
+          (item.sku === null || typeof item.sku === "string") &&
+          validText(item.name) &&
+          validText(item.category) &&
+          validText(item.unitLabel) &&
+          validQuantity(item.issueQuantity) &&
+          validQuantity(item.looseQuantity) &&
+          validQuantity(item.actualQuantity) &&
+          validText(item.normalizedUnit) &&
+          (item.zeroReason === null ||
+            item.zeroReason === undefined ||
+            validZeroReasons.includes(item.zeroReason as string)) &&
+          (item.zeroReasonNote === null ||
+            item.zeroReasonNote === undefined ||
+            typeof item.zeroReasonNote === "string")
+        );
+      });
+
+      if (!hasValidItems) {
+        return null;
+      }
+
+      normalizedMachineRefill = {
+        recordType: "legacy",
+        databaseId: record.databaseId as string | null,
+        sourceVisitId: visit.id,
+        confirmedAt: record.confirmedAt as string,
+        items: record.items.map((rawItem) => {
+          const item = rawItem as Record<string, unknown>;
+
+          return {
+            ...item,
+            zeroReason: item.zeroReason ?? null,
+            zeroReasonNote: item.zeroReasonNote ?? null,
+          } as MachineRefillItemRecord;
+        }),
+        syncStatus:
+          record.syncStatus as LegacyMachineRefillRecord["syncStatus"],
+        syncError: record.syncError as string | null,
+      };
+    } else {
+      /*
+       * INV-V3-04 confirmation-only record.
+       */
       if (
-        record.syncStatus !== "synced" ||
-        typeof record.databaseId !== "string"
+        record.recordType !== undefined &&
+        record.recordType !== "confirmation"
       ) {
         return null;
       }
 
-      const wasRefilled = record.items.some(
-        (item) =>
-          item !== null &&
-          typeof item === "object" &&
-          "actualQuantity" in item &&
-          typeof item.actualQuantity === "number" &&
-          item.actualQuantity > 0,
-      );
-
-      normalizedMachineRefill = {
-        databaseId: record.databaseId,
-        sourceVisitId: visit.id,
-        confirmedAt: record.confirmedAt as string,
-        outcome: wasRefilled ? "refilled" : "not_needed",
-        reason: null,
-        syncStatus: "synced",
-        syncError: null,
-      };
-    } else {
-      if (!validOutcomes.includes(record.outcome as string)) {
+      if (
+        record.items !== undefined ||
+        !validOutcomes.some((outcome) => outcome === record.outcome)
+      ) {
         return null;
       }
 
@@ -567,6 +635,7 @@ export function validateRestoredVisit(
       }
 
       normalizedMachineRefill = {
+        recordType: "confirmation",
         databaseId: record.databaseId as string | null,
         sourceVisitId: visit.id,
         confirmedAt: record.confirmedAt as string,

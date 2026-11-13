@@ -37,7 +37,8 @@ const OUTCOME_OPTIONS: {
 ];
 
 export default function MachineRefillStep() {
-  const { activeVisit, completeMachineRefill } = useServiceVisit();
+  const { activeVisit, completeMachineRefill, retryLegacyMachineRefill } =
+    useServiceVisit();
 
   const [outcome, setOutcome] = useState<MachineServiceOutcome | null>(null);
   const [reason, setReason] = useState("");
@@ -114,6 +115,27 @@ export default function MachineRefillStep() {
     }
   }
 
+  async function handleLegacyRetry() {
+    if (submitting || !legacyMachineRefill) {
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      await retryLegacyMachineRefill();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to synchronize the historical machine refill.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -131,16 +153,45 @@ export default function MachineRefillStep() {
       </View>
 
       {legacyMachineRefill ? (
-        <View style={styles.errorCard}>
-          <Text style={styles.errorText}>
-            This visit contains a machine refill recorded with the previous
-            inventory workflow.
-            {"\n\n"}
-            The original product quantities have been preserved.
-            {"\n\n"}
-            This visit requires legacy synchronization or recovery before
-            continuing. Do not start a replacement visit.
+        <View style={styles.pendingCard}>
+          <Text style={styles.pendingTitle}>Historical machine refill</Text>
+
+          <Text style={styles.pendingText}>
+            This visit was started using the previous inventory workflow. Your
+            original product quantities and confirmation timestamp have been
+            preserved.
           </Text>
+
+          {legacyMachineRefill.syncError ? (
+            <Text style={styles.errorText}>
+              {legacyMachineRefill.syncError}
+            </Text>
+          ) : null}
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retry historical machine refill synchronization"
+            accessibilityState={{ disabled: submitting }}
+            disabled={submitting}
+            onPress={() => {
+              void handleLegacyRetry();
+            }}
+            style={({ pressed }) => [
+              styles.button,
+              pressed && !submitting && styles.buttonPressed,
+              submitting && styles.buttonDisabled,
+            ]}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.buttonText}>
+                {legacyMachineRefill.syncStatus === "synced"
+                  ? "Continue Saved Visit"
+                  : "Retry Legacy Sync"}
+              </Text>
+            )}
+          </Pressable>
         </View>
       ) : null}
 
@@ -160,90 +211,98 @@ export default function MachineRefillStep() {
         </View>
       ) : null}
 
-      <View style={styles.options}>
-        {OUTCOME_OPTIONS.map((option) => {
-          const selected = outcome === option.value;
+      {!legacyMachineRefill ? (
+        <>
+          <View style={styles.options}>
+            {OUTCOME_OPTIONS.map((option) => {
+              const selected = outcome === option.value;
 
-          return (
-            <Pressable
-              key={option.value}
-              accessibilityRole="radio"
-              accessibilityState={{
-                selected,
-                disabled: submitting || hasPendingConfirmation,
-              }}
-              disabled={submitting || hasPendingConfirmation}
-              onPress={() => {
-                setOutcome(option.value);
-                setReason("");
-                setErrorMessage(null);
-              }}
-              style={({ pressed }) => [
-                styles.optionCard,
-                selected && styles.optionCardSelected,
-                pressed && !submitting && styles.optionCardPressed,
-                (submitting || hasPendingConfirmation) &&
-                  styles.optionCardDisabled,
-              ]}
-            >
-              <View style={[styles.radio, selected && styles.radioSelected]}>
-                {selected ? <View style={styles.radioDot} /> : null}
-              </View>
+              return (
+                <Pressable
+                  key={option.value}
+                  accessibilityRole="radio"
+                  accessibilityState={{
+                    selected,
+                    disabled: submitting || hasPendingConfirmation,
+                  }}
+                  disabled={submitting || hasPendingConfirmation}
+                  onPress={() => {
+                    setOutcome(option.value);
+                    setReason("");
+                    setErrorMessage(null);
+                  }}
+                  style={({ pressed }) => [
+                    styles.optionCard,
+                    selected && styles.optionCardSelected,
+                    pressed && !submitting && styles.optionCardPressed,
+                    (submitting || hasPendingConfirmation) &&
+                      styles.optionCardDisabled,
+                  ]}
+                >
+                  <View
+                    style={[styles.radio, selected && styles.radioSelected]}
+                  >
+                    {selected ? <View style={styles.radioDot} /> : null}
+                  </View>
 
-              <View style={styles.optionContent}>
-                <Text style={styles.optionTitle}>{option.title}</Text>
-                <Text style={styles.secondaryText}>{option.description}</Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
+                  <View style={styles.optionContent}>
+                    <Text style={styles.optionTitle}>{option.title}</Text>
+                    <Text style={styles.secondaryText}>
+                      {option.description}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
 
-      {outcome === "unable_to_refill" ? (
-        <View style={styles.reasonSection}>
-          <Text style={styles.reasonTitle}>
-            Reason for being unable to refill *
-          </Text>
+          {outcome === "unable_to_refill" ? (
+            <View style={styles.reasonSection}>
+              <Text style={styles.reasonTitle}>
+                Reason for being unable to refill *
+              </Text>
 
-          <TextInput
-            accessibilityLabel="Reason for being unable to refill"
-            editable={!submitting && !hasPendingConfirmation}
-            multiline
-            onChangeText={(text) => {
-              setReason(text);
-              setErrorMessage(null);
+              <TextInput
+                accessibilityLabel="Reason for being unable to refill"
+                editable={!submitting && !hasPendingConfirmation}
+                multiline
+                onChangeText={(text) => {
+                  setReason(text);
+                  setErrorMessage(null);
+                }}
+                placeholder="Describe why the refill could not be completed..."
+                placeholderTextColor="#a89c8f"
+                style={styles.reasonInput}
+                textAlignVertical="top"
+                value={reason}
+              />
+            </View>
+          ) : null}
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={!canSubmit}
+            onPress={() => {
+              void handleSubmit();
             }}
-            placeholder="Describe why the refill could not be completed..."
-            placeholderTextColor="#a89c8f"
-            style={styles.reasonInput}
-            textAlignVertical="top"
-            value={reason}
-          />
-        </View>
+            style={({ pressed }) => [
+              styles.button,
+              pressed && canSubmit && styles.buttonPressed,
+              !canSubmit && styles.buttonDisabled,
+            ]}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.buttonText}>
+                {hasPendingConfirmation
+                  ? "Retry Machine Service Sync"
+                  : "Confirm Machine Service & Continue"}
+              </Text>
+            )}
+          </Pressable>
+        </>
       ) : null}
-
-      <Pressable
-        accessibilityRole="button"
-        disabled={!canSubmit}
-        onPress={() => {
-          void handleSubmit();
-        }}
-        style={({ pressed }) => [
-          styles.button,
-          pressed && canSubmit && styles.buttonPressed,
-          !canSubmit && styles.buttonDisabled,
-        ]}
-      >
-        {submitting ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text style={styles.buttonText}>
-            {hasPendingConfirmation
-              ? "Retry Machine Service Sync"
-              : "Confirm Machine Service & Continue"}
-          </Text>
-        )}
-      </Pressable>
     </View>
   );
 }

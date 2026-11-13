@@ -20,6 +20,7 @@ import {
 import { useServiceVisit } from "./ServiceVisitProvider";
 
 import {
+  isLegacyMachineRefill,
   type ServiceVisit,
   type ServiceVisitStepId,
 } from "./service-visit.types";
@@ -151,12 +152,25 @@ export default function SummaryStep({
 
   const machineService = visit.machineRefill;
 
-  const machineServiceLabel =
-    machineService?.outcome === "refilled"
+  const legacyMachineRefill =
+    machineService && isLegacyMachineRefill(machineService)
+      ? machineService
+      : null;
+
+  const confirmation =
+    machineService && !isLegacyMachineRefill(machineService)
+      ? machineService
+      : null;
+
+  const machineServiceLabel = legacyMachineRefill
+    ? legacyMachineRefill.items.some((item) => item.actualQuantity > 0)
+      ? "Legacy refill recorded"
+      : "Legacy zero refill recorded"
+    : confirmation?.outcome === "refilled"
       ? "Refilled"
-      : machineService?.outcome === "not_needed"
+      : confirmation?.outcome === "not_needed"
         ? "Not needed"
-        : machineService?.outcome === "unable_to_refill"
+        : confirmation?.outcome === "unable_to_refill"
           ? "Unable to refill"
           : "Not confirmed";
 
@@ -305,7 +319,9 @@ export default function SummaryStep({
         <Text
           style={[
             styles.summaryValue,
-            machineService?.outcome === "refilled"
+            confirmation?.outcome === "refilled" ||
+            (legacyMachineRefill !== null &&
+              legacyMachineRefill.items.some((item) => item.actualQuantity > 0))
               ? styles.summaryValueYes
               : styles.summaryValueNo,
           ]}
@@ -313,11 +329,35 @@ export default function SummaryStep({
           {machineServiceLabel}
         </Text>
 
-        {machineService?.outcome === "unable_to_refill" &&
-        machineService.reason ? (
-          <Text style={styles.summaryLabel}>
-            Reason: {machineService.reason}
-          </Text>
+        {confirmation?.outcome === "unable_to_refill" && confirmation.reason ? (
+          <Text style={styles.summaryLabel}>Reason: {confirmation.reason}</Text>
+        ) : null}
+
+        {legacyMachineRefill ? (
+          <View>
+            <Text style={styles.summaryLabel}>
+              Historical quantity-based machine refill
+            </Text>
+
+            <Text style={styles.summaryLabel}>
+              Sync status: {legacyMachineRefill.syncStatus}
+            </Text>
+
+            {legacyMachineRefill.items.map((item) => (
+              <View key={item.productId}>
+                <Text style={styles.summaryLabel}>
+                  {item.name}: {item.actualQuantity} {item.normalizedUnit}
+                </Text>
+
+                {item.zeroReason ? (
+                  <Text style={styles.summaryLabel}>
+                    Zero-refill reason: {item.zeroReason}
+                    {item.zeroReasonNote ? ` — ${item.zeroReasonNote}` : ""}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          </View>
         ) : null}
       </View>
 

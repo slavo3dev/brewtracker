@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import type { LegacyMachineRefillRecord } from "./service-visit.types";
 
 export type MachineServiceOutcome =
   | "refilled"
@@ -62,6 +63,61 @@ export async function saveMachineServiceConfirmation(
 
   if (typeof data !== "string" || !data.trim()) {
     throw new Error("Machine service confirmation was saved without an ID.");
+  }
+
+  return data;
+}
+
+/**
+ * FLOW-18 compatibility:
+ * Synchronize a quantity-based machine refill created
+ * before INV-V3-04.
+ *
+ * Never use this function for new confirmations.
+ */
+export async function syncLegacyMachineRefill(input: {
+  record: LegacyMachineRefillRecord;
+  clientId: string;
+  stopId: string;
+  machineId: string;
+}): Promise<string> {
+  const { record, clientId, stopId, machineId } = input;
+
+  const sourceVisitId = record.sourceVisitId.trim();
+
+  if (!sourceVisitId) {
+    throw new Error("A legacy service visit ID is required.");
+  }
+
+  if (!record.confirmedAt || Number.isNaN(Date.parse(record.confirmedAt))) {
+    throw new Error("Legacy machine refill timestamp is invalid.");
+  }
+
+  const { data, error } = await supabase.rpc("save_machine_refill", {
+    p_source_visit_id: sourceVisitId,
+    p_client_id: clientId,
+    p_stop_id: stopId,
+    p_machine_id: machineId,
+    p_confirmed_at: record.confirmedAt,
+    p_items: record.items.map((item) => ({
+      product_id: item.productId,
+      issue_quantity: item.issueQuantity,
+      loose_quantity: item.looseQuantity,
+      zero_reason: item.zeroReason,
+      zero_reason_note: item.zeroReasonNote,
+    })),
+  });
+
+  if (error) {
+    throw new Error(
+      error.message || "Unable to synchronize legacy machine refill.",
+    );
+  }
+
+  if (typeof data !== "string" || !data.trim()) {
+    throw new Error(
+      "Legacy machine refill synchronization returned no database ID.",
+    );
   }
 
   return data;
