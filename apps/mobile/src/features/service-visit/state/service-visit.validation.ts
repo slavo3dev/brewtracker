@@ -573,8 +573,12 @@ export function validateRestoredVisit(
           validText(item.category) &&
           validText(item.unitLabel) &&
           validQuantity(item.issueQuantity) &&
-          validQuantity(item.looseQuantity) &&
-          validQuantity(item.actualQuantity) &&
+          typeof item.looseQuantity === "number" &&
+          Number.isFinite(item.looseQuantity) &&
+          item.looseQuantity >= 0 &&
+          typeof item.actualQuantity === "number" &&
+          Number.isFinite(item.actualQuantity) &&
+          item.actualQuantity >= 0 &&
           validText(item.normalizedUnit) &&
           (item.zeroReason === null ||
             item.zeroReason === undefined ||
