@@ -38,9 +38,19 @@ type VisitSummaryRestockDrop = {
   items: VisitSummaryInventoryItem[];
 } | null;
 
-type VisitSummaryMachineRefill = {
-  items: VisitSummaryInventoryItem[];
-} | null;
+type MachineServiceOutcome = "refilled" | "not_needed" | "unable_to_refill";
+
+type VisitSummaryMachineRefill =
+  | {
+      recordType: "confirmation";
+      outcome: MachineServiceOutcome;
+      reason: string | null;
+    }
+  | {
+      recordType?: "legacy";
+      items: VisitSummaryInventoryItem[];
+    }
+  | null;
 
 type VisitSummaryReserveAfterItem = {
   productId: string;
@@ -76,10 +86,7 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#039;");
 }
 
-function formatQuantity(
-  quantity: number,
-  unit: string,
-): string {
+function formatQuantity(quantity: number, unit: string): string {
   const safeUnit = escapeHtml(unit);
 
   if (quantity === 1) {
@@ -98,17 +105,16 @@ function formatQuantity(
   return `${quantity} ${safeUnit}s`;
 }
 
-function createInventorySummaryHtml(
-  visitSummary: VisitSummary,
-): string {
-  const deliveredItems =
-    visitSummary.restockDrop?.items ?? [];
+function createInventorySummaryHtml(visitSummary: VisitSummary): string {
+  const deliveredItems = visitSummary.restockDrop?.items ?? [];
 
-  const machineRefillItems =
-    visitSummary.machineRefill?.items ?? [];
+  const machineRefill = visitSummary.machineRefill;
 
-  const reserveAfterItems =
-    visitSummary.reserveAfter?.items ?? [];
+  const isLegacyRefill = machineRefill != null && "items" in machineRefill;
+
+  const machineRefillItems = isLegacyRefill ? machineRefill.items : [];
+
+  const reserveAfterItems = visitSummary.reserveAfter?.items ?? [];
 
   const productIds = new Set<string>();
 
@@ -124,17 +130,13 @@ function createInventorySummaryHtml(
     productIds.add(item.productId);
   }
 
-  if (productIds.size === 0) {
-    return "";
-  }
-
   const productHtml = [...productIds]
     .map((productId) => {
       const delivered = deliveredItems.find(
         (item) => item.productId === productId,
       );
 
-      const machineRefill = machineRefillItems.find(
+      const refillItem = machineRefillItems.find(
         (item) => item.productId === productId,
       );
 
@@ -142,56 +144,55 @@ function createInventorySummaryHtml(
         (item) => item.productId === productId,
       );
 
-      const product =
-        delivered ?? machineRefill;
+      const product = delivered ?? refillItem;
 
-      if (!product) {
+      if (!product && !reserveAfter) {
         return "";
       }
 
-      const deliveredQuantity =
-        delivered?.actualQuantity ?? 0;
-
-      const machineRefillQuantity =
-        machineRefill?.actualQuantity ?? 0;
-
       const normalizedUnit =
         delivered?.normalizedUnit ??
-        machineRefill?.normalizedUnit ??
+        refillItem?.normalizedUnit ??
         reserveAfter?.normalizedUnit ??
         "";
 
-      const sku = product.sku
-        ? ` · ${escapeHtml(product.sku)}`
-        : "";
+      const sku = product?.sku ? ` · ${escapeHtml(product.sku)}` : "";
+
+      const productName = product
+        ? escapeHtml(product.name)
+        : escapeHtml(productId);
 
       return `
         <div style="margin-bottom: 20px;">
           <p style="margin-bottom: 8px;">
-            <strong>
-              ${escapeHtml(product.name)}${sku}
-            </strong>
+            <strong>${productName}${sku}</strong>
           </p>
 
-          <p style="margin: 4px 0;">
-            Delivered to client:
-            <strong>
-              ${formatQuantity(
-                deliveredQuantity,
-                normalizedUnit,
-              )}
-            </strong>
-          </p>
+          ${
+            delivered
+              ? `
+                <p style="margin: 4px 0;">
+                  Delivered to client:
+                  <strong>
+                    ${formatQuantity(delivered.actualQuantity, normalizedUnit)}
+                  </strong>
+                </p>
+              `
+              : ""
+          }
 
-          <p style="margin: 4px 0;">
-            Machine refill:
-            <strong>
-              ${formatQuantity(
-                machineRefillQuantity,
-                normalizedUnit,
-              )}
-            </strong>
-          </p>
+          ${
+            refillItem
+              ? `
+                <p style="margin: 4px 0;">
+                  Machine refill:
+                  <strong>
+                    ${formatQuantity(refillItem.actualQuantity, normalizedUnit)}
+                  </strong>
+                </p>
+              `
+              : ""
+          }
 
           ${
             reserveAfter
@@ -214,16 +215,59 @@ function createInventorySummaryHtml(
     .filter(Boolean)
     .join("");
 
-  if (!productHtml) {
+  let machineServiceHtml = "";
+
+  if (
+    machineRefill &&
+    "recordType" in machineRefill &&
+    machineRefill.recordType === "confirmation"
+  ) {
+    const outcomeLabels: Record<MachineServiceOutcome, string> = {
+      refilled: "Refilled",
+      not_needed: "Not needed",
+      unable_to_refill: "Unable to refill",
+    };
+
+    const outcomeLabel = outcomeLabels[machineRefill.outcome];
+
+    const reasonHtml =
+      machineRefill.outcome === "unable_to_refill" && machineRefill.reason
+        ? `
+          <p style="margin: 4px 0;">
+            Reason:
+            <strong>${escapeHtml(machineRefill.reason)}</strong>
+          </p>
+        `
+        : "";
+
+    machineServiceHtml = `
+      <div style="margin-top: 24px;">
+        <h2>Machine service</h2>
+        <p style="margin: 4px 0;">
+          Status: <strong>${outcomeLabel}</strong>
+        </p>
+        ${reasonHtml}
+      </div>
+    `;
+  }
+
+  if (!productHtml && !machineServiceHtml) {
     return "";
   }
 
   return `
-    <div style="margin-top: 24px;">
-      <h2>Inventory summary</h2>
+    ${
+      productHtml
+        ? `
+          <div style="margin-top: 24px;">
+            <h2>Inventory summary</h2>
+            ${productHtml}
+          </div>
+        `
+        : ""
+    }
 
-      ${productHtml}
-    </div>
+    ${machineServiceHtml}
   `;
 }
 
@@ -698,8 +742,7 @@ Deno.serve(async (request: Request) => {
     });
   }
 
-  const inventorySummaryHtml =
-    createInventorySummaryHtml(payload.visitSummary);
+  const inventorySummaryHtml = createInventorySummaryHtml(payload.visitSummary);
 
   const photoHtml = [
     ...beforePhotos.map((photo: { kind?: string; url?: string | null }) =>
