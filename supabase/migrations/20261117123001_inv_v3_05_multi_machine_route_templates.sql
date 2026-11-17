@@ -57,6 +57,80 @@ CREATE TABLE public.route_template_stop_exception_machines (
 CREATE INDEX route_template_stop_exception_machines_machine_idx
   ON public.route_template_stop_exception_machines(machine_id);
 
+-- ============================================================
+-- INV-V3-05: Machine assignment table security
+-- ============================================================
+
+ALTER TABLE public.route_template_stop_machines
+  ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.route_template_stop_exception_machines
+  ENABLE ROW LEVEL SECURITY;
+
+-- Prevent direct client-side modifications.
+REVOKE ALL ON public.route_template_stop_machines
+  FROM PUBLIC, anon, authenticated;
+
+REVOKE ALL ON public.route_template_stop_exception_machines
+  FROM PUBLIC, anon, authenticated;
+
+-- Allow authorized users to read assignments.
+GRANT SELECT ON public.route_template_stop_machines
+  TO authenticated;
+
+GRANT SELECT ON public.route_template_stop_exception_machines
+  TO authenticated;
+
+-- Server-side RPCs use service_role.
+GRANT ALL ON public.route_template_stop_machines
+  TO service_role;
+
+GRANT ALL ON public.route_template_stop_exception_machines
+  TO service_role;
+
+CREATE POLICY "Authorized users can read template machine assignments"
+ON public.route_template_stop_machines
+FOR SELECT
+TO authenticated
+USING (
+  public.is_ceo()
+  OR (
+    public.is_manager()
+    AND EXISTS (
+      SELECT 1
+      FROM public.route_template_stops rts
+      JOIN public.route_templates rt
+        ON rt.id = rts.route_template_id
+      WHERE rts.id = route_template_stop_machines.route_template_stop_id
+        AND public.warehouse_is_in_current_user_region(
+          rt.warehouse_id
+        )
+    )
+  )
+);
+
+CREATE POLICY "Authorized users can read exception machine assignments"
+ON public.route_template_stop_exception_machines
+FOR SELECT
+TO authenticated
+USING (
+  public.is_ceo()
+  OR (
+    public.is_manager()
+    AND EXISTS (
+      SELECT 1
+      FROM public.route_template_stop_exceptions rtse
+      JOIN public.route_templates rt
+        ON rt.id = rtse.route_template_id
+      WHERE rtse.id =
+        route_template_stop_exception_machines.route_template_stop_exception_id
+        AND public.warehouse_is_in_current_user_region(
+          rt.warehouse_id
+        )
+    )
+  )
+);
+
 -- Validate recurring-template machine assignments.
 CREATE FUNCTION public.inv_v3_05_validate_template_machine()
 RETURNS trigger
@@ -337,6 +411,33 @@ BEGIN
     RAISE EXCEPTION 'Route template was not found.';
   END IF;
 
+  -- Reject duplicate machine assignments within this template.
+  IF EXISTS (
+    WITH template_machines AS (
+      SELECT rts.machine_id
+      FROM public.route_template_stops rts
+      WHERE rts.route_template_id = p_route_template_id
+        AND rts.machine_id IS NOT NULL
+
+      UNION ALL
+
+      SELECT rtsm.machine_id
+      FROM public.route_template_stops rts
+      JOIN public.route_template_stop_machines rtsm
+        ON rtsm.route_template_stop_id = rts.id
+      WHERE rts.route_template_id = p_route_template_id
+    )
+    SELECT 1
+    FROM template_machines
+    GROUP BY machine_id
+    HAVING count(*) > 1
+  ) THEN
+    RAISE EXCEPTION
+      'The same machine cannot be assigned to multiple stops in one recurring template.';
+  END IF;
+
+  -- Inactive templates require internal validation only.
+  -- Cross-template conflicts are checked upon activation.
   IF NOT v_template.is_active THEN
     RETURN;
   END IF;
