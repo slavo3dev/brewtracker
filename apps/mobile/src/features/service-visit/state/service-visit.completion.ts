@@ -1,15 +1,8 @@
-import {
-  BEFORE_PHOTO_KINDS,
-  type ServiceVisit,
-} from "../service-visit.types";
+import { BEFORE_PHOTO_KINDS, type ServiceVisit } from "../service-visit.types";
 
-export function assertVisitReadyForCompletion(
-  visit: ServiceVisit,
-): void {
+export function assertVisitReadyForCompletion(visit: ServiceVisit): void {
   if (visit.status !== "in_progress") {
-    throw new Error(
-      "Only an active service visit can be completed.",
-    );
+    throw new Error("Only an active service visit can be completed.");
   }
 
   if (visit.currentStep !== "summary") {
@@ -19,30 +12,21 @@ export function assertVisitReadyForCompletion(
   }
 
   if (!visit.arrivalVerification) {
-    throw new Error(
-      "Arrival verification is missing.",
-    );
+    throw new Error("Arrival verification is missing.");
   }
 
   if (!visit.machineScanVerification) {
-    throw new Error(
-      "The initial machine verification is missing.",
-    );
+    throw new Error("The initial machine verification is missing.");
   }
 
-  const beforeKinds = new Set(
-    visit.beforePhotos.map((photo) => photo.kind),
+  const beforeKinds = new Set(visit.beforePhotos.map((photo) => photo.kind));
+
+  const hasAllBeforePhotos = BEFORE_PHOTO_KINDS.every((kind) =>
+    beforeKinds.has(kind),
   );
 
-  const hasAllBeforePhotos =
-    BEFORE_PHOTO_KINDS.every((kind) =>
-      beforeKinds.has(kind),
-    );
-
   if (!hasAllBeforePhotos) {
-    throw new Error(
-      "Required before-service photos are missing.",
-    );
+    throw new Error("Required before-service photos are missing.");
   }
 
   /*
@@ -50,13 +34,8 @@ export function assertVisitReadyForCompletion(
    * Drink Count is required only when the admin assigned
    * the task to this specific route stop.
    */
-  if (
-    visit.tasks.drinkCountRequired &&
-    !visit.drinkCount
-  ) {
-    throw new Error(
-      "Drink Count is required for this service visit.",
-    );
+  if (visit.tasks.drinkCountRequired && !visit.drinkCount) {
+    throw new Error("Drink Count is required for this service visit.");
   }
 
   /*
@@ -65,9 +44,7 @@ export function assertVisitReadyForCompletion(
    * be persisted before the visit can be completed.
    */
   if (!visit.inventoryAudit) {
-    throw new Error(
-      "The client reserve count is missing.",
-    );
+    throw new Error("The client reserve count is missing.");
   }
 
   if (
@@ -88,9 +65,7 @@ export function assertVisitReadyForCompletion(
    * simply have been persisted.
    */
   if (!visit.restockDrop) {
-    throw new Error(
-      "The client delivery confirmation is missing.",
-    );
+    throw new Error("The client delivery confirmation is missing.");
   }
 
   if (
@@ -103,18 +78,22 @@ export function assertVisitReadyForCompletion(
   }
 
   /*
-   * FLOW-18:
-   * Machine refill is an independent movement:
+   * INV-V3-04:
+   * Machine Service Confirmation.
    *
-   * Driver / Van -> Machine
+   * The driver confirms one of three outcomes:
+   * - refilled
+   * - not_needed
+   * - unable_to_refill
    *
-   * It must be completed and persisted before the
-   * final client confirmation.
+   * No product quantities or inventory movements
+   * are recorded by this step.
+   *
+   * The confirmation must be synchronized before
+   * the service visit can be completed.
    */
   if (!visit.machineRefill) {
-    throw new Error(
-      "The machine refill confirmation is missing.",
-    );
+    throw new Error("The machine service confirmation is missing.");
   }
 
   if (
@@ -122,7 +101,7 @@ export function assertVisitReadyForCompletion(
     !visit.machineRefill.databaseId
   ) {
     throw new Error(
-      "The machine refill must finish syncing before completing service.",
+      "The machine service confirmation must finish syncing before completing service.",
     );
   }
 
@@ -135,9 +114,7 @@ export function assertVisitReadyForCompletion(
    * Machine refill is intentionally excluded.
    */
   if (!visit.reserveAfter) {
-    throw new Error(
-      "The client reserve-after calculation is missing.",
-    );
+    throw new Error("The client reserve-after calculation is missing.");
   }
 
   if (
@@ -154,9 +131,7 @@ export function assertVisitReadyForCompletion(
    * After Service requires one completed-machine photo.
    */
   if (!visit.afterService.afterPhoto?.localUri) {
-    throw new Error(
-      "The required after-service photo is missing.",
-    );
+    throw new Error("The required after-service photo is missing.");
   }
 
   /*
@@ -164,13 +139,10 @@ export function assertVisitReadyForCompletion(
    * A client or responsible person must sign before
    * the service visit can be completed.
    */
-  const signature =
-    visit.clientConfirmation.signature;
+  const signature = visit.clientConfirmation.signature;
 
   if (!signature) {
-    throw new Error(
-      "Client signature is required before completing service.",
-    );
+    throw new Error("Client signature is required before completing service.");
   }
 
   /*
@@ -188,36 +160,26 @@ export function assertVisitReadyForCompletion(
     !signature.storagePath ||
     !signature.uploadedAt
   ) {
-    throw new Error(
-      "Client signature has not been saved successfully.",
-    );
+    throw new Error("Client signature has not been saved successfully.");
   }
 
   if (!visit.clientConfirmation.confirmedAt) {
-    throw new Error(
-      "Client confirmation is incomplete.",
-    );
+    throw new Error("Client confirmation is incomplete.");
   }
 
   /*
    * Arrival marks the beginning of the client visit.
    * Signature marks the end.
    */
-  const arrivalTime =
-    Date.parse(
-      visit.arrivalVerification.verifiedAt,
-    );
+  const arrivalTime = Date.parse(visit.arrivalVerification.verifiedAt);
 
-  const signatureTime =
-    Date.parse(signature.signedAt);
+  const signatureTime = Date.parse(signature.signedAt);
 
   if (
     Number.isNaN(arrivalTime) ||
     Number.isNaN(signatureTime) ||
     signatureTime < arrivalTime
   ) {
-    throw new Error(
-      "The client confirmation timestamp is invalid.",
-    );
+    throw new Error("The client confirmation timestamp is invalid.");
   }
 }

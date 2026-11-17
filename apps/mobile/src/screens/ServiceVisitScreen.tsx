@@ -32,14 +32,62 @@ export default function ServiceVisitScreen({
   onBack,
   onVisitCompleted,
 }: Props) {
-  const { activeVisit, clearCompletedVisit, retrySummarySync } =
-    useServiceVisit();
+  const {
+    activeVisit,
+    restoringVisit,
+    restoreErrorMessage,
+    retryRestore,
+    clearCompletedVisit,
+    retrySummarySync,
+  } = useServiceVisit();
 
   const [submitting, setSubmitting] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [signatureActive, setSignatureActive] = useState(false);
+
+  if (restoringVisit) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="large" color="#7a3f2c" />
+          <Text style={styles.emptyText}>Restoring saved service visit...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (restoreErrorMessage) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyTitle}>Saved visit needs recovery</Text>
+
+          <Text style={styles.emptyText}>{restoreErrorMessage}</Text>
+
+          <Text style={styles.emptyText}>
+            Your locally saved data has been preserved. Do not uninstall the app
+            or clear its storage. Contact your manager if retrying does not
+            resolve the issue.
+          </Text>
+
+          <Pressable
+            style={styles.primaryButton}
+            onPress={() => {
+              void retryRestore();
+            }}
+          >
+            <Text style={styles.primaryButtonText}>Retry Restore</Text>
+          </Pressable>
+
+          <Pressable style={styles.primaryButton} onPress={onBack}>
+            <Text style={styles.primaryButtonText}>Return to Route</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!activeVisit) {
     return (

@@ -92,6 +92,8 @@ type ServiceVisitContextValue = {
     input: CompleteMachineRefillInput,
   ) => Promise<ServiceVisit>;
 
+  retryLegacyMachineRefill: () => Promise<ServiceVisit>;
+
   saveAfterPhoto: (input: SaveAfterPhotoInput) => Promise<ServiceVisit>;
 
   updateAfterPhotoUpload: (
@@ -224,11 +226,12 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     setErrorMessage,
   });
 
-  const { completeMachineRefill } = useMachineRefillStep({
-    activeVisit,
-    setActiveVisit,
-    setErrorMessage,
-  });
+  const { completeMachineRefill, retryLegacyMachineRefill } =
+    useMachineRefillStep({
+      activeVisit,
+      setActiveVisit,
+      setErrorMessage,
+    });
 
   /*
    * Step 7 - After photo + signature
@@ -640,9 +643,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       activeVisit.status === "completed" &&
       activeVisit.summary.syncStatus !== "synced"
     ) {
-      throw new Error(
-        "Sync the completed service visit before cancelling it.",
-      );
+      throw new Error("Sync the completed service visit before cancelling it.");
     }
 
     const now = new Date().toISOString();
@@ -731,6 +732,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
       completeRestockDrop,
       completeMachineRefill,
+      retryLegacyMachineRefill,
 
       saveAfterPhoto,
       updateAfterPhotoUpload,
@@ -775,6 +777,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
       completeRestockDrop,
       completeMachineRefill,
+      retryLegacyMachineRefill,
 
       saveAfterPhoto,
       updateAfterPhotoUpload,

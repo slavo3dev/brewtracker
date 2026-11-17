@@ -8,9 +8,7 @@ function getStorageKey(userId: string): string {
   return `${STORAGE_KEY_PREFIX}:${userId}`;
 }
 
-export async function saveServiceVisit(
-  visit: ServiceVisit,
-): Promise<void> {
+export async function saveServiceVisit(visit: ServiceVisit): Promise<void> {
   await AsyncStorage.setItem(
     getStorageKey(visit.userId),
     JSON.stringify(visit),
@@ -20,9 +18,7 @@ export async function saveServiceVisit(
 export async function loadServiceVisit(
   userId: string,
 ): Promise<ServiceVisit | null> {
-  const storedValue = await AsyncStorage.getItem(
-    getStorageKey(userId),
-  );
+  const storedValue = await AsyncStorage.getItem(getStorageKey(userId));
 
   if (!storedValue) {
     return null;
@@ -31,13 +27,23 @@ export async function loadServiceVisit(
   try {
     return JSON.parse(storedValue) as ServiceVisit;
   } catch {
-    await AsyncStorage.removeItem(getStorageKey(userId));
-    return null;
+    /*
+     * Preserve the original saved visit.
+     *
+     * Offline service visits may contain
+     * unsynchronized inventory and photos.
+     *
+     * Never delete potentially recoverable
+     * data because JSON parsing failed.
+     */
+    throw new Error(
+      "The saved service visit could not be read. " +
+        "Your local data has been preserved. " +
+        "Please contact support before clearing the visit.",
+    );
   }
 }
 
-export async function removeServiceVisit(
-  userId: string,
-): Promise<void> {
+export async function removeServiceVisit(userId: string): Promise<void> {
   await AsyncStorage.removeItem(getStorageKey(userId));
 }
