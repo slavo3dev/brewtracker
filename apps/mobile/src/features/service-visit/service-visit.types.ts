@@ -338,88 +338,90 @@ export type RestockDropRecord = {
   syncError: string | null;
 };
 
+export type MachineServiceOutcome =
+  | "refilled"
+  | "not_needed"
+  | "unable_to_refill";
+
+export type CompleteMachineRefillInput = {
+  outcome: MachineServiceOutcome;
+  reason: string | null;
+};
+
+export type MachineRefillSyncStatus = "pending_sync" | "synced" | "failed";
+
+/*
+ * Historical FLOW-18 quantity-based refill data.
+ *
+ * Retained for restoring and synchronizing visits
+ * created before INV-V3-04.
+ */
 export type MachineRefillZeroReason =
   | "refill_not_required"
   | "product_unavailable"
   | "machine_issue"
   | "other";
 
-export type MachineRefillQuantityInput = {
-  productId: string;
-
-  issueQuantity: number;
-  looseQuantity: number;
-
-  /*
-   * Optional explanation when this product was
-   * not added to the machine.
-   *
-   * Must be null when actual quantity > 0.
-   */
-  zeroReason: MachineRefillZeroReason | null;
-
-  /*
-   * Used only when zeroReason === "other".
-   */
-  zeroReasonNote: string | null;
-};
-
-export type CompleteMachineRefillInput = {
-  quantities: MachineRefillQuantityInput[];
-  configuredProducts: ClientInventoryProduct[];
-};
-
 export type MachineRefillItemRecord = {
   productId: string;
-
   sku: string | null;
   name: string;
-
   category: InventoryProductCategory;
-
   unitLabel: string;
-
   issueQuantity: number;
   looseQuantity: number;
-
   actualQuantity: number;
   normalizedUnit: string;
-
-  /*
-   * Persisted reason for an explicit zero refill.
-   */
   zeroReason: MachineRefillZeroReason | null;
-
   zeroReasonNote: string | null;
 };
 
-export type MachineRefillSyncStatus = "pending_sync" | "synced" | "failed";
-
-export type MachineRefillRecord = {
+export type MachineServiceConfirmationRecord = {
+  recordType: "confirmation";
   databaseId: string | null;
-
   sourceVisitId: string;
-
   confirmedAt: string;
-
-  items: MachineRefillItemRecord[];
-
+  outcome: MachineServiceOutcome;
+  reason: string | null;
   syncStatus: MachineRefillSyncStatus;
-
   syncError: string | null;
 };
 
-/*
- * Machine-refilled is intentionally derived rather
- * than persisted as another source of truth.
- *
- * true  -> at least one product was added
- * false -> every product has quantity 0
- */
+export type LegacyMachineRefillRecord = {
+  /*
+   * Older persisted records have no recordType.
+   */
+  recordType?: "legacy";
+  databaseId: string | null;
+  sourceVisitId: string;
+  confirmedAt: string;
+  items: MachineRefillItemRecord[];
+  syncStatus: MachineRefillSyncStatus;
+  syncError: string | null;
+};
+
+export type MachineRefillRecord =
+  | MachineServiceConfirmationRecord
+  | LegacyMachineRefillRecord;
+
+export function isLegacyMachineRefill(
+  record: MachineRefillRecord,
+): record is LegacyMachineRefillRecord {
+  return "items" in record;
+}
+
 export function wasMachineRefilled(
   machineRefill: MachineRefillRecord | null,
 ): boolean {
-  return machineRefill?.items.some((item) => item.actualQuantity > 0) ?? false;
+  if (!machineRefill) {
+    return false;
+  }
+
+  if (isLegacyMachineRefill(machineRefill)) {
+    return machineRefill.items.some((item) => item.actualQuantity > 0);
+  }
+
+  return machineRefill.outcome === "refilled";
 }
 
 export type CompleteMachineScanInput = {
