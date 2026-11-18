@@ -1,11 +1,35 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import type { TodayRouteSnapshot } from "./route.types";
+import type {
+  TodayRouteSnapshot,
+  TodayRouteStop,
+} from "./route.types";
 
 const ROUTE_CACHE_PREFIX = "@brewtracker/today-route";
 
 function createCacheKey(userId: string, routeDate: string): string {
   return `${ROUTE_CACHE_PREFIX}:${userId}:${routeDate}`;
+}
+
+function normalizeCachedStop(stop: TodayRouteStop): TodayRouteStop {
+  if (Array.isArray(stop.machines)) {
+    return stop;
+  }
+
+  return {
+    ...stop,
+    machines:
+      stop.machineId && stop.machine
+        ? [
+            {
+              machineId: stop.machineId,
+              sequenceNumber: 1,
+              drinkCountRequired: stop.drinkCountRequired,
+              machine: stop.machine,
+            },
+          ]
+        : [],
+  };
 }
 
 export async function saveTodayRouteSnapshot(
@@ -35,7 +59,15 @@ export async function readTodayRouteSnapshot(
       return null;
     }
 
-    return parsedValue;
+    return {
+      ...parsedValue,
+      route: parsedValue.route
+        ? {
+            ...parsedValue.route,
+            stops: parsedValue.route.stops.map(normalizeCachedStop),
+          }
+        : null,
+    };
   } catch {
     await AsyncStorage.removeItem(key);
     return null;
