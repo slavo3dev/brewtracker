@@ -11,7 +11,14 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  reporter: 'html',
+  // PLAYWRIGHT_JSON_OUTPUT_NAME controls where the json reporter writes its results file —
+  // defaults to test-results/results.json (gitignored) so `npm run test:regression` works
+  // without the caller having to set it. Consumed by scripts/generate-regression-table.ts to
+  // turn a run into an English regression status table.
+  reporter: [
+    ['html'],
+    ['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_NAME ?? 'test-results/results.json' }],
+  ],
 
   use: {
     // Local dev server (npm run dev:web) — start IT BEFORE running the tests. The user

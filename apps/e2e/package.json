@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "regression:table": "tsx scripts/generate-regression-table.ts",
+    "test:regression": "playwright test --workers=1; npm run regression:table && open test-results/regression-table.md"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +16,7 @@
     "@playwright/test": "^1.64.1",
     "@types/ws": "^8.18.2",
     "dotenv": "^16.4.7",
+    "tsx": "^4.23.15",
     "ws": "^8.22.0"
   },
   "dependencies": {
