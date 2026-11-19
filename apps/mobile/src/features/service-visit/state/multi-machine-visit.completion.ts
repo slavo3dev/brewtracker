@@ -134,8 +134,31 @@ export function completeMultiMachineVisit(
 ): MultiMachineServiceVisit {
   assertMultiMachineVisitReadyForCompletion(visit);
 
-  if (!Number.isFinite(Date.parse(now))) {
+  const completionTime = Date.parse(now);
+
+  if (!Number.isFinite(completionTime)) {
     throw new Error("Invalid completion timestamp.");
+  }
+
+  const signatureTime = Date.parse(
+    visit.clientConfirmation.signature!.signedAt,
+  );
+
+  if (completionTime < signatureTime) {
+    throw new Error("Completion cannot precede client confirmation.");
+  }
+
+  for (const machine of visit.machines) {
+    const machineCompletionTime = Date.parse(machine.completedAt!);
+
+    if (
+      !Number.isFinite(machineCompletionTime) ||
+      completionTime < machineCompletionTime
+    ) {
+      throw new Error(
+        "Visit completion cannot precede machine service completion.",
+      );
+    }
   }
 
   return {

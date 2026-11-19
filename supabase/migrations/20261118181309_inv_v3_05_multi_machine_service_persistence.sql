@@ -1,3 +1,80 @@
+-- INV-V3-05: Shared multi-machine stop synchronization.
+--
+-- Lock ordering: visit advisory lock, then stop advisory lock.
+-- This protects against different visit IDs referencing the same stop.
+
+CREATE OR REPLACE FUNCTION public.lock_multi_machine_inventory_stop(
+  p_source_visit_id text,
+  p_stop_id uuid
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+DECLARE
+  v_visit_id text := NULLIF(btrim(p_source_visit_id), '');
+  v_machine_id uuid;
+  v_route_id uuid;
+  v_status public.stop_status;
+BEGIN
+  IF v_visit_id IS NULL OR p_stop_id IS NULL THEN
+    RAISE EXCEPTION 'Service visit and stop IDs are required';
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended(v_visit_id, 0)
+  );
+
+  SELECT s.machine_id, s.status
+  INTO v_machine_id, v_status
+  FROM public.stops s
+  WHERE s.id = p_stop_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Service stop not found';
+  END IF;
+
+  IF v_machine_id IS NULL THEN
+    PERFORM pg_advisory_xact_lock(
+      hashtextextended('multi_machine_stop:' || p_stop_id::text, 0)
+    );
+
+    -- Resolve the parent route before acquiring row locks.
+    SELECT s.route_id
+    INTO v_route_id
+    FROM public.stops s
+    WHERE s.id = p_stop_id;
+
+    -- Match route-management lock ordering: route before stop.
+    PERFORM 1
+    FROM public.routes r
+    WHERE r.id = v_route_id
+    FOR SHARE;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Service route not found';
+    END IF;
+
+    -- Prevent completion while inventory persistence is active.
+    SELECT s.status
+    INTO v_status
+    FROM public.stops s
+    WHERE s.id = p_stop_id
+    FOR SHARE;
+
+    IF v_status = 'completed' THEN
+      RAISE EXCEPTION
+        'Inventory cannot be modified after multi-machine visit completion';
+    END IF;
+  END IF;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.lock_multi_machine_inventory_stop(
+  text, uuid
+) FROM PUBLIC, anon, authenticated;
+
 -- INV-V3-05: Multi-Machine Service Visit Persistence
 --
 -- Allow one machine service confirmation per machine within
@@ -157,9 +234,10 @@ BEGIN
   -- Serialize synchronization for the same visit
   -- ========================================================
 
-  -- Coordinate with after-service, machine confirmation and completion.
-  PERFORM pg_advisory_xact_lock(
-    hashtextextended(TRIM(p_source_visit_id), 0)
+  -- Serialize inventory writes by visit and multi-machine stop.
+  PERFORM public.lock_multi_machine_inventory_stop(
+    p_source_visit_id,
+    p_stop_id
   );
 
   PERFORM pg_advisory_xact_lock(
@@ -626,9 +704,10 @@ begin
   -- transaction completes or rolls back.
   ----------------------------------------------------------
 
-  -- Coordinate with after-service, machine confirmation and completion.
-  perform pg_advisory_xact_lock(
-    hashtextextended(trim(p_source_visit_id), 0)
+  -- Serialize inventory writes by visit and multi-machine stop.
+  perform public.lock_multi_machine_inventory_stop(
+    p_source_visit_id,
+    p_stop_id
   );
 
   perform pg_advisory_xact_lock(
@@ -1386,8 +1465,10 @@ begin
   -- for the same service visit.
   ----------------------------------------------------------
 
-  perform pg_advisory_xact_lock(
-    hashtextextended(trim(p_source_visit_id), 0)
+  -- Serialize inventory writes by visit and multi-machine stop.
+  perform public.lock_multi_machine_inventory_stop(
+    p_source_visit_id,
+    p_stop_id
   );
 
 
@@ -1743,9 +1824,10 @@ BEGIN
     END IF;
   END IF;
 
-  -- Serialize concurrent attempts for this service visit.
-  PERFORM pg_advisory_xact_lock(
-    hashtextextended(v_visit_id, 0)
+  -- Serialize confirmation by visit and multi-machine stop.
+  PERFORM public.lock_multi_machine_inventory_stop(
+    v_visit_id,
+    p_stop_id
   );
 
   -- Never create a confirmation-only record when historical
@@ -2929,6 +3011,24 @@ BEGIN
   -- shared after-service inventory persistence.
   PERFORM pg_advisory_xact_lock(hashtextextended(v_visit_id, 0));
 
+  -- Coordinate completion with inventory writes across visit IDs.
+  -- Lock order: visit first, then multi-machine stop.
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended('multi_machine_stop:' || p_stop_id::text, 0)
+  );
+
+  -- Lock the route before the stop to match route-management operations.
+  -- The stop guard also takes a SHARE lock on this route.
+  SELECT r.status
+  INTO v_route_status
+  FROM public.routes r
+  WHERE r.id = p_route_id
+  FOR SHARE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Service route not found';
+  END IF;
+
   SELECT s.*
   INTO v_stop
   FROM public.stops s
@@ -2950,6 +3050,69 @@ BEGIN
      OR v_stop.client_id IS DISTINCT FROM p_client_id
      OR v_stop.machine_id IS NOT NULL THEN
     RAISE EXCEPTION 'Invalid multi-machine stop assignment';
+  END IF;
+
+  -- Idempotent retry: use the persisted completion without requiring
+  -- inventory and machine confirmations to be revalidated.
+  SELECT *
+  INTO v_existing
+  FROM public.service_visit_summaries s
+  WHERE s.source_visit_id = v_visit_id
+  FOR UPDATE;
+
+  IF FOUND THEN
+    IF v_existing.stop_id IS DISTINCT FROM p_stop_id
+       OR v_existing.client_id IS DISTINCT FROM p_client_id
+       OR v_existing.machine_id IS NOT NULL
+       OR v_existing.completed_by IS DISTINCT FROM v_user_id
+       OR v_existing.completed_at IS DISTINCT FROM p_completed_at
+       OR v_stop.status <> 'completed'
+       OR v_stop.completed_at IS DISTINCT FROM p_completed_at THEN
+      RAISE EXCEPTION 'Conflicting completion already exists';
+    END IF;
+
+    -- Verify the original client confirmation and submitted summary.
+    SELECT *
+    INTO v_signature
+    FROM public.service_visit_signatures sig
+    WHERE sig.source_visit_id = v_visit_id
+      AND sig.stop_id = p_stop_id
+      AND sig.client_id = p_client_id
+      AND sig.machine_id IS NULL
+      AND sig.signed_by = v_user_id;
+
+    IF NOT FOUND
+       OR NULLIF(btrim(v_signature.storage_path), '') IS NULL THEN
+      RAISE EXCEPTION 'Original client confirmation is missing';
+    END IF;
+
+    v_summary := p_summary || jsonb_build_object(
+      'clientConfirmation',
+      jsonb_build_object(
+        'signatureId', v_signature.id,
+        'storagePath', v_signature.storage_path,
+        'signedAt', v_signature.signed_at,
+        'confirmedAt', v_signature.signed_at
+      )
+    );
+
+    IF v_existing.summary IS DISTINCT FROM v_summary THEN
+      RAISE EXCEPTION 'Conflicting completion summary already exists';
+    END IF;
+
+    RETURN QUERY
+    SELECT v_existing.id,
+           v_existing.survey_token,
+           v_existing.notification_status,
+           v_existing.email_sent_at;
+    RETURN;
+  END IF;
+
+  -- Preserve the original completion time for offline synchronization.
+  -- Reject completion before arrival when arrival is recorded.
+  IF v_stop.arrived_at IS NOT NULL
+     AND p_completed_at < v_stop.arrived_at THEN
+    RAISE EXCEPTION 'Completion time cannot precede arrival time';
   END IF;
 
   SELECT count(*)
@@ -3031,6 +3194,17 @@ BEGIN
     RAISE EXCEPTION 'Every assigned machine requires confirmation';
   END IF;
 
+  -- Machine confirmations must not occur after visit completion.
+  IF EXISTS (
+    SELECT 1
+    FROM public.machine_refills mr
+    WHERE mr.source_visit_id = v_visit_id
+      AND mr.stop_id = p_stop_id
+      AND mr.confirmed_at > p_completed_at
+  ) THEN
+    RAISE EXCEPTION 'Machine confirmation cannot follow visit completion';
+  END IF;
+
   IF EXISTS (
     SELECT 1
     FROM public.machine_refills mr
@@ -3082,32 +3256,6 @@ BEGIN
       'confirmedAt', v_signature.signed_at
     )
   );
-
-  SELECT *
-  INTO v_existing
-  FROM public.service_visit_summaries s
-  WHERE s.source_visit_id = v_visit_id
-  FOR UPDATE;
-
-  IF FOUND THEN
-    IF v_existing.stop_id IS DISTINCT FROM p_stop_id
-       OR v_existing.client_id IS DISTINCT FROM p_client_id
-       OR v_existing.machine_id IS NOT NULL
-       OR v_existing.completed_by IS DISTINCT FROM v_user_id
-       OR v_existing.completed_at IS DISTINCT FROM p_completed_at
-       OR v_existing.summary IS DISTINCT FROM v_summary
-       OR v_stop.status <> 'completed'
-       OR v_stop.completed_at IS DISTINCT FROM p_completed_at THEN
-      RAISE EXCEPTION 'Conflicting completion already exists';
-    END IF;
-
-    RETURN QUERY
-    SELECT v_existing.id,
-           v_existing.survey_token,
-           v_existing.notification_status,
-           v_existing.email_sent_at;
-    RETURN;
-  END IF;
 
   IF v_route_status <> 'in_progress'
      OR v_stop.status <> 'in_progress' THEN
@@ -3236,10 +3384,6 @@ BEGIN
       RAISE EXCEPTION 'Inventory visit association is required';
     END IF;
 
-    PERFORM pg_advisory_xact_lock(
-      hashtextextended(btrim(v_visit_id), 0)
-    );
-
     SELECT s.status
     INTO v_status
     FROM public.stops s
@@ -3294,3 +3438,17 @@ CREATE TRIGGER guard_completed_multi_machine_refill_items
 BEFORE INSERT OR UPDATE OR DELETE ON public.machine_refill_items
 FOR EACH ROW
 EXECUTE FUNCTION public.guard_completed_multi_machine_inventory();
+
+-- INV-V3-05: Restrict inventory table truncation.
+--
+-- RLS does not protect TRUNCATE operations.
+-- Inventory history must not be removable by API client roles.
+
+REVOKE TRUNCATE ON TABLE
+  public.client_reserve_snapshots,
+  public.client_reserve_snapshot_items,
+  public.client_deliveries,
+  public.client_delivery_items,
+  public.machine_refills,
+  public.machine_refill_items
+FROM anon, authenticated;

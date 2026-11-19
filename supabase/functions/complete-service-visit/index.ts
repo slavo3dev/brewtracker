@@ -1,4 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { createMultiMachineEmailHtml } from "./multi-machine-email.ts";
+import { sendMultiMachineServiceEmail } from "./multi-machine-resend.ts";
+import { loadMultiMachineEmailItems } from "./multi-machine-notification-data.ts";
+import {
+  claimMultiMachineNotification,
+  finalizeMultiMachineNotification,
+} from "./multi-machine-notification.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -18,7 +25,8 @@ type CompletionPayload = {
   routeId: string;
   stopId: string;
   clientId: string;
-  machineId: string;
+  machineId?: string;
+  schemaVersion?: 2;
   completedBy: string;
 
   completedAt: string;
@@ -287,6 +295,293 @@ async function createPhotoSignedUrl(
   return data.signedUrl;
 }
 
+type MultiMachinePersistedSummary = {
+  id: string;
+  source_visit_id: string;
+  stop_id: string;
+  client_id: string;
+  machine_id: string | null;
+  completed_by: string;
+  completed_at: string;
+  survey_token: string;
+  notification_status: string;
+  email_sent_at: string | null;
+  summary: VisitSummary;
+};
+
+async function loadMultiMachinePersistedSummary(
+  summaryId: string,
+  payload: CompletionPayload,
+): Promise<MultiMachinePersistedSummary> {
+  const { data, error } = await supabaseAdmin
+    .from("service_visit_summaries")
+    .select(
+      "id, source_visit_id, stop_id, client_id, machine_id, completed_by, completed_at, survey_token, notification_status, email_sent_at, summary",
+    )
+    .eq("id", summaryId)
+    .single();
+
+  if (error || !data) {
+    throw new Error(
+      `Unable to load completed visit summary: ${error?.message ?? "Not found"}`,
+    );
+  }
+
+  if (
+    data.source_visit_id !== payload.sourceVisitId ||
+    data.stop_id !== payload.stopId ||
+    data.client_id !== payload.clientId ||
+    data.machine_id !== null ||
+    data.completed_by !== payload.completedBy
+  ) {
+    throw new Error("Persisted multi-machine summary does not match the visit.");
+  }
+
+  if (
+    !data.summary ||
+    typeof data.summary !== "object" ||
+    Array.isArray(data.summary)
+  ) {
+    throw new Error("Persisted multi-machine summary is invalid.");
+  }
+
+  return data as MultiMachinePersistedSummary;
+}
+
+type MultiMachinePhotoLink = {
+  machineId: string;
+  stage: "before" | "after";
+  kind: string;
+  url: string;
+};
+
+async function loadMultiMachinePhotoLinks(
+  sourceVisitId: string,
+  stopId: string,
+  machineIds: string[],
+): Promise<MultiMachinePhotoLink[]> {
+  const allowedMachineIds = new Set(machineIds);
+
+  const { data, error } = await supabaseAdmin
+    .from("service_visit_photos")
+    .select("machine_id, stage, kind, storage_path")
+    .eq("source_visit_id", sourceVisitId)
+    .eq("stop_id", stopId);
+
+  if (error) {
+    throw new Error(`Unable to load multi-machine photos: ${error.message}`);
+  }
+
+  const photos = data ?? [];
+
+  for (const photo of photos) {
+    if (!allowedMachineIds.has(photo.machine_id)) {
+      throw new Error("Service photo belongs to an unexpected machine.");
+    }
+
+    if (photo.stage !== "before" && photo.stage !== "after") {
+      throw new Error("Invalid service photo stage.");
+    }
+  }
+
+  const links = await Promise.all(
+    photos.map(async (photo) => ({
+      machineId: photo.machine_id,
+      stage: photo.stage as "before" | "after",
+      kind: photo.kind,
+      url: await createPhotoSignedUrl(photo.storage_path),
+    })),
+  );
+
+  return links.filter(
+    (photo): photo is MultiMachinePhotoLink => photo.url !== null,
+  );
+}
+
+function createMultiMachineNotificationHtml(
+  summary: MultiMachinePersistedSummary,
+  machines: Parameters<typeof createMultiMachineEmailHtml>[0],
+  photos: MultiMachinePhotoLink[],
+  machineIds: string[],
+): string {
+  if (machines.length !== machineIds.length) {
+    throw new Error("Machine and photo grouping counts do not match.");
+  }
+
+  const inventoryHtml = createInventorySummaryHtml(summary.summary);
+  const machinesHtml = createMultiMachineEmailHtml(machines);
+
+  const photoSections = machineIds.map((machineId, index) => {
+    const machinePhotos = photos.filter(
+      (photo) => photo.machineId === machineId,
+    );
+
+    if (machinePhotos.length === 0) {
+      return "";
+    }
+
+    const links = machinePhotos
+      .sort((a, b) =>
+        a.stage.localeCompare(b.stage) ||
+        a.kind.localeCompare(b.kind)
+      )
+      .map((photo) => {
+        const label = escapeHtml(`${photo.stage} — ${photo.kind}`);
+        const url = escapeHtml(photo.url);
+
+        return `<li><a href="${url}">${label}</a></li>`;
+      })
+      .join("");
+
+    return `
+      <h3>Machine ${index + 1} — Photos</h3>
+      <ul>${links}</ul>
+    `;
+  }).join("");
+
+  return `
+    <h1>Service visit completed</h1>
+    <p>The service visit has been completed.</p>
+    ${inventoryHtml}
+    ${machinesHtml}
+    ${photoSections ? `<h2>Service photos</h2>${photoSections}` : ""}
+    ${WEB_APP_URL
+      ? `<p><a href="${escapeHtml(
+          `${WEB_APP_URL.replace(/\/$/, "")}/survey/${encodeURIComponent(summary.survey_token)}`,
+        )}">Rate your service experience</a></p>`
+      : ""}
+  `;
+}
+
+type MultiMachineNotificationClient = {
+  id: string;
+  name: string;
+  service_email: string | null;
+};
+
+async function loadMultiMachineNotificationClient(
+  clientId: string,
+): Promise<MultiMachineNotificationClient> {
+  const { data, error } = await supabaseAdmin
+    .from("clients")
+    .select("id, name, service_email")
+    .eq("id", clientId)
+    .single();
+
+  if (error || !data) {
+    throw new Error(
+      `Unable to load notification client: ${error?.message ?? "Not found"}`,
+    );
+  }
+
+  return data as MultiMachineNotificationClient;
+}
+
+async function processMultiMachineNotification(
+  summary: MultiMachinePersistedSummary,
+): Promise<void> {
+  if (
+    summary.notification_status === "sent" ||
+    summary.notification_status === "skipped"
+  ) {
+    return;
+  }
+
+  const claim = await claimMultiMachineNotification(
+    supabaseAdmin,
+    summary.id,
+  );
+
+  if (!claim) {
+    return;
+  }
+
+  let status: "sent" | "failed" | "skipped" = "failed";
+  let failureMessage: string | null = null;
+
+  try {
+    const client = await loadMultiMachineNotificationClient(
+      summary.client_id,
+    );
+
+    if (!client.service_email?.trim()) {
+      status = "skipped";
+    } else {
+      const machines = await loadMultiMachineEmailItems(
+        supabaseAdmin,
+        summary.source_visit_id,
+        summary.stop_id,
+        summary.client_id,
+        summary.completed_by,
+      );
+
+      if (machines.length < 2) {
+        throw new Error(
+          "Multi-machine notification has insufficient machines.",
+        );
+      }
+
+      const machineIds = machines.map(
+        (machine) => machine.machineId,
+      );
+
+      if (
+        machineIds.length < 2 ||
+        new Set(machineIds).size !== machineIds.length
+      ) {
+        throw new Error("Invalid verified machine IDs for notification.");
+      }
+
+      const photos = await loadMultiMachinePhotoLinks(
+        summary.source_visit_id,
+        summary.stop_id,
+        machineIds,
+      );
+
+      const emailHtml = createMultiMachineNotificationHtml(
+        summary,
+        machines,
+        photos,
+        machineIds,
+      );
+
+      if (!emailHtml.trim()) {
+        throw new Error("Multi-machine notification HTML is empty.");
+      }
+
+      await sendMultiMachineServiceEmail({
+        apiKey: RESEND_API_KEY ?? "",
+        from: SERVICE_EMAIL_FROM,
+        to: client.service_email.trim(),
+        clientName: client.name,
+        summaryId: summary.id,
+        html: emailHtml,
+      });
+
+      status = "sent";
+      failureMessage = null;
+    }
+  } catch (error) {
+    status = "failed";
+    failureMessage = error instanceof Error
+      ? error.message
+      : "Unknown multi-machine notification error.";
+
+    console.error("Multi-machine notification failed:", failureMessage);
+  }
+
+  try {
+    await finalizeMultiMachineNotification(
+      supabaseAdmin,
+      claim,
+      status,
+      failureMessage,
+    );
+  } catch (error) {
+    console.error("Unable to finalize multi-machine notification:", error);
+  }
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") {
     return jsonResponse(
@@ -334,7 +629,23 @@ Deno.serve(async (request: Request) => {
     );
   }
 
-  const payload = (await request.json()) as CompletionPayload;
+  let rawPayload: unknown;
+
+  try {
+    rawPayload = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON request body." }, 400);
+  }
+
+  if (
+    rawPayload === null ||
+    typeof rawPayload !== "object" ||
+    Array.isArray(rawPayload)
+  ) {
+    return jsonResponse({ error: "Invalid completion payload." }, 400);
+  }
+
+  const payload = rawPayload as CompletionPayload;
 
   if (payload.completedBy !== user.id) {
     return jsonResponse(
@@ -345,13 +656,19 @@ Deno.serve(async (request: Request) => {
     );
   }
 
+  const isMultiMachine = payload.schemaVersion === 2;
+
   if (
+    (payload.schemaVersion !== undefined && !isMultiMachine) ||
     !payload.sourceVisitId ||
     !payload.routeId ||
     !payload.stopId ||
     !payload.clientId ||
-    !payload.machineId ||
-    !payload.completedAt
+    (!isMultiMachine && !payload.machineId) ||
+    !payload.completedAt ||
+    !payload.visitSummary ||
+    typeof payload.visitSummary !== "object" ||
+    Array.isArray(payload.visitSummary)
   ) {
     return jsonResponse(
       {
@@ -359,6 +676,88 @@ Deno.serve(async (request: Request) => {
       },
       400,
     );
+  }
+
+  if (isMultiMachine) {
+    const { data: rows, error: completionError } = await userClient.rpc(
+      "complete_multi_machine_service_visit",
+      {
+        p_source_visit_id: payload.sourceVisitId,
+        p_route_id: payload.routeId,
+        p_stop_id: payload.stopId,
+        p_client_id: payload.clientId,
+        p_completed_at: payload.completedAt,
+        p_summary: payload.visitSummary,
+      },
+    );
+
+    if (completionError) {
+      console.error(
+        "Unable to complete multi-machine service visit:",
+        completionError,
+      );
+
+      return jsonResponse(
+        {
+          error: "Unable to complete multi-machine service visit.",
+          details: completionError.message,
+          code: completionError.code,
+        },
+        400,
+      );
+    }
+
+    const summary = rows?.[0];
+
+    if (!summary) {
+      return jsonResponse(
+        { error: "Multi-machine completion returned no summary." },
+        500,
+      );
+    }
+
+    let notificationStatus = summary.notification_status;
+    let emailSentAt = summary.email_sent_at;
+
+    // Notification failures must never reverse visit completion.
+    try {
+      const persistedSummary = await loadMultiMachinePersistedSummary(
+        summary.summary_id,
+        payload,
+      );
+
+      await processMultiMachineNotification(persistedSummary);
+
+      // Return the latest notification status after processing.
+      const { data: notification, error: notificationError } =
+        await supabaseAdmin
+          .from("service_visit_summaries")
+          .select("notification_status, email_sent_at")
+          .eq("id", summary.summary_id)
+          .single();
+
+      if (notificationError) {
+        console.error(
+          "Unable to reload notification status:",
+          notificationError.message,
+        );
+      } else if (notification) {
+        notificationStatus = notification.notification_status;
+        emailSentAt = notification.email_sent_at;
+      }
+    } catch (error) {
+      console.error(
+        "Multi-machine notification processing failed:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+
+    return jsonResponse({
+      summaryId: summary.summary_id,
+      surveyToken: summary.survey_token,
+      notificationStatus,
+      emailSentAt,
+    });
   }
 
   //--------------------------------------------------
