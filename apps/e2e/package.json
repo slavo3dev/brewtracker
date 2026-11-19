@@ -6,7 +6,7 @@
   "scripts": {
     "test": "playwright test",
     "regression:table": "tsx scripts/generate-regression-table.ts",
-    "test:regression": "playwright test --workers=1; npm run regression:table && open test-results/regression-table.md"
+    "test:regression": "playwright test --workers=1; npm run regression:table && open test-results/regression-table.html"
   },
   "keywords": [],
   "author": "",
