@@ -515,9 +515,9 @@ async function processMultiMachineNotification(
         summary.completed_by,
       );
 
-      if (machines.length < 2) {
+      if (machines.length < 1) {
         throw new Error(
-          "Multi-machine notification has insufficient machines.",
+          "Service notification requires at least one machine.",
         );
       }
 
@@ -526,7 +526,7 @@ async function processMultiMachineNotification(
       );
 
       if (
-        machineIds.length < 2 ||
+        machineIds.length < 1 ||
         new Set(machineIds).size !== machineIds.length
       ) {
         throw new Error("Invalid verified machine IDs for notification.");

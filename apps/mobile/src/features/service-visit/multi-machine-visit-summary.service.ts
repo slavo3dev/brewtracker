@@ -12,8 +12,8 @@ export async function syncCompletedMultiMachineServiceVisit(
     );
   }
 
-  if (visit.machines.length < 2) {
-    throw new Error("Multiple assigned machines are required.");
+  if (visit.machines.length < 1) {
+    throw new Error("At least one assigned machine is required.");
   }
 
   const { data, error } =

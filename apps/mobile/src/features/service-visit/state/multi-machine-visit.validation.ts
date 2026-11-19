@@ -50,7 +50,7 @@ export function validateRestoredMultiMachineVisit(
     return null;
   }
 
-  if (!Array.isArray(visit.machines) || visit.machines.length < 2) {
+  if (!Array.isArray(visit.machines) || visit.machines.length < 1) {
     return null;
   }
 

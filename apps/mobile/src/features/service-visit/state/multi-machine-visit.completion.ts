@@ -14,8 +14,8 @@ export function assertMultiMachineVisitReadyForCompletion(
     throw new Error("Arrival verification is missing.");
   }
 
-  if (visit.machines.length < 2) {
-    throw new Error("The visit must contain multiple assigned machines.");
+  if (visit.machines.length < 1) {
+    throw new Error("The visit must contain at least one assigned machine.");
   }
 
   const machineIds = new Set<string>();

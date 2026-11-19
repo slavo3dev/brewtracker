@@ -6,30 +6,20 @@ import type {
 } from "../multi-machine-visit.types";
 
 import type {
-  ServiceVisitMachineTarget,
-  ServiceVisitTarget,
-} from "../service-visit.types";
+  StartUnifiedServiceVisitInput,
+} from "../multi-machine-visit.types";
 
-export type StartMultiMachineVisitInput = {
-  userId: string;
-  routeId: string;
-  stopId: string;
-  clientId: string;
-  target: ServiceVisitTarget;
-  machines: {
-    machineId: string;
-    sequenceNumber: number;
-    drinkCountRequired: boolean;
-    machineTarget: ServiceVisitMachineTarget;
-  }[];
-};
+export type StartMultiMachineVisitInput =
+  StartUnifiedServiceVisitInput & {
+    userId: string;
+  };
 
 export function createMultiMachineVisit(
   input: StartMultiMachineVisitInput,
 ): MultiMachineServiceVisit {
-  if (input.machines.length < 2) {
+  if (input.machines.length < 1) {
     throw new Error(
-      "A multi-machine visit requires at least two assigned machines.",
+      "A service visit requires at least one assigned machine.",
     );
   }
 

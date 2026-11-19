@@ -182,6 +182,16 @@ export default function StopDetailsScreen({
       return;
     }
 
+    const unifiedMachines = stop.machines.map((assignment) => ({
+      machineId: assignment.machineId,
+      sequenceNumber: assignment.sequenceNumber,
+      drinkCountRequired: assignment.drinkCountRequired,
+      machineTarget: {
+        ...assignment.machine,
+        qrCode: assignment.machine.qrCode?.trim() ?? "",
+      },
+    }));
+
     setStartingService(true);
     setServiceError(null);
 

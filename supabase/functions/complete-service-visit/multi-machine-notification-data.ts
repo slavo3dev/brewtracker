@@ -18,8 +18,8 @@ export async function loadMultiMachineEmailItems(
     throw new Error(`Unable to load assigned machines: ${assignmentError.message}`);
   }
 
-  if (!assignments || assignments.length < 2) {
-    throw new Error("Multi-machine visit requires at least two assigned machines.");
+  if (!assignments || assignments.length < 1) {
+    throw new Error("Service visit requires at least one assigned machine.");
   }
 
   const machineIds = assignments.map((assignment) => assignment.machine_id);

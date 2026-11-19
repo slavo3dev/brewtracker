@@ -16,6 +16,19 @@ import type {
   ServiceVisitTarget,
 } from "./service-visit.types";
 
+export type StartUnifiedServiceVisitInput = {
+  routeId: string;
+  stopId: string;
+  clientId: string;
+  target: ServiceVisitTarget;
+  machines: {
+    machineId: string;
+    sequenceNumber: number;
+    drinkCountRequired: boolean;
+    machineTarget: ServiceVisitMachineTarget;
+  }[];
+};
+
 export type MultiMachineVisitStepId =
   | "arrival"
   | "inventory_audit"

@@ -6,19 +6,19 @@ import {
   type SetStateAction,
 } from "react";
 
-import { saveServiceVisit } from "../../src/features/service-visit/service-visit.storage";
-import type { ServiceVisit } from "../../src/features/service-visit/service-visit.types";
 
-type UseVisitMutationParams = {
-  activeVisit: ServiceVisit | null;
-  setActiveVisit: Dispatch<SetStateAction<ServiceVisit | null>>;
+type UseVisitMutationParams<TVisit> = {
+  activeVisit: TVisit | null;
+  setActiveVisit: Dispatch<SetStateAction<TVisit | null>>;
+  persistVisit: (visit: TVisit) => Promise<void>;
 };
 
-export function useVisitMutation({
+export function useVisitMutation<TVisit>({
   activeVisit,
   setActiveVisit,
-}: UseVisitMutationParams) {
-  const activeVisitRef = useRef<ServiceVisit | null>(activeVisit);
+  persistVisit,
+}: UseVisitMutationParams<TVisit>) {
+  const activeVisitRef = useRef<TVisit | null>(activeVisit);
 
   const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
 
@@ -29,9 +29,9 @@ export function useVisitMutation({
   const commitVisitMutation = useCallback(
     (
       mutation: (
-        currentVisit: ServiceVisit,
-      ) => ServiceVisit | Promise<ServiceVisit>,
-    ): Promise<ServiceVisit> => {
+        currentVisit: TVisit,
+      ) => TVisit | Promise<TVisit>,
+    ): Promise<TVisit> => {
       const operation = mutationQueueRef.current.then(async () => {
         const currentVisit = activeVisitRef.current;
 
@@ -41,7 +41,7 @@ export function useVisitMutation({
 
         const updatedVisit = await mutation(currentVisit);
 
-        await saveServiceVisit(updatedVisit);
+        await persistVisit(updatedVisit);
 
         activeVisitRef.current = updatedVisit;
         setActiveVisit(updatedVisit);
@@ -60,7 +60,7 @@ export function useVisitMutation({
 
       return operation;
     },
-    [setActiveVisit],
+    [persistVisit, setActiveVisit],
   );
 
   return {

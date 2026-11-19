@@ -1983,9 +1983,9 @@ BEGIN
       JOIN public.machines m ON m.id = sm.machine_id
       WHERE sm.stop_id = NEW.stop_id
         AND m.client_id = NEW.client_id
-    ) < 2 THEN
+    ) < 1 THEN
       RAISE EXCEPTION
-        'Shared signature requires at least two assigned client machines'
+        'Shared signature requires at least one assigned client machine'
         USING ERRCODE = '23514';
     END IF;
   ELSE
@@ -3122,13 +3122,13 @@ BEGIN
   WHERE sm.stop_id = p_stop_id
     AND m.client_id = p_client_id;
 
-  IF v_machine_count < 2
+  IF v_machine_count < 1
      OR v_machine_count <> (
        SELECT count(*)
        FROM public.stop_machines sm
        WHERE sm.stop_id = p_stop_id
      ) THEN
-    RAISE EXCEPTION 'At least two valid assigned machines are required';
+    RAISE EXCEPTION 'At least one valid assigned machine is required';
   END IF;
 
   SELECT *

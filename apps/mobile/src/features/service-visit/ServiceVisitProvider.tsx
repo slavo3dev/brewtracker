@@ -168,6 +168,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   const { commitVisitMutation } = useVisitMutation({
     activeVisit,
     setActiveVisit,
+    persistVisit: saveServiceVisit,
   });
 
   const { saveSignature, updateSignatureUpload, removeSignature } =
