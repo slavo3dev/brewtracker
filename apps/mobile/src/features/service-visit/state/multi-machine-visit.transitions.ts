@@ -65,6 +65,12 @@ export function assertMachineStepComplete(
         if (!photo?.localUri) {
           throw new Error(`Required ${kind} photo is missing.`);
         }
+
+        if (photo.uploadStatus !== "uploaded") {
+          throw new Error(
+            `Required ${kind} photo must finish uploading before continuing.`,
+          );
+        }
       }
 
       break;

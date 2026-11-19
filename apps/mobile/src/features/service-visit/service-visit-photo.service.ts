@@ -19,6 +19,8 @@ export type CreateServiceVisitPhotoInput = {
   storagePath: string;
 
   capturedAt: string;
+
+  schemaVersion?: 1 | 2;
 };
 
 export async function createServiceVisitPhoto(
@@ -50,7 +52,7 @@ export async function createServiceVisitPhoto(
         captured_at: input.capturedAt,
       },
       {
-        onConflict: "source_visit_id,stage,kind",
+        onConflict: "source_visit_id,machine_id,stage,kind",
       },
     )
     .select("id")
