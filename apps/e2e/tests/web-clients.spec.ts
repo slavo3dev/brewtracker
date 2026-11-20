@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 import { createTestClient, deleteTestClient } from '../helpers/clientSeed';
+import { createTestProduct, deleteProductByName } from '../helpers/productSeed';
 
 // NEW FUNCTIONALITY (app update, dev branch) — /dashboard/clients. The server requires that
 // a manager create/edit clients ONLY in their assigned region (see client-actions.ts
@@ -38,6 +39,12 @@ test('WEB-CLI-02: Creating a client with required fields succeeds and goes to th
 
   await expect(page).toHaveURL(/\/dashboard\/clients\/[^/]+$/);
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+
+  // This test creates the client through the real UI flow (not createTestClient()), so the
+  // ID has to be read back from the URL to clean it up — without this, the shared QA database
+  // grows by one permanent client every time this test runs.
+  const clientId = page.url().split('/').pop()!;
+  await deleteTestClient(clientId);
 });
 
 test('WEB-CLI-03: Creating a client is blocked without a name', async ({ page }) => {
@@ -166,4 +173,128 @@ test('WEB-CLI-08: Empty state when no clients match the filters', async ({ page 
   await page.goto('/dashboard/clients');
   await page.getByLabel('Search clients').fill(`qa-cli-08-nonexistent-${Date.now()}`);
   await expect(page.getByText('No clients match your filters.')).toBeVisible();
+});
+
+// Client product assignments ("Assigned Inventory Products" on /dashboard/clients/[clientId])
+// — new functionality (app update, dev branch), previously untested. A product is only
+// eligible for a client if a matching row exists in inventory_product_business_types for the
+// CLIENT'S business_type (see getEligibleClientProducts()), so every fixture product here is
+// created with an explicit businessTypes array.
+
+test('WEB-CLI-09: Assigning an eligible product with a valid par level succeeds', async ({ page }) => {
+  const stamp = Date.now();
+  const clientId = await createTestClient({ name: `QA CLI-09 Client ${stamp}`, businessType: 'ocs', region: 'Italy' });
+  const productName = `QA CLI-09 Product ${stamp}`;
+
+  try {
+    await createTestProduct({ name: productName, businessTypes: ['ocs'] });
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+    await page.goto(`/dashboard/clients/${clientId}`);
+    await expect(page.getByText('No inventory products assigned to this client yet.')).toBeVisible();
+
+    await page.getByLabel('Product', { exact: true }).selectOption({ label: productName });
+    await page.getByLabel('Par Level (base units)').fill('10');
+    await page.getByRole('button', { name: 'Assign Product' }).click();
+
+    await expect(page.getByRole('heading', { name: productName, exact: true })).toBeVisible();
+    await expect(page.getByText('1 configured products')).toBeVisible();
+  } finally {
+    await deleteTestClient(clientId);
+    await deleteProductByName(productName);
+  }
+});
+
+test('WEB-CLI-10: Assigning a product with a negative par level is rejected', async ({ page }) => {
+  const stamp = Date.now();
+  const clientId = await createTestClient({ name: `QA CLI-10 Client ${stamp}`, businessType: 'ocs', region: 'Italy' });
+  const productName = `QA CLI-10 Product ${stamp}`;
+
+  try {
+    await createTestProduct({ name: productName, businessTypes: ['ocs'] });
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+    await page.goto(`/dashboard/clients/${clientId}`);
+    await page.getByLabel('Product', { exact: true }).selectOption({ label: productName });
+    const parLevelInput = page.getByLabel('Par Level (base units)');
+    await parLevelInput.fill('-5');
+
+    // The input has min="0" — native HTML validation blocks the submit before the form's own
+    // "Enter a non-negative par level." check ever runs (same pattern as the warehouse
+    // geofence radius field).
+    await page.getByRole('button', { name: 'Assign Product' }).click();
+    await expect.poll(() => parLevelInput.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
+    await expect(page.getByText('No inventory products assigned to this client yet.')).toBeVisible();
+  } finally {
+    await deleteTestClient(clientId);
+    await deleteProductByName(productName);
+  }
+});
+
+test('WEB-CLI-11: Only products eligible for the client\'s business type are offered', async ({ page }) => {
+  const stamp = Date.now();
+  const clientId = await createTestClient({ name: `QA CLI-11 Client ${stamp}`, businessType: 'ocs', region: 'Italy' });
+  const eligibleName = `QA CLI-11 Eligible ${stamp}`;
+  const ineligibleName = `QA CLI-11 Ineligible ${stamp}`;
+
+  try {
+    await createTestProduct({ name: eligibleName, businessTypes: ['ocs'] });
+    await createTestProduct({ name: ineligibleName, businessTypes: ['horeca'] });
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+    await page.goto(`/dashboard/clients/${clientId}`);
+    const productSelect = page.getByLabel('Product', { exact: true });
+    await expect(productSelect.locator('option', { hasText: eligibleName })).toHaveCount(1);
+    await expect(productSelect.locator('option', { hasText: ineligibleName })).toHaveCount(0);
+  } finally {
+    await deleteTestClient(clientId);
+    await deleteProductByName(eligibleName);
+    await deleteProductByName(ineligibleName);
+  }
+});
+
+test('WEB-CLI-12: Editing an assignment persists the new par level and active flag', async ({ page }) => {
+  const stamp = Date.now();
+  const clientId = await createTestClient({ name: `QA CLI-12 Client ${stamp}`, businessType: 'ocs', region: 'Italy' });
+  const productName = `QA CLI-12 Product ${stamp}`;
+
+  try {
+    await createTestProduct({ name: productName, businessTypes: ['ocs'] });
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+    await page.goto(`/dashboard/clients/${clientId}`);
+    await page.getByLabel('Product', { exact: true }).selectOption({ label: productName });
+    await page.getByLabel('Par Level (base units)').fill('10');
+    await page.getByRole('button', { name: 'Assign Product' }).click();
+    await expect(page.getByRole('heading', { name: productName, exact: true })).toBeVisible();
+
+    const card = page.locator('article').filter({ hasText: productName });
+    await card.getByRole('button', { name: 'Edit' }).click();
+    await card.getByLabel('Par Level (base units)').fill('25');
+    await card.getByLabel('Active assignment').uncheck();
+    await card.getByRole('button', { name: 'Save Changes' }).click();
+
+    // Deactivating hides "Edit" behind the now-inactive card state — reload and re-expand to
+    // confirm the change was actually persisted server-side, not just reflected locally.
+    await page.goto(`/dashboard/clients/${clientId}`);
+    const reloadedCard = page.locator('article').filter({ hasText: productName });
+    await expect(reloadedCard.getByText('Inactive', { exact: true })).toBeVisible();
+    await reloadedCard.getByRole('button', { name: 'Edit' }).click();
+    await expect(reloadedCard.getByLabel('Par Level (base units)')).toHaveValue('25');
+  } finally {
+    await deleteTestClient(clientId);
+    await deleteProductByName(productName);
+  }
 });

@@ -18,7 +18,7 @@ export class RouteTemplatesPage {
     const deactivateButton = card.getByRole('button', { name: 'Deactivate' });
     if (await deactivateButton.isVisible().catch(() => false)) {
       await deactivateButton.click();
-      await expect(card.getByText('Inactive', { exact: true })).toBeVisible();
+      await expect(card.getByText('Inactive', { exact: true })).toBeVisible({ timeout: 20000 });
     }
   }
 
@@ -111,7 +111,7 @@ export class RouteTemplatesPage {
     // Same pattern as addStop(): the file is large enough (29 tests) that under load
     // (the shared database having grown over time) the default 5s timeout on the success
     // message occasionally runs out.
-    await expect(card.getByText('One-off stop added.')).toBeVisible({ timeout: 15000 });
+    await expect(card.getByText('One-off stop added.')).toBeVisible({ timeout: 20000 });
   }
 
   async expectStopExceptionListed(templateName: string, dateLabel: string) {
@@ -145,7 +145,7 @@ export class RouteTemplatesPage {
       .locator('select[name="routeTemplateStopId"]')
       .selectOption({ label: options.stopLabel });
     await card.getByRole('button', { name: 'Remove stop for date' }).click();
-    await expect(card.getByText('Recurring stop removed for this date.')).toBeVisible();
+    await expect(card.getByText('Recurring stop removed for this date.')).toBeVisible({ timeout: 20000 });
   }
 
   async expectRecurringStopRemovedListed(templateName: string, dateLabel: string) {
@@ -162,7 +162,7 @@ export class RouteTemplatesPage {
       await card.locator('select[name="machineId"]').selectOption({ label: machineLabel });
     }
     await card.getByRole('button', { name: 'Add Stop', exact: true }).click();
-    await expect(card.getByText('Stop added to route template.')).toBeVisible({ timeout: 15000 });
+    await expect(card.getByText('Stop added to route template.')).toBeVisible({ timeout: 20000 });
   }
 
   async attemptAddStop(templateName: string, clientLabel: string, machineLabel?: string) {
@@ -350,7 +350,7 @@ export class RouteTemplatesPage {
     // Same pattern as addStop()/addOneOffStopException(): under load on the shared staging
     // server, 10s is occasionally not enough for this server round-trip (confirmed by
     // isolated retries — not a logic error).
-    await expect(card.getByText('Route exception saved.')).toBeVisible({ timeout: 15000 });
+    await expect(card.getByText('Route exception saved.')).toBeVisible({ timeout: 20000 });
   }
 
   exceptionRow(templateName: string, dateLabel: string, badgeText: string): Locator {

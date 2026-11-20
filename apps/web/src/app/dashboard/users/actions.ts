@@ -95,15 +95,6 @@ export async function createUser(
       region,
       role,
     });
-
-    await sendAppUserPasswordReset(email, await getOrigin());
-
-    revalidatePath("/dashboard/users");
-
-    return {
-      error: null,
-      success: "User created and password setup email sent.",
-    };
   } catch (error) {
     return {
       error:
@@ -113,6 +104,23 @@ export async function createUser(
       success: null,
     };
   }
+
+  revalidatePath("/dashboard/users");
+
+  try {
+    await sendAppUserPasswordReset(email, await getOrigin());
+  } catch {
+    return {
+      error: null,
+      success:
+        "User created, but the password setup email could not be sent. Use \"Send password reset\" to retry.",
+    };
+  }
+
+  return {
+    error: null,
+    success: "User created and password setup email sent.",
+  };
 }
 
 export async function updateUser(

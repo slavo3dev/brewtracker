@@ -3,6 +3,7 @@ import { SurveyPage } from '../pages/SurveyPage';
 import {
   attemptForgedSurveyInsert,
   createFreshSurveyToken,
+  deleteSurveyFixture,
   getGoogleReviewUrl,
   setGoogleReviewUrl,
 } from '../helpers/surveySeed';
@@ -16,9 +17,13 @@ test('WEB-SURV-01: Valid survey token shows the rating form', async ({ page }) =
   // Doesn't submit a rating, so it's safe to use this token for just this test (no shared
   // fixture needed).
   const token = await createFreshSurveyToken();
-  const survey = new SurveyPage(page);
-  await survey.goto(token);
-  await survey.expectRatingFormVisible();
+  try {
+    const survey = new SurveyPage(page);
+    await survey.goto(token);
+    await survey.expectRatingFormVisible();
+  } finally {
+    await deleteSurveyFixture(token);
+  }
 });
 
 test('WEB-SURV-02: Non-existent token is rejected on submit', async ({ page }) => {
@@ -31,21 +36,26 @@ test('WEB-SURV-02: Non-existent token is rejected on submit', async ({ page }) =
 test('WEB-SURV-05: Submitting a rating of 1-4 shows a thank-you without the Google review prompt', async ({ page }) => {
   const token = await createFreshSurveyToken();
 
-  const survey = new SurveyPage(page);
-  await survey.goto(token);
-  await survey.selectRating(3);
-  await survey.submitRating();
-  await survey.expectThankYouWithoutGoogleReview();
+  try {
+    const survey = new SurveyPage(page);
+    await survey.goto(token);
+    await survey.selectRating(3);
+    await survey.submitRating();
+    await survey.expectThankYouWithoutGoogleReview();
+  } finally {
+    await deleteSurveyFixture(token);
+  }
 });
 
 test('WEB-SURV-06: 5 stars with a configured Google review URL shows the call to action', async ({ page }) => {
   const originalUrl = await getGoogleReviewUrl();
   const testUrl = 'https://g.page/r/qa-test-review-link/review';
+  let token: string | null = null;
 
   try {
     await setGoogleReviewUrl(testUrl);
 
-    const token = await createFreshSurveyToken();
+    token = await createFreshSurveyToken();
     const survey = new SurveyPage(page);
     await survey.goto(token);
     await survey.selectRating(5);
@@ -53,34 +63,43 @@ test('WEB-SURV-06: 5 stars with a configured Google review URL shows the call to
     await survey.expectGoogleReviewPrompt(testUrl);
   } finally {
     await setGoogleReviewUrl(originalUrl);
+    if (token) await deleteSurveyFixture(token);
   }
 });
 
 test('WEB-SURV-08: Resubmitting an already-answered survey link shows the "already received" state', async ({ page }) => {
   const token = await createFreshSurveyToken();
 
-  const survey = new SurveyPage(page);
-  await survey.goto(token);
-  await survey.selectRating(3);
-  await survey.submitRating();
-  await survey.expectThankYouWithoutGoogleReview();
+  try {
+    const survey = new SurveyPage(page);
+    await survey.goto(token);
+    await survey.selectRating(3);
+    await survey.submitRating();
+    await survey.expectThankYouWithoutGoogleReview();
 
-  // Revisiting the same link and attempting to submit a DIFFERENT rating — must behave
-  // identically regardless of the newly selected rating.
-  await survey.revisit();
-  await survey.selectRating(5);
-  await survey.submitRating();
-  await survey.expectAlreadyReceived();
+    // Revisiting the same link and attempting to submit a DIFFERENT rating — must behave
+    // identically regardless of the newly selected rating.
+    await survey.revisit();
+    await survey.selectRating(5);
+    await survey.submitRating();
+    await survey.expectAlreadyReceived();
+  } finally {
+    await deleteSurveyFixture(token);
+  }
 });
 
 test('WEB-SURV-04: Each star click correctly highlights the stars and updates aria-pressed', async ({ page }) => {
   const token = await createFreshSurveyToken();
-  const survey = new SurveyPage(page);
-  await survey.goto(token);
+  try {
+    const survey = new SurveyPage(page);
+    await survey.goto(token);
 
-  for (let stars = 1; stars <= 5; stars++) {
-    await survey.selectRating(stars);
-    await survey.expectHighlightState(stars);
+    for (let stars = 1; stars <= 5; stars++) {
+      await survey.selectRating(stars);
+      await survey.expectHighlightState(stars);
+    }
+  } finally {
+    await deleteSurveyFixture(token);
   }
 });
 
@@ -103,9 +122,13 @@ test('WEB-SURV-10: Rating outside the 1-5 range is rejected at the database leve
   // inability to submit an out-of-range value at all.
   const token = await createFreshSurveyToken();
 
-  for (const invalidRating of [0, 6, -1]) {
-    const { error } = await attemptForgedSurveyInsert(token, invalidRating);
-    expect(error).not.toBeNull();
+  try {
+    for (const invalidRating of [0, 6, -1]) {
+      const { error } = await attemptForgedSurveyInsert(token, invalidRating);
+      expect(error).not.toBeNull();
+    }
+  } finally {
+    await deleteSurveyFixture(token);
   }
 });
 
@@ -114,18 +137,23 @@ test('WEB-SURV-03: Submit is blocked with no rating selected', async ({ page }) 
   // disabled until a rating is selected (it can't even be clicked), instead of showing an
   // error only after clicking submit.
   const token = await createFreshSurveyToken();
-  const survey = new SurveyPage(page);
-  await survey.goto(token);
-  await expect(page.getByRole('button', { name: 'Submit rating' })).toBeDisabled();
+  try {
+    const survey = new SurveyPage(page);
+    await survey.goto(token);
+    await expect(page.getByRole('button', { name: 'Submit rating' })).toBeDisabled();
+  } finally {
+    await deleteSurveyFixture(token);
+  }
 });
 
 test('WEB-SURV-07: 5 stars with no configured Google review URL skips the call to action', async ({ page }) => {
   const originalUrl = await getGoogleReviewUrl();
+  let token: string | null = null;
 
   try {
     await setGoogleReviewUrl(null);
 
-    const token = await createFreshSurveyToken();
+    token = await createFreshSurveyToken();
     const survey = new SurveyPage(page);
     await survey.goto(token);
     await survey.selectRating(5);
@@ -133,6 +161,7 @@ test('WEB-SURV-07: 5 stars with no configured Google review URL skips the call t
     await survey.expectThankYouWithoutGoogleReview();
   } finally {
     await setGoogleReviewUrl(originalUrl);
+    if (token) await deleteSurveyFixture(token);
   }
 });
 
@@ -178,5 +207,6 @@ test('WEB-SURV-09: Concurrent duplicate submission is handled without crashing',
     expect(outcomes.some((t) => /unable to save|error|exception/i.test(t))).toBe(false);
   } finally {
     await page2.close();
+    await deleteSurveyFixture(token);
   }
 });
