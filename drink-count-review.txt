@@ -1,0 +1,100 @@
+apps/mobile/src/features/service-visit/InventoryAuditStep.tsx:134:    savedAudit.sourceVisitId === activeVisit?.id &&
+apps/mobile/src/features/service-visit/InventoryAuditStep.tsx:186:          savedAudit.sourceVisitId === activeVisitId &&
+apps/mobile/src/features/service-visit/RestockDropStep.tsx:141:            savedDelivery.sourceVisitId === activeVisit.id &&
+apps/mobile/src/features/service-visit/ServiceVisitProvider.tsx:32:import { useDrinkCountStep } from "../../hooks/useDrinkCountStep";
+apps/mobile/src/features/service-visit/ServiceVisitProvider.tsx:489:  const { completeDrinkCount } = useDrinkCountStep({
+apps/mobile/src/features/service-visit/ServiceVisitProvider.tsx:878:        drinkCount: null,
+apps/mobile/src/features/service-visit/client-reserve-after.service.ts:4:  sourceVisitId: string;
+apps/mobile/src/features/service-visit/client-reserve-after.service.ts:12:  sourceVisitId,
+apps/mobile/src/features/service-visit/client-reserve-after.service.ts:21:      p_source_visit_id: sourceVisitId,
+apps/mobile/src/features/service-visit/client-reserve-after.sync.ts:83:      sourceVisitId: visit.id,
+apps/mobile/src/features/service-visit/client-reserve-after.sync.ts:97:        sourceVisitId: visit.id,
+apps/mobile/src/features/service-visit/inventory-audit.retry.ts:25:    audit.sourceVisitId !== visit.id ||
+apps/mobile/src/features/service-visit/inventory-audit.service.ts:33:  sourceVisitId: string;
+apps/mobile/src/features/service-visit/inventory-audit.service.ts:253:  if (!input.sourceVisitId.trim()) {
+apps/mobile/src/features/service-visit/inventory-audit.service.ts:287:      p_source_visit_id: input.sourceVisitId,
+apps/mobile/src/features/service-visit/inventory-audit.sync-state.ts:22:    currentAudit.sourceVisitId !== originalAudit.sourceVisitId ||
+apps/mobile/src/features/service-visit/inventory-audit.sync.ts:11:  if (!audit || audit.sourceVisitId !== visit.id) {
+apps/mobile/src/features/service-visit/inventory-audit.sync.ts:80:    sourceVisitId: audit.sourceVisitId,
+apps/mobile/src/features/service-visit/machine-refill.service.ts:10:  sourceVisitId: string;
+apps/mobile/src/features/service-visit/machine-refill.service.ts:22:  const sourceVisitId = input.sourceVisitId.trim();
+apps/mobile/src/features/service-visit/machine-refill.service.ts:25:  if (!sourceVisitId) {
+apps/mobile/src/features/service-visit/machine-refill.service.ts:48:      p_source_visit_id: sourceVisitId,
+apps/mobile/src/features/service-visit/machine-refill.service.ts:86:  const sourceVisitId = record.sourceVisitId.trim();
+apps/mobile/src/features/service-visit/machine-refill.service.ts:88:  if (!sourceVisitId) {
+apps/mobile/src/features/service-visit/machine-refill.service.ts:97:    p_source_visit_id: sourceVisitId,
+apps/mobile/src/features/service-visit/meter-reading.service.ts:13:  sourceVisitId: string;
+apps/mobile/src/features/service-visit/meter-reading.service.ts:25:  sourceVisitId: string;
+apps/mobile/src/features/service-visit/meter-reading.service.ts:78:    sourceVisitId: row.source_visit_id,
+apps/mobile/src/features/service-visit/meter-reading.service.ts:129:async function loadReadingByVisitId(
+apps/mobile/src/features/service-visit/meter-reading.service.ts:130:  sourceVisitId: string,
+apps/mobile/src/features/service-visit/meter-reading.service.ts:136:    .eq("source_visit_id", sourceVisitId)
+apps/mobile/src/features/service-visit/meter-reading.service.ts:153:export async function saveMachineMeterReading(
+apps/mobile/src/features/service-visit/meter-reading.service.ts:168:  if (!input.sourceVisitId.trim()) {
+apps/mobile/src/features/service-visit/meter-reading.service.ts:187:  const existingReading = await loadReadingByVisitId(
+apps/mobile/src/features/service-visit/meter-reading.service.ts:188:    input.sourceVisitId,
+apps/mobile/src/features/service-visit/meter-reading.service.ts:255:      source_visit_id: input.sourceVisitId,
+apps/mobile/src/features/service-visit/meter-reading.service.ts:278:      const duplicateReading = await loadReadingByVisitId(
+apps/mobile/src/features/service-visit/meter-reading.service.ts:279:        input.sourceVisitId,
+apps/mobile/src/features/service-visit/multi-machine-visit-summary.service.ts:25:          sourceVisitId: visit.id,
+apps/mobile/src/features/service-visit/multi-machine-visit-summary.service.ts:52:              drinkCount: machine.drinkCount,
+apps/mobile/src/features/service-visit/multi-machine-visit.types.ts:27:    drinkCountRequired: boolean;
+apps/mobile/src/features/service-visit/multi-machine-visit.types.ts:50:  drinkCountRequired: boolean;
+apps/mobile/src/features/service-visit/multi-machine-visit.types.ts:58:  drinkCount: DrinkCountRecord | null;
+apps/mobile/src/features/service-visit/restock-drop.service.ts:13:  sourceVisitId: string;
+apps/mobile/src/features/service-visit/restock-drop.service.ts:27:  if (!input.sourceVisitId.trim()) {
+apps/mobile/src/features/service-visit/restock-drop.service.ts:86:          input.sourceVisitId,
+apps/mobile/src/features/service-visit/restock-drop.sync-state.ts:22:    currentDelivery.sourceVisitId !== originalDelivery.sourceVisitId ||
+apps/mobile/src/features/service-visit/restock-drop.sync.ts:13:  if (!delivery || delivery.sourceVisitId !== visit.id) {
+apps/mobile/src/features/service-visit/restock-drop.sync.ts:68:    sourceVisitId: delivery.sourceVisitId,
+apps/mobile/src/features/service-visit/service-visit-summary.service.ts:39:          sourceVisitId: visit.id,
+apps/mobile/src/features/service-visit/service-visit-summary.service.ts:70:            drinkCount: visit.drinkCount,
+apps/mobile/src/features/service-visit/service-visit.types.ts:65:  drinkCountRequired: boolean;
+apps/mobile/src/features/service-visit/service-visit.types.ts:201:  sourceVisitId: string;
+apps/mobile/src/features/service-visit/service-visit.types.ts:267:  sourceVisitId: string;
+apps/mobile/src/features/service-visit/service-visit.types.ts:325:  sourceVisitId: string;
+apps/mobile/src/features/service-visit/service-visit.types.ts:382:  sourceVisitId: string;
+apps/mobile/src/features/service-visit/service-visit.types.ts:396:  sourceVisitId: string;
+apps/mobile/src/features/service-visit/service-visit.types.ts:468:  sourceVisitId: string;
+apps/mobile/src/features/service-visit/service-visit.types.ts:498:  drinkCount: DrinkCountRecord | null;
+apps/mobile/src/features/service-visit/service-visit.types.ts:555:    (step) => step.id !== "drink_count" || tasks.drinkCountRequired,
+apps/mobile/src/features/service-visit/state/multi-machine-visit.completion.ts:55:    if (machine.drinkCountRequired && !machine.drinkCount) {
+apps/mobile/src/features/service-visit/state/multi-machine-visit.factory.ts:63:      drinkCountRequired: machine.drinkCountRequired,
+apps/mobile/src/features/service-visit/state/multi-machine-visit.factory.ts:69:      drinkCount: null,
+apps/mobile/src/features/service-visit/state/multi-machine-visit.transitions.ts:17:  if (machine.drinkCountRequired) {
+apps/mobile/src/features/service-visit/state/multi-machine-visit.transitions.ts:80:      if (!machine.drinkCountRequired || !machine.drinkCount) {
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:103:      typeof machine.drinkCountRequired !== "boolean" ||
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:147:    if (!machine.drinkCountRequired && machine.drinkCount !== null) {
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:192:    if (hasReachedStep("drink_count") && !machine.drinkCount) {
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:223:        refill.sourceVisitId !== visit.id ||
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:250:    const drinkCount = machine.drinkCount;
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:252:    if (drinkCount !== null) {
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:254:        !machine.drinkCountRequired ||
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:255:        typeof drinkCount !== "object" ||
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:256:        typeof drinkCount.databaseId !== "string" ||
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:257:        !drinkCount.databaseId.trim() ||
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:258:        drinkCount.sourceVisitId !== visit.id ||
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:259:        !Number.isSafeInteger(drinkCount.runningTotal) ||
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:260:        drinkCount.runningTotal < 0 ||
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:261:        !Number.isSafeInteger(drinkCount.archiveTotal) ||
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:262:        drinkCount.archiveTotal < 0 ||
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:263:        typeof drinkCount.recordedAt !== "string" ||
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:264:        !Number.isFinite(Date.parse(drinkCount.recordedAt))
+apps/mobile/src/features/service-visit/state/multi-machine-visit.validation.ts:396:    if (record.sourceVisitId !== visit.id) {
+apps/mobile/src/features/service-visit/state/service-visit.completion.ts:37:  if (visit.tasks.drinkCountRequired && !visit.drinkCount) {
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:197:  if (typeof visit.tasks.drinkCountRequired !== "boolean") {
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:256:  const restoredDrinkCount = visit.drinkCount ?? null;
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:270:      typeof restoredDrinkCount.sourceVisitId !== "string" ||
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:271:      restoredDrinkCount.sourceVisitId.trim().length === 0 ||
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:284:  if (!visit.tasks.drinkCountRequired && restoredDrinkCount) {
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:382:      typeof restoredInventoryAudit.sourceVisitId !== "string" ||
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:383:      restoredInventoryAudit.sourceVisitId.trim().length === 0 ||
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:451:      typeof restoredRestockDrop.sourceVisitId !== "string" ||
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:452:      restoredRestockDrop.sourceVisitId.trim().length === 0 ||
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:504:    const hasValidSourceVisitId = record.sourceVisitId === visit.id;
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:599:        sourceVisitId: visit.id,
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:644:        sourceVisitId: visit.id,
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:725:      typeof restoredReserveAfter.sourceVisitId === "string" &&
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:726:      restoredReserveAfter.sourceVisitId.trim().length > 0;
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:733:      restoredReserveAfter.sourceVisitId === visit.id;
+apps/mobile/src/features/service-visit/state/service-visit.validation.ts:922:    drinkCount: restoredDrinkCount,

@@ -14,7 +14,7 @@ export type SaveClientDeliveryInput = {
 
   clientId: string;
   stopId: string;
-  machineId: string;
+  machineId: string | null;
 
   confirmedAt: string;
 

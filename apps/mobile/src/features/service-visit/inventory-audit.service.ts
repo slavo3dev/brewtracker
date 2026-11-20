@@ -33,7 +33,7 @@ export type SaveClientReserveBeforeInput = {
   sourceVisitId: string;
   clientId: string;
   stopId: string;
-  machineId: string;
+  machineId: string | null;
   recordedAt: string;
 
   quantities: ClientReserveQuantityInput[];

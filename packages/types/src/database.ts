@@ -2550,7 +2550,7 @@ export type Database = {
           p_client_id: string;
           p_confirmed_at: string;
           p_items: Json;
-          p_machine_id: string;
+          p_machine_id: string | null;
           p_source_visit_id: string;
           p_stop_id: string;
         };
@@ -2581,7 +2581,7 @@ export type Database = {
         Args: {
           p_client_id: string;
           p_items: Json;
-          p_machine_id: string;
+          p_machine_id: string | null;
           p_recorded_at: string;
           p_source_visit_id: string;
           p_stop_id: string;
@@ -2677,6 +2677,13 @@ export type Database = {
       warehouse_is_in_current_user_region: {
         Args: { target_warehouse_id: string };
         Returns: boolean;
+      };
+      mark_service_stop_arrived: {
+        Args: {
+          p_stop_id: string;
+          p_arrived_at: string;
+        };
+        Returns: void;
       };
       was_machine_refilled: {
         Args: { p_machine_refill_id: string };

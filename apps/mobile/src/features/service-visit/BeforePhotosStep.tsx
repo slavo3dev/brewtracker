@@ -1,5 +1,5 @@
 import { CameraView, type CameraType, useCameraPermissions } from "expo-camera";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -22,6 +22,13 @@ import type {
   BeforePhotoRecord,
   ServiceVisit,
 } from "./service-visit.types";
+import type { MultiMachineServiceVisit } from "./multi-machine-visit.types";
+
+function isUnifiedVisit(
+  visit: ServiceVisit | MultiMachineServiceVisit,
+): visit is MultiMachineServiceVisit {
+  return "schemaVersion" in visit && visit.schemaVersion === 2;
+}
 
 type CaptureState = "overview" | "camera" | "preview" | "saving";
 
@@ -86,11 +93,18 @@ export default function BeforePhotosStep() {
 
   const {
     activeVisit,
+    unifiedVisit,
+    unifiedBeforePhotos,
     saveBeforePhoto,
     updateBeforePhotoUpload,
     removeBeforePhoto,
     completeBeforePhotos,
   } = useServiceVisit();
+
+  const activeMachine =
+    unifiedVisit?.currentStep === "machine_service"
+      ? unifiedVisit.machines[unifiedVisit.activeMachineIndex] ?? null
+      : null;
 
   const [captureState, setCaptureState] = useState<CaptureState>("overview");
 
@@ -110,17 +124,31 @@ export default function BeforePhotosStep() {
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  if (!activeVisit) {
+  const machineIdentity = activeMachine?.machineId ?? activeVisit?.machineId;
+  const machineIdentityRef = useRef(machineIdentity);
+  machineIdentityRef.current = machineIdentity;
+
+  useEffect(() => {
+    setCaptureState("overview");
+    setActiveKind(null);
+    setTemporaryPhotoUri(null);
+    setErrorMessage(null);
+  }, [machineIdentity]);
+
+  if (!activeVisit && !activeMachine) {
     return null;
   }
 
   const visit = activeVisit;
+  const beforePhotos = activeMachine
+    ? activeMachine.beforePhotos
+    : activeVisit?.beforePhotos ?? [];
 
   const exteriorPhoto =
-    visit.beforePhotos.find((photo) => photo.kind === "exterior") ?? null;
+    beforePhotos.find((photo) => photo.kind === "exterior") ?? null;
 
   const interiorPhoto =
-    visit.beforePhotos.find((photo) => photo.kind === "interior_hopper") ??
+    beforePhotos.find((photo) => photo.kind === "interior_hopper") ??
     null;
 
   const requiredPhotosUploaded =
@@ -129,9 +157,16 @@ export default function BeforePhotosStep() {
 
   const uploadInProgress =
     uploadingKind !== null ||
-    visit.beforePhotos.some((photo) => photo.uploadStatus === "uploading");
+    beforePhotos.some((photo) => photo.uploadStatus === "uploading");
 
   function openCamera(kind: BeforePhotoKind): void {
+    if (uploadInProgress || completing) {
+      setErrorMessage(
+        "Wait for the current photo upload to finish before replacing a photo.",
+      );
+      return;
+    }
+
     setActiveKind(kind);
     setTemporaryPhotoUri(null);
     setErrorMessage(null);
@@ -154,6 +189,8 @@ export default function BeforePhotosStep() {
       return;
     }
 
+    const captureMachineId = machineIdentityRef.current;
+
     setCapturing(true);
     setErrorMessage(null);
 
@@ -162,6 +199,10 @@ export default function BeforePhotosStep() {
         quality: 0.78,
         skipProcessing: false,
       });
+
+      if (machineIdentityRef.current !== captureMachineId) {
+        return;
+      }
 
       if (!photo?.uri) {
         throw new Error("The camera did not return a photo.");
@@ -181,20 +222,43 @@ export default function BeforePhotosStep() {
   }
 
   async function attemptUpload(
-    visit: ServiceVisit,
+    visit: ServiceVisit | MultiMachineServiceVisit,
+    machineId: string,
     kind: BeforePhotoKind,
     localUri: string,
   ): Promise<void> {
     setUploadingKind(kind);
 
+    const isUnified = isUnifiedVisit(visit);
+
+    const updateUpload = async (
+      input: Parameters<typeof unifiedBeforePhotos.updateBeforePhotoUpload>[3],
+    ) => {
+      if (isUnifiedVisit(visit)) {
+        await unifiedBeforePhotos.updateBeforePhotoUpload(
+          machineId,
+          kind,
+          localUri,
+          input,
+        );
+      } else {
+        await updateBeforePhotoUpload(visit, kind, input);
+      }
+    };
+
     try {
-      await updateBeforePhotoUpload(visit, kind, {
+      await updateUpload({
         uploadStatus: "uploading",
         uploadError: null,
       });
 
-      const localPhoto = visit.beforePhotos.find(
-        (photo: BeforePhotoRecord) => photo.kind === kind,
+      const photos = isUnifiedVisit(visit)
+        ? visit.machines.find((machine) => machine.machineId === machineId)
+            ?.beforePhotos ?? []
+        : visit.beforePhotos;
+
+      const localPhoto = photos.find(
+        (photo) => photo.kind === kind && photo.localUri === localUri,
       );
 
       if (!localPhoto) {
@@ -205,14 +269,15 @@ export default function BeforePhotosStep() {
         userId: visit.userId,
         visitId: visit.id,
         stopId: visit.stopId,
-        machineId: visit.machineId,
+        machineId,
         capturedAt: localPhoto.capturedAt,
         stage: "before",
         kind,
         localUri,
+        ...(isUnified ? { schemaVersion: 2 as const } : {}),
       });
 
-      await updateBeforePhotoUpload(visit, kind, {
+      await updateUpload({
         uploadStatus: "uploaded",
         storagePath: result.storagePath,
         databaseId: result.databaseId,
@@ -224,17 +289,42 @@ export default function BeforePhotosStep() {
 
       const message = getFriendlyUploadError(error);
 
-      await updateBeforePhotoUpload(visit, kind, {
-        uploadStatus: "failed",
-        uploadError: message,
-      });
+      try {
+        await updateUpload({
+          uploadStatus: "failed",
+          uploadError: message,
+        });
+      } catch (updateError) {
+        console.warn("Unable to persist before-photo upload failure:", updateError);
+      }
     } finally {
       setUploadingKind(null);
     }
   }
 
   async function handleUsePhoto(): Promise<void> {
-    if (!activeKind || !temporaryPhotoUri || captureState === "saving") {
+    if (
+      !activeKind ||
+      !temporaryPhotoUri ||
+      captureState === "saving" ||
+      uploadInProgress ||
+      completing
+    ) {
+      return;
+    }
+
+    const selectedVisit = unifiedVisit ?? activeVisit;
+    const selectedMachineId = activeMachine?.machineId ?? activeVisit?.machineId;
+
+    if (!selectedVisit || !selectedMachineId) {
+      setErrorMessage("The active machine could not be found.");
+      return;
+    }
+
+    const savingMachineId = machineIdentityRef.current;
+
+    if (savingMachineId !== selectedMachineId) {
+      setErrorMessage("The active machine changed. Please capture the photo again.");
       return;
     }
 
@@ -242,35 +332,51 @@ export default function BeforePhotosStep() {
     setErrorMessage(null);
 
     try {
-      const previousPhoto = visit.beforePhotos.find(
-        (photo) => photo.kind === activeKind,
-      );
-
       const capturedAt = new Date().toISOString();
 
       const localUri = await persistBeforePhotoLocally({
-        visitId: visit.id,
+        visitId: selectedVisit.id,
+        ...(isUnifiedVisit(selectedVisit)
+          ? { machineId: selectedMachineId }
+          : {}),
         kind: activeKind,
         temporaryUri: temporaryPhotoUri,
       });
 
-      const updatedVisit = await saveBeforePhoto({
-        kind: activeKind,
-        localUri,
-        capturedAt,
-      });
-
-      if (previousPhoto && previousPhoto.localUri !== localUri) {
-        await deleteLocalBeforePhoto(previousPhoto.localUri);
+      if (machineIdentityRef.current !== savingMachineId) {
+        await deleteLocalBeforePhoto(localUri);
+        throw new Error(
+          "The active machine changed while saving. Please capture the photo again.",
+        );
       }
 
+      const updatedVisit = isUnifiedVisit(selectedVisit)
+        ? await unifiedBeforePhotos.saveBeforePhoto(selectedMachineId, {
+            kind: activeKind,
+            localUri,
+            capturedAt,
+          })
+        : await saveBeforePhoto({
+            kind: activeKind,
+            localUri,
+            capturedAt,
+          });
+
+      // Preserve the previous photo until replacement upload and
+      // database persistence have been confirmed. Cleanup must not
+      // delete a database row reused by the replacement upsert.
       const savedKind = activeKind;
 
       setActiveKind(null);
       setTemporaryPhotoUri(null);
       setCaptureState("overview");
 
-      void attemptUpload(updatedVisit, savedKind, localUri);
+      void attemptUpload(
+        updatedVisit,
+        selectedMachineId,
+        savedKind,
+        localUri,
+      );
     } catch (error) {
       setCaptureState("preview");
 
@@ -283,14 +389,25 @@ export default function BeforePhotosStep() {
   }
 
   async function handleRemovePhoto(photo: BeforePhotoRecord): Promise<void> {
-    if (uploadingKind === photo.kind || completing) {
+    if (uploadInProgress || completing) {
       return;
     }
 
     setErrorMessage(null);
 
     try {
-      await removeBeforePhoto(photo.kind);
+      if (unifiedVisit) {
+        if (!activeMachine) {
+          throw new Error("The active machine could not be found.");
+        }
+
+        await unifiedBeforePhotos.removeBeforePhoto(
+          activeMachine.machineId,
+          photo.kind,
+        );
+      } else {
+        await removeBeforePhoto(photo.kind);
+      }
 
       await deleteLocalBeforePhoto(photo.localUri);
       await deleteUploadedBeforePhoto(photo.storagePath, photo.databaseId);
@@ -310,7 +427,20 @@ export default function BeforePhotosStep() {
 
     setErrorMessage(null);
 
-    await attemptUpload(visit, photo.kind, photo.localUri);
+    const selectedVisit = unifiedVisit ?? activeVisit;
+    const selectedMachineId = activeMachine?.machineId ?? activeVisit?.machineId;
+
+    if (!selectedVisit || !selectedMachineId) {
+      setErrorMessage("The active machine could not be found.");
+      return;
+    }
+
+    await attemptUpload(
+      selectedVisit,
+      selectedMachineId,
+      photo.kind,
+      photo.localUri,
+    );
   }
 
   async function handleCompleteStep(): Promise<void> {
@@ -322,7 +452,17 @@ export default function BeforePhotosStep() {
     setErrorMessage(null);
 
     try {
-      await completeBeforePhotos();
+      if (unifiedVisit) {
+        if (!activeMachine) {
+          throw new Error("The active machine could not be found.");
+        }
+
+        await unifiedBeforePhotos.completeBeforePhotos(
+          activeMachine.machineId,
+        );
+      } else {
+        await completeBeforePhotos();
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error

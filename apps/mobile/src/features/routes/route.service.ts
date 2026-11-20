@@ -11,6 +11,7 @@ import type {
   TodayRouteSnapshot,
   TodayRouteStop,
 } from "./route.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 type RouteRow = Pick<
   Database["public"]["Tables"]["routes"]["Row"],
@@ -60,6 +61,30 @@ type MachineRow = Pick<
   | "installed_at"
   | "last_service_at"
 >;
+
+// Temporary until Supabase database types are regenerated.
+type StopMachineRow = {
+  stop_id: string;
+  machine_id: string;
+  sequence_number: number;
+  drink_count_required: boolean;
+};
+
+type DatabaseWithStopMachines = Omit<Database, "public"> & {
+  public: Omit<Database["public"], "Tables"> & {
+    Tables: Database["public"]["Tables"] & {
+      stop_machines: {
+        Row: StopMachineRow;
+        Insert: StopMachineRow;
+        Update: Partial<StopMachineRow>;
+        Relationships: [];
+      };
+    };
+  };
+};
+
+const multiMachineSupabase =
+  supabase as unknown as SupabaseClient<DatabaseWithStopMachines>;
 
 export type LoadTodayRouteResult = {
   route: TodayRoute | null;
@@ -161,6 +186,30 @@ async function fetchRouteStops(routeId: string): Promise<StopRow[]> {
   }
 
   return data;
+}
+
+async function fetchStopMachines(
+  stopIds: string[],
+): Promise<StopMachineRow[]> {
+  if (stopIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await multiMachineSupabase
+    .from("stop_machines")
+    .select(
+      "stop_id, machine_id, sequence_number, drink_count_required",
+    )
+    .in("stop_id", stopIds)
+    .order("sequence_number", { ascending: true });
+
+  if (error) {
+    throw new Error(
+      `Unable to load assigned stop machines: ${error.message}`,
+    );
+  }
+
+  return data ?? [];
 }
 
 function hasRemainingWork(stops: StopRow[]): boolean {
@@ -271,12 +320,21 @@ function buildTodayRouteStops(
   stops: StopRow[],
   clients: ClientRow[],
   machines: MachineRow[],
+  stopMachines: StopMachineRow[],
 ): TodayRouteStop[] {
   const clientsById = new Map(clients.map((client) => [client.id, client]));
 
   const machinesById = new Map(
     machines.map((machine) => [machine.id, machine]),
   );
+
+  const assignmentsByStopId = new Map<string, StopMachineRow[]>();
+
+  for (const assignment of stopMachines) {
+    const existing = assignmentsByStopId.get(assignment.stop_id) ?? [];
+    existing.push(assignment);
+    assignmentsByStopId.set(assignment.stop_id, existing);
+  }
 
   return stops.flatMap((stop) => {
     const client = clientsById.get(stop.client_id);
@@ -294,10 +352,62 @@ function buildTodayRouteStops(
       ? (machinesById.get(stop.machine_id) ?? null)
       : null;
 
+    const assignments = assignmentsByStopId.get(stop.id) ?? [];
+
+    const assignedMachines = assignments.map((assignment) => {
+      const assignedMachine = machinesById.get(assignment.machine_id);
+
+      if (!assignedMachine) {
+        throw new Error(
+          `Unable to resolve assigned machine ${assignment.machine_id} for stop ${stop.id}.`,
+        );
+      }
+
+      return {
+        machineId: assignment.machine_id,
+        sequenceNumber: assignment.sequence_number,
+        drinkCountRequired: assignment.drink_count_required,
+        machine: {
+          id: assignedMachine.id,
+          name: assignedMachine.name,
+          model: assignedMachine.model,
+          serialNumber: assignedMachine.serial_number,
+          qrCode: assignedMachine.qr_code,
+          status: assignedMachine.status,
+          installedAt: assignedMachine.installed_at,
+          lastServiceAt: assignedMachine.last_service_at,
+        },
+      };
+    });
+
+    const normalizedMachines =
+      assignedMachines.length > 0
+        ? assignedMachines
+        : machine
+          ? [
+              {
+                machineId: machine.id,
+                sequenceNumber: 1,
+                drinkCountRequired: stop.drink_count_required,
+                machine: {
+                  id: machine.id,
+                  name: machine.name,
+                  model: machine.model,
+                  serialNumber: machine.serial_number,
+                  qrCode: machine.qr_code,
+                  status: machine.status,
+                  installedAt: machine.installed_at,
+                  lastServiceAt: machine.last_service_at,
+                },
+              },
+            ]
+          : [];
+
     const routeStop: TodayRouteStop = {
       id: stop.id,
       clientId: stop.client_id,
       machineId: stop.machine_id,
+      machines: normalizedMachines,
       sequenceNumber: stop.sequence_number,
       status: stop.status,
       scheduledStartAt: stop.scheduled_start_at,
@@ -361,9 +471,16 @@ async function fetchTodayRouteFromNetwork(
 
   const clientIds = removeDuplicates(stops.map((stop) => stop.client_id));
 
-  const machineIds = removeDuplicates(
-    stops.flatMap((stop) => (stop.machine_id ? [stop.machine_id] : [])),
+  const stopMachines = await fetchStopMachines(
+    stops.map((stop) => stop.id),
   );
+
+  const machineIds = removeDuplicates([
+    ...stops.flatMap((stop) =>
+      stop.machine_id ? [stop.machine_id] : [],
+    ),
+    ...stopMachines.map((assignment) => assignment.machine_id),
+  ]);
 
   const [clients, machines] = await Promise.all([
     fetchClients(clientIds),
@@ -376,7 +493,12 @@ async function fetchTodayRouteFromNetwork(
     status: routeRow.status,
     notes: routeRow.notes,
     warehouse,
-    stops: buildTodayRouteStops(stops, clients, machines),
+    stops: buildTodayRouteStops(
+      stops,
+      clients,
+      machines,
+      stopMachines,
+    ),
   };
 
   const snapshot: TodayRouteSnapshot = {
