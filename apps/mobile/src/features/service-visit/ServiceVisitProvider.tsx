@@ -148,6 +148,10 @@ type ServiceVisitContextValue = {
 
   removeSignature: () => Promise<ServiceVisit>;
 
+  unifiedClientConfirmation: ReturnType<
+    typeof useClientConfirmation<MultiMachineServiceVisit>
+  >;
+
   completeAfterService: () => Promise<ServiceVisit>;
 
   cancelVisit: () => Promise<void>;
@@ -542,6 +546,11 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       commitVisitMutation,
       clearError,
     });
+
+  const unifiedClientConfirmation = useClientConfirmation({
+    commitVisitMutation: commitUnifiedVisitMutation,
+    setErrorMessage,
+  });
 
   /*
    * Restore an unfinished service visit for
@@ -1226,6 +1235,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       updateSignatureUpload,
       removeSignature,
 
+      unifiedClientConfirmation,
+
       completeAfterService,
 
       completeSummary,
@@ -1282,6 +1293,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       saveSignature,
       updateSignatureUpload,
       removeSignature,
+
+      unifiedClientConfirmation,
 
       completeAfterService,
 
