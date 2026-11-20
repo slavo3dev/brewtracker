@@ -25,6 +25,39 @@ export function validateRestoredMultiMachineVisit(
 
   const visit = value as Partial<MultiMachineServiceVisit>;
 
+  // Restore visits saved before arrivalSyncStatus was introduced.
+  // Preserve the original arrival verification and all other records.
+  if (visit.arrivalSyncStatus === undefined) {
+    visit.arrivalSyncStatus = !visit.arrivalVerification
+      ? "not_started"
+      : visit.currentStep === "arrival"
+        ? "pending_sync"
+        : "synced";
+  }
+
+  const validArrivalSyncStatuses = [
+    "not_started",
+    "pending_sync",
+    "synced",
+    "failed",
+  ];
+
+  if (!validArrivalSyncStatuses.includes(visit.arrivalSyncStatus)) {
+    return null;
+  }
+
+  if (
+    (!visit.arrivalVerification &&
+      visit.arrivalSyncStatus !== "not_started") ||
+    (visit.arrivalVerification &&
+      visit.arrivalSyncStatus === "not_started") ||
+    (visit.currentStep !== "arrival" &&
+      (visit.arrivalSyncStatus !== "synced" ||
+        !visit.arrivalVerification))
+  ) {
+    return null;
+  }
+
   if (
     visit.schemaVersion !== 2 ||
     visit.userId !== userId ||

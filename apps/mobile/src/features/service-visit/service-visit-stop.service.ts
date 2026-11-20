@@ -12,25 +12,17 @@ export async function markServiceStopArrived(
     throw new Error("A valid arrival timestamp is required.");
   }
 
-  const { data, error } = await supabase
-    .from("stops")
-    .update({
-      status: "in_progress",
-      arrived_at: arrivedAt,
-    })
-    .eq("id", stopId)
-    .select("id")
-    .maybeSingle();
+  const { error } = await supabase.rpc(
+    "mark_service_stop_arrived",
+    {
+      p_stop_id: stopId,
+      p_arrived_at: arrivedAt,
+    },
+  );
 
   if (error) {
     throw new Error(
       `Unable to save stop arrival: ${error.message}`,
-    );
-  }
-
-  if (!data) {
-    throw new Error(
-      "Unable to save stop arrival. The assigned stop could not be updated.",
     );
   }
 }

@@ -77,6 +77,7 @@ export type MultiMachineServiceVisit = {
   currentStep: MultiMachineVisitStepId;
 
   arrivalVerification: ArrivalVerification | null;
+  arrivalSyncStatus: "not_started" | "pending_sync" | "synced" | "failed";
 
   inventoryAudit: InventoryAuditRecord | null;
   restockDrop: RestockDropRecord | null;

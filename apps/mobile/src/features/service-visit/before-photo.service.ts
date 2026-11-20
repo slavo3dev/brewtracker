@@ -241,37 +241,37 @@ export async function deleteUploadedBeforePhoto(
   storagePath: string | null | undefined,
   databaseId: string | null | undefined,
 ): Promise<void> {
-  if (storagePath) {
-    const { error } = await supabase.storage
-      .from(SERVICE_VISIT_PHOTOS_BUCKET)
-      .remove([storagePath]);
-
-    if (error) {
-      console.warn("Unable to remove replaced service photo:", error.message);
-    }
+  if (!storagePath) {
+    return;
   }
 
-  if (databaseId && storagePath) {
+  if (databaseId) {
     const { data, error } = await supabase
       .from("service_visit_photos")
-      .select("storage_path")
+      .delete()
       .eq("id", databaseId)
-      .maybeSingle();
+      .eq("storage_path", storagePath)
+      .select("id");
 
     if (error) {
       throw error;
     }
 
-    if (data?.storage_path === storagePath) {
-      const { error: deleteError } = await supabase
-        .from("service_visit_photos")
-        .delete()
-        .eq("id", databaseId)
-        .eq("storage_path", storagePath);
-
-      if (deleteError) {
-        throw deleteError;
-      }
+    if (!data?.length) {
+      // The row no longer references this photo, or deletion was denied.
+      // Do not remove its Storage object without confirming ownership.
+      return;
     }
+  }
+
+  const { error: storageError } = await supabase.storage
+    .from(SERVICE_VISIT_PHOTOS_BUCKET)
+    .remove([storagePath]);
+
+  if (storageError) {
+    console.warn(
+      "Unable to remove service photo from storage:",
+      storageError.message,
+    );
   }
 }

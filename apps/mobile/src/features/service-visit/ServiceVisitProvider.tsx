@@ -15,6 +15,8 @@ import type {
   StartUnifiedServiceVisitInput,
 } from "./multi-machine-visit.types";
 import { createMultiMachineVisit } from "./state/multi-machine-visit.factory";
+import { advanceMultiMachineVisitStep } from "./state/multi-machine-visit.workflow";
+import { advanceActiveMachine } from "./state/multi-machine-visit.transitions";
 import {
   loadMultiMachineServiceVisit,
   saveMultiMachineServiceVisit,
@@ -24,6 +26,8 @@ import {
 import { useAfterServiceStep } from "../../hooks/useAfterServiceStep";
 import { useBeforePhotosStep } from "../../hooks/useBeforePhotosStep";
 import { useUnifiedBeforePhotosStep } from "../../hooks/useUnifiedBeforePhotosStep";
+import { useUnifiedInventoryAuditStep } from "../../hooks/useUnifiedInventoryAuditStep";
+import { useUnifiedRestockStep } from "../../hooks/useUnifiedRestockStep";
 import { useInventoryAuditStep } from "../../hooks/useInventoryAuditStep";
 import { useDrinkCountStep } from "../../hooks/useDrinkCountStep";
 import { useRestockStep } from "../../hooks/useRestockStep";
@@ -65,6 +69,16 @@ type ServiceVisitContextValue = {
   unifiedVisit: MultiMachineServiceVisit | null;
 
   unifiedBeforePhotos: ReturnType<typeof useUnifiedBeforePhotosStep>;
+  unifiedInventoryAudit: ReturnType<typeof useUnifiedInventoryAuditStep>;
+  unifiedRestock: ReturnType<typeof useUnifiedRestockStep>;
+  advanceUnifiedVisit: () => Promise<MultiMachineServiceVisit>;
+  completeUnifiedArrival: (
+    input: CompleteArrivalInput,
+  ) => Promise<MultiMachineServiceVisit>;
+  retryUnifiedArrivalSync: () => Promise<MultiMachineServiceVisit>;
+  completeUnifiedMachineScan: (
+    input: CompleteMachineScanInput,
+  ) => Promise<MultiMachineServiceVisit>;
   restoringVisit: boolean;
   errorMessage: string | null;
   restoreErrorMessage: string | null;
@@ -155,7 +169,12 @@ function createVisitId(): string {
 }
 
 export function ServiceVisitProvider({ children }: PropsWithChildren) {
-  const { session, status: authStatus, authGeneration, getAuthGeneration } = useAuth();
+  const {
+    session,
+    status: authStatus,
+    authGeneration,
+    getAuthGeneration,
+  } = useAuth();
 
   const [activeVisit, setActiveVisit] = useState<ServiceVisit | null>(null);
 
@@ -205,19 +224,233 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     getAuthGeneration,
   });
 
-  const { commitVisitMutation: commitUnifiedVisitMutation } =
-    useVisitMutation({
-      activeVisit: unifiedVisit,
-      setActiveVisit: setUnifiedVisit,
-      persistVisit: saveMultiMachineServiceVisit,
-      getVisitId: (visit) => visit.id,
-      getVisitUserId: (visit) => visit.userId,
-      authenticatedUserId: authStatus === "authenticated" ? userId : null,
-      authGeneration,
-      getAuthGeneration,
-    });
+  const { commitVisitMutation: commitUnifiedVisitMutation } = useVisitMutation({
+    activeVisit: unifiedVisit,
+    setActiveVisit: setUnifiedVisit,
+    persistVisit: saveMultiMachineServiceVisit,
+    getVisitId: (visit) => visit.id,
+    getVisitUserId: (visit) => visit.userId,
+    authenticatedUserId: authStatus === "authenticated" ? userId : null,
+    authGeneration,
+    getAuthGeneration,
+  });
+
+  const advanceUnifiedVisit = useCallback(
+    (): Promise<MultiMachineServiceVisit> =>
+      commitUnifiedVisitMutation((visit) =>
+        visit.currentStep === "machine_service"
+          ? advanceActiveMachine(visit)
+          : advanceMultiMachineVisitStep(visit),
+      ),
+    [commitUnifiedVisitMutation],
+  );
+
+  const completeUnifiedArrival = useCallback(
+    async (input: CompleteArrivalInput): Promise<MultiMachineServiceVisit> => {
+      const savedVisit = await commitUnifiedVisitMutation((visit) => {
+        if (visit.status !== "in_progress" || visit.currentStep !== "arrival") {
+          throw new Error("Arrival is not the current visit step.");
+        }
+
+        if (visit.arrivalVerification) {
+          throw new Error(
+            "Arrival is already verified. Retry synchronization instead.",
+          );
+        }
+
+        const expectedRadius = visit.target.geofenceRadiusMeters;
+
+        if (!Number.isFinite(expectedRadius) || expectedRadius <= 0) {
+          throw new Error("The client geofence radius is invalid.");
+        }
+
+        if (input.method === "geofence") {
+          if (!input.driverPosition || !input.targetPosition) {
+            throw new Error(
+              "A valid GPS position is required to confirm arrival.",
+            );
+          }
+
+          if (
+            input.distanceMeters == null ||
+            !Number.isFinite(input.distanceMeters) ||
+            input.distanceMeters < 0
+          ) {
+            throw new Error(
+              "The distance from the client could not be calculated.",
+            );
+          }
+
+          if (input.distanceMeters > expectedRadius) {
+            throw new Error("You are outside the client geofence.");
+          }
+        } else if (input.method !== "manual_override") {
+          throw new Error("Invalid arrival verification method.");
+        }
+
+        const overrideReason = input.overrideReason?.trim() ?? "";
+
+        if (input.method === "manual_override" && overrideReason.length < 10) {
+          throw new Error(
+            "Enter a clear override reason of at least 10 characters.",
+          );
+        }
+
+        const now = new Date().toISOString();
+
+        return {
+          ...visit,
+          arrivalVerification: {
+            method: input.method,
+            driverPosition: input.driverPosition,
+            targetPosition: input.targetPosition,
+            distanceMeters: input.distanceMeters,
+            geofenceRadiusMeters: expectedRadius,
+            overrideReason:
+              input.method === "manual_override" ? overrideReason : null,
+            verifiedAt: now,
+          },
+          arrivalSyncStatus: "pending_sync" as const,
+          updatedAt: now,
+        };
+      });
+
+      try {
+        await markServiceStopArrived(
+          savedVisit.stopId,
+          savedVisit.arrivalVerification!.verifiedAt,
+        );
+      } catch (error) {
+        console.warn("Unified arrival sync pending:", error);
+        return savedVisit;
+      }
+
+      return commitUnifiedVisitMutation((visit) => {
+        if (
+          visit.id !== savedVisit.id ||
+          visit.currentStep !== "arrival" ||
+          visit.arrivalVerification?.verifiedAt !==
+            savedVisit.arrivalVerification?.verifiedAt
+        ) {
+          throw new Error("Arrival changed during synchronization.");
+        }
+
+        return advanceMultiMachineVisitStep({
+          ...visit,
+          arrivalSyncStatus: "synced",
+        });
+      });
+    },
+    [commitUnifiedVisitMutation],
+  );
+
+  const retryUnifiedArrivalSync =
+    useCallback(async (): Promise<MultiMachineServiceVisit> => {
+      const savedVisit = await commitUnifiedVisitMutation((visit) => {
+        if (
+          visit.status !== "in_progress" ||
+          visit.currentStep !== "arrival" ||
+          !visit.arrivalVerification
+        ) {
+          throw new Error(
+            "There is no verified arrival awaiting synchronization.",
+          );
+        }
+
+        return visit;
+      });
+
+      if (savedVisit.arrivalSyncStatus !== "synced") {
+        await markServiceStopArrived(
+          savedVisit.stopId,
+          savedVisit.arrivalVerification!.verifiedAt,
+        );
+      }
+
+      return commitUnifiedVisitMutation((visit) => {
+        if (
+          visit.id !== savedVisit.id ||
+          visit.currentStep !== "arrival" ||
+          visit.arrivalVerification?.verifiedAt !==
+            savedVisit.arrivalVerification?.verifiedAt
+        ) {
+          throw new Error("Arrival changed during synchronization.");
+        }
+
+        return advanceMultiMachineVisitStep({
+          ...visit,
+          arrivalSyncStatus: "synced",
+        });
+      });
+    }, [commitUnifiedVisitMutation]);
+
+  const completeUnifiedMachineScan = useCallback(
+    (input: CompleteMachineScanInput): Promise<MultiMachineServiceVisit> =>
+      commitUnifiedVisitMutation((visit) => {
+        if (
+          visit.status !== "in_progress" ||
+          visit.currentStep !== "machine_service"
+        ) {
+          throw new Error("The visit is not servicing a machine.");
+        }
+
+        const index = visit.activeMachineIndex;
+        const machine = visit.machines[index];
+
+        if (!machine || machine.currentStep !== "machine_scan") {
+          throw new Error("Machine scanning is not the current step.");
+        }
+
+        const scannedValue = input.scannedValue.trim();
+        const expectedQrCode = machine.machineTarget.qrCode.trim();
+
+        if (!scannedValue || !expectedQrCode) {
+          throw new Error("A valid machine QR code is required.");
+        }
+
+        if (scannedValue !== expectedQrCode) {
+          throw new Error("This QR code belongs to a different machine.");
+        }
+
+        const now = new Date().toISOString();
+
+        const machines = visit.machines.map((item, itemIndex) =>
+          itemIndex === index
+            ? {
+                ...item,
+                machineScanVerification: {
+                  scannedValue,
+                  expectedQrCode,
+                  machineId: item.machineId,
+                  verifiedAt: now,
+                },
+              }
+            : item,
+        );
+
+        return advanceActiveMachine(
+          {
+            ...visit,
+            machines,
+            updatedAt: now,
+          },
+          now,
+        );
+      }),
+    [commitUnifiedVisitMutation],
+  );
 
   const unifiedBeforePhotos = useUnifiedBeforePhotosStep({
+    commitVisitMutation: commitUnifiedVisitMutation,
+    clearError,
+  });
+
+  const unifiedInventoryAudit = useUnifiedInventoryAuditStep({
+    commitVisitMutation: commitUnifiedVisitMutation,
+    clearError,
+  });
+
+  const unifiedRestock = useUnifiedRestockStep({
     commitVisitMutation: commitUnifiedVisitMutation,
     clearError,
   });
@@ -327,8 +560,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     setRestoreErrorMessage(null);
 
     try {
-      const storedUnifiedVisit =
-        await loadMultiMachineServiceVisit(userId);
+      const storedUnifiedVisit = await loadMultiMachineServiceVisit(userId);
 
       if (!isCurrentRequest()) return;
 
@@ -353,10 +585,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         (visit?.status === "completed" &&
           visit.summary.syncStatus !== "synced");
 
-      if (
-        blocksNewVisit(storedUnifiedVisit) &&
-        blocksNewVisit(validVisit)
-      ) {
+      if (blocksNewVisit(storedUnifiedVisit) && blocksNewVisit(validVisit)) {
         throw new Error(
           "Both legacy and unified service visits require attention. Resolve the saved visits before starting another service.",
         );
@@ -381,8 +610,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         0,
         pendingRestoreCountRef.current - 1,
       );
-      restoreInProgressRef.current =
-        pendingRestoreCountRef.current > 0;
+      restoreInProgressRef.current = pendingRestoreCountRef.current > 0;
 
       if (isCurrentRequest()) {
         setRestoringVisit(false);
@@ -923,7 +1151,6 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     setErrorMessage(null);
   }, [runVisitLifecycle, userId]);
 
-
   const isVisitForStop = useCallback(
     (stopId: string): boolean => {
       if (!activeVisit || activeVisit.stopId !== stopId) {
@@ -944,6 +1171,12 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       activeVisit,
       unifiedVisit,
       unifiedBeforePhotos,
+      unifiedInventoryAudit,
+      unifiedRestock,
+      advanceUnifiedVisit,
+      completeUnifiedArrival,
+      retryUnifiedArrivalSync,
+      completeUnifiedMachineScan,
       restoringVisit,
       errorMessage,
       restoreErrorMessage,
@@ -992,6 +1225,12 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       activeVisit,
       unifiedVisit,
       unifiedBeforePhotos,
+      unifiedInventoryAudit,
+      unifiedRestock,
+      advanceUnifiedVisit,
+      completeUnifiedArrival,
+      retryUnifiedArrivalSync,
+      completeUnifiedMachineScan,
       restoringVisit,
       errorMessage,
       restoreErrorMessage,

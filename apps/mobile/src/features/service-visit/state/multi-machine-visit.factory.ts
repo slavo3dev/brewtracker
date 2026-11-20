@@ -90,6 +90,7 @@ export function createMultiMachineVisit(
     status: "in_progress",
     currentStep: "arrival",
     arrivalVerification: null,
+    arrivalSyncStatus: "not_started",
 
     inventoryAudit: null,
     restockDrop: null,

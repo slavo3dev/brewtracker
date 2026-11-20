@@ -32,6 +32,12 @@ export function advanceMultiMachineVisitStep(
       if (!visit.arrivalVerification) {
         throw new Error("Arrival verification is missing.");
       }
+
+      if (visit.arrivalSyncStatus !== "synced") {
+        throw new Error(
+          "Arrival must finish syncing before continuing.",
+        );
+      }
       break;
 
     case "inventory_audit":
