@@ -128,11 +128,13 @@ export async function loadLatestMachineMeterReading(
 
 async function loadReadingByVisitId(
   sourceVisitId: string,
+  machineId: string,
 ): Promise<MachineMeterReadingResult | null> {
   const { data, error } = await supabase
     .from("machine_meter_readings")
     .select(METER_READING_SELECT)
     .eq("source_visit_id", sourceVisitId)
+    .eq("machine_id", machineId)
     .maybeSingle();
 
   if (error) {
@@ -184,6 +186,7 @@ export async function saveMachineMeterReading(
    */
   const existingReading = await loadReadingByVisitId(
     input.sourceVisitId,
+    input.machineId,
   );
 
   if (existingReading) {
@@ -274,9 +277,19 @@ export async function saveMachineMeterReading(
     if (error.code === "23505") {
       const duplicateReading = await loadReadingByVisitId(
         input.sourceVisitId,
+        input.machineId,
       );
 
       if (duplicateReading) {
+        if (
+          duplicateReading.serviceStopId !== input.stopId ||
+          duplicateReading.runningTotal !== input.runningTotal
+        ) {
+          throw new Error(
+            "This machine already has a different Drink Count for this service visit.",
+          );
+        }
+
         return duplicateReading;
       }
     }

@@ -82,6 +82,13 @@ REVOKE ALL ON FUNCTION public.lock_multi_machine_inventory_stop(
 --
 -- Existing single-machine visits remain supported.
 
+-- INV-V3-05: One Drink Count per machine per service visit.
+-- Preserve the historical migration and replace its uniqueness rule here.
+DROP INDEX public.machine_meter_readings_source_visit_id_idx;
+
+CREATE UNIQUE INDEX machine_meter_readings_visit_machine_unique_idx
+  ON public.machine_meter_readings (source_visit_id, machine_id);
+
 ALTER TABLE public.machine_refills
   DROP CONSTRAINT machine_refills_source_visit_id_key;
 
