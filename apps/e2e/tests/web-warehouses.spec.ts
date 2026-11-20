@@ -16,17 +16,6 @@ test('WEB-WH-02: Empty state when there are no warehouses', async () => {
 });
 
 test('WEB-WH-01: Warehouse geofence can be updated and saved', async ({ page }) => {
-  // Investigated directly: changing the geofence value to any NEW value (tried with a
-  // fractional one too, 212.5 ft) crashes the page ("This page couldn't load — A server
-  // error occurred"); re-submitting the SAME, already-existing fractional value doesn't
-  // crash. Same root cause as WEB-WH-03. The test below doesn't use test.fail() —
-  // intentionally FAILS (red) for as long as this defect is present.
-  test.info().annotations.push({
-    type: 'note',
-    description:
-      'Known app defect: saving any new geofence value crashes the page with a server error ("This page couldn\'t load — A server error occurred") — same root cause as WEB-WH-03. Needs investigation in the geofence update server action (updateWarehouseGeofenceAction or equivalent).',
-  });
-
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -55,17 +44,6 @@ test('WEB-WH-01: Warehouse geofence can be updated and saved', async ({ page }) 
 });
 
 test('WEB-WH-03: Invalid geofence values (non-numeric/negative radius) are rejected', async ({ page }) => {
-  // A negative radius is correctly blocked by NATIVE HTML validation (the input has
-  // min="1") — that part already works correctly. But saving a VALID, CHANGED radius still
-  // crashes the page ("This page couldn't load — A server error occurred") — the same root
-  // cause already documented in WEB-WH-01. The test below doesn't use test.fail() —
-  // intentionally FAILS (red) for as long as this defect is present.
-  test.info().annotations.push({
-    type: 'note',
-    description:
-      'Partial app defect: a negative radius is correctly blocked (HTML min="1") — that part is NOT a problem. BUT saving a valid, changed value still crashes the page with a server error — same root cause as WEB-WH-01. Needs a fix in the geofence update server action.',
-  });
-
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -73,12 +51,19 @@ test('WEB-WH-03: Invalid geofence values (non-numeric/negative radius) are rejec
   const warehouses = new WarehousesPage(page);
   await warehouses.goto();
 
+  // Captured BEFORE attemptNegativeRadius() below — getGeofenceValues() reads the LIVE form
+  // input, not a fresh page load. attemptNegativeRadius() fills the radius field with -50 and
+  // that value stays in the field (native validation blocks the submit, so the page never
+  // reloads) — reading "current" AFTER that call would capture "-50", not the real persisted
+  // radius, breaking the alternation below (it would always resolve to 99, defeating the
+  // point of testing an actual CHANGE on repeat runs).
+  const current = await warehouses.getGeofenceValues(OTHER_WAREHOUSE_NAME);
+
   // 1) A negative radius is rejected before being sent to the server.
   await warehouses.attemptNegativeRadius(OTHER_WAREHOUSE_NAME, -50);
   await warehouses.expectRadiusFieldInvalid(OTHER_WAREHOUSE_NAME);
 
   // 2) A valid, CHANGED radius is actually saved (not just that it doesn't crash the page).
-  const current = await warehouses.getGeofenceValues(OTHER_WAREHOUSE_NAME);
   const newRadius = Number(current.radiusFeet) === 99 ? 101 : 99;
   await warehouses.updateGeofence(OTHER_WAREHOUSE_NAME, {
     latitude: Number(current.latitude),

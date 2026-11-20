@@ -175,6 +175,12 @@ test('WEB-TCENT-06: Entry card shows the clock-in selfie when one exists', async
 });
 
 test('WEB-TCENT-07: Fallback messages for the selfie on the Entries page (no selfie / cannot be signed)', async ({ page }) => {
+  // Same reason as WEB-TCENT-04: calls entries.goto() twice, and the Entries page has no
+  // limit on how many rows it loads — under full-suite load (the shared entries table only
+  // grows), a full-suite run pushed this past the default 30s with no specific assertion
+  // failing (page.goto itself timed out); isolated reruns pass comfortably in ~11s.
+  test.setTimeout(90000);
+
   const driverId = process.env.QA_DRIVER_TRANSFERS_ID!;
   const driverEmail = process.env.QA_DRIVER_TRANSFERS_EMAIL!;
   const login = new LoginPage(page);
