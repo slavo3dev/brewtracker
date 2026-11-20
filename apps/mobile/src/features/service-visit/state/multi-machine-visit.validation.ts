@@ -189,8 +189,19 @@ export function validateRestoredMultiMachineVisit(
       }
     }
 
-    if (hasReachedStep("drink_count") && !machine.drinkCount) {
-      return null;
+    if (hasReachedStep("drink_count")) {
+      const reading = machine.drinkCount;
+
+      if (
+        !reading ||
+        reading.syncStatus !== "synced" ||
+        !reading.databaseId ||
+        reading.archiveTotal === null ||
+        !Number.isSafeInteger(reading.archiveTotal) ||
+        reading.archiveTotal < 0
+      ) {
+        return null;
+      }
     }
 
     if (hasReachedStep("machine_refill")) {
@@ -253,15 +264,34 @@ export function validateRestoredMultiMachineVisit(
       if (
         !machine.drinkCountRequired ||
         typeof drinkCount !== "object" ||
-        typeof drinkCount.databaseId !== "string" ||
-        !drinkCount.databaseId.trim() ||
         drinkCount.sourceVisitId !== visit.id ||
+        drinkCount.machineId !== machine.machineId ||
         !Number.isSafeInteger(drinkCount.runningTotal) ||
         drinkCount.runningTotal < 0 ||
-        !Number.isSafeInteger(drinkCount.archiveTotal) ||
-        drinkCount.archiveTotal < 0 ||
         typeof drinkCount.recordedAt !== "string" ||
-        !Number.isFinite(Date.parse(drinkCount.recordedAt))
+        !Number.isFinite(Date.parse(drinkCount.recordedAt)) ||
+        !["pending_sync", "synced", "failed"].includes(
+          drinkCount.syncStatus,
+        ) ||
+        (drinkCount.syncError !== null &&
+          typeof drinkCount.syncError !== "string")
+      ) {
+        return null;
+      }
+
+      if (drinkCount.syncStatus === "synced") {
+        if (
+          typeof drinkCount.databaseId !== "string" ||
+          !drinkCount.databaseId.trim() ||
+          drinkCount.archiveTotal === null ||
+          !Number.isSafeInteger(drinkCount.archiveTotal) ||
+          drinkCount.archiveTotal < 0
+        ) {
+          return null;
+        }
+      } else if (
+        drinkCount.databaseId !== null ||
+        drinkCount.archiveTotal !== null
       ) {
         return null;
       }

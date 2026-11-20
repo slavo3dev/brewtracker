@@ -44,6 +44,20 @@ export type MachineServiceStepId =
   | "machine_refill"
   | "after_service";
 
+export type UnifiedDrinkCountRecord = {
+  databaseId: string | null;
+  sourceVisitId: string;
+  machineId: string;
+
+  runningTotal: number;
+  archiveTotal: number | null;
+
+  recordedAt: string;
+
+  syncStatus: "pending_sync" | "synced" | "failed";
+  syncError: string | null;
+};
+
 export type MachineServiceState = {
   machineId: string;
   sequenceNumber: number;
@@ -55,7 +69,7 @@ export type MachineServiceState = {
 
   machineScanVerification: MachineScanVerification | null;
   beforePhotos: BeforePhotoRecord[];
-  drinkCount: DrinkCountRecord | null;
+  drinkCount: UnifiedDrinkCountRecord | null;
   machineRefill: MachineServiceConfirmationRecord | null;
   afterService: AfterServiceRecord;
 

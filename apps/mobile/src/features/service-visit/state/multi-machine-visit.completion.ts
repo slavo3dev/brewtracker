@@ -1,4 +1,3 @@
-
 import { BEFORE_PHOTO_KINDS } from "../service-visit.types";
 
 import type { MultiMachineServiceVisit } from "../multi-machine-visit.types";
@@ -52,8 +51,18 @@ export function assertMultiMachineVisitReadyForCompletion(
       }
     }
 
-    if (machine.drinkCountRequired && !machine.drinkCount) {
-      throw new Error("Required Drink Count is missing.");
+    if (
+      machine.drinkCountRequired &&
+      (!machine.drinkCount ||
+        machine.drinkCount.machineId !== machine.machineId ||
+        machine.drinkCount.sourceVisitId !== visit.id ||
+        machine.drinkCount.syncStatus !== "synced" ||
+        !machine.drinkCount.databaseId ||
+        machine.drinkCount.archiveTotal === null)
+    ) {
+      throw new Error(
+        "Required Drink Count must finish syncing before completion.",
+      );
     }
 
     const confirmation = machine.machineRefill;
@@ -127,7 +136,6 @@ export function assertMultiMachineVisitReadyForCompletion(
   }
 }
 
-
 export function completeMultiMachineVisit(
   visit: MultiMachineServiceVisit,
   now: string = new Date().toISOString(),
@@ -173,4 +181,3 @@ export function completeMultiMachineVisit(
     },
   };
 }
-

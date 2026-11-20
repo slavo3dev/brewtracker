@@ -77,8 +77,23 @@ export function assertMachineStepComplete(
     }
 
     case "drink_count": {
-      if (!machine.drinkCountRequired || !machine.drinkCount) {
+      const reading = machine.drinkCount;
+
+      if (!machine.drinkCountRequired || !reading) {
         throw new Error("Required Drink Count is missing.");
+      }
+
+      if (
+        reading.machineId !== machine.machineId ||
+        reading.syncStatus !== "synced" ||
+        !reading.databaseId ||
+        reading.archiveTotal === null ||
+        !Number.isSafeInteger(reading.archiveTotal) ||
+        reading.archiveTotal < 0
+      ) {
+        throw new Error(
+          "Drink Count must finish syncing before continuing.",
+        );
       }
 
       break;

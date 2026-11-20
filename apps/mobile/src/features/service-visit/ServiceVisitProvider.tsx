@@ -27,6 +27,7 @@ import { useAfterServiceStep } from "../../hooks/useAfterServiceStep";
 import { useBeforePhotosStep } from "../../hooks/useBeforePhotosStep";
 import { useUnifiedBeforePhotosStep } from "../../hooks/useUnifiedBeforePhotosStep";
 import { useUnifiedInventoryAuditStep } from "../../hooks/useUnifiedInventoryAuditStep";
+import { useUnifiedDrinkCountStep } from "../../hooks/useUnifiedDrinkCountStep";
 import { useUnifiedRestockStep } from "../../hooks/useUnifiedRestockStep";
 import { useInventoryAuditStep } from "../../hooks/useInventoryAuditStep";
 import { useDrinkCountStep } from "../../hooks/useDrinkCountStep";
@@ -70,6 +71,7 @@ type ServiceVisitContextValue = {
 
   unifiedBeforePhotos: ReturnType<typeof useUnifiedBeforePhotosStep>;
   unifiedInventoryAudit: ReturnType<typeof useUnifiedInventoryAuditStep>;
+  unifiedDrinkCount: ReturnType<typeof useUnifiedDrinkCountStep>;
   unifiedRestock: ReturnType<typeof useUnifiedRestockStep>;
   advanceUnifiedVisit: () => Promise<MultiMachineServiceVisit>;
   completeUnifiedArrival: (
@@ -446,6 +448,11 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   });
 
   const unifiedInventoryAudit = useUnifiedInventoryAuditStep({
+    commitVisitMutation: commitUnifiedVisitMutation,
+    clearError,
+  });
+
+  const unifiedDrinkCount = useUnifiedDrinkCountStep({
     commitVisitMutation: commitUnifiedVisitMutation,
     clearError,
   });
@@ -1153,17 +1160,16 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
   const isVisitForStop = useCallback(
     (stopId: string): boolean => {
-      if (!activeVisit || activeVisit.stopId !== stopId) {
-        return false;
-      }
-
-      return (
-        activeVisit.status === "in_progress" ||
-        (activeVisit.status === "completed" &&
-          activeVisit.summary.syncStatus !== "synced")
+      return [unifiedVisit, activeVisit].some(
+        (visit) =>
+          visit !== null &&
+          visit.stopId === stopId &&
+          (visit.status === "in_progress" ||
+            (visit.status === "completed" &&
+              visit.summary.syncStatus !== "synced")),
       );
     },
-    [activeVisit],
+    [unifiedVisit, activeVisit],
   );
 
   const value = useMemo<ServiceVisitContextValue>(
@@ -1172,6 +1178,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedVisit,
       unifiedBeforePhotos,
       unifiedInventoryAudit,
+      unifiedDrinkCount,
       unifiedRestock,
       advanceUnifiedVisit,
       completeUnifiedArrival,
@@ -1226,6 +1233,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedVisit,
       unifiedBeforePhotos,
       unifiedInventoryAudit,
+      unifiedDrinkCount,
       unifiedRestock,
       advanceUnifiedVisit,
       completeUnifiedArrival,
