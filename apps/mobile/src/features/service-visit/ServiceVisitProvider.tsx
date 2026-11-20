@@ -36,6 +36,7 @@ import { useVisitMutation } from "../../hooks/useVisitMutation";
 import { useSummaryStep } from "../../hooks/useSummaryStep";
 import { useMachineRefillStep } from "../../hooks/useMachineRefillStep";
 import { useClientConfirmation } from "../../hooks/useClientConfirmation";
+import { useUnifiedSummaryStep } from "../../hooks/useUnifiedSummaryStep";
 import {
   loadServiceVisit,
   removeServiceVisit,
@@ -73,6 +74,8 @@ type ServiceVisitContextValue = {
   unifiedInventoryAudit: ReturnType<typeof useUnifiedInventoryAuditStep>;
   unifiedDrinkCount: ReturnType<typeof useUnifiedDrinkCountStep>;
   unifiedRestock: ReturnType<typeof useUnifiedRestockStep>;
+  completeUnifiedSummary: () => Promise<MultiMachineServiceVisit>;
+  retryUnifiedSummarySync: () => Promise<MultiMachineServiceVisit>;
   advanceUnifiedVisit: () => Promise<MultiMachineServiceVisit>;
   completeUnifiedArrival: (
     input: CompleteArrivalInput,
@@ -461,6 +464,12 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     commitVisitMutation: commitUnifiedVisitMutation,
     clearError,
   });
+
+  const { completeUnifiedSummary, retryUnifiedSummarySync } =
+    useUnifiedSummaryStep({
+      commitVisitMutation: commitUnifiedVisitMutation,
+      setErrorMessage,
+    });
 
   const { saveSignature, updateSignatureUpload, removeSignature } =
     useClientConfirmation({
@@ -1180,6 +1189,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedInventoryAudit,
       unifiedDrinkCount,
       unifiedRestock,
+      completeUnifiedSummary,
+      retryUnifiedSummarySync,
       advanceUnifiedVisit,
       completeUnifiedArrival,
       retryUnifiedArrivalSync,
@@ -1235,6 +1246,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedInventoryAudit,
       unifiedDrinkCount,
       unifiedRestock,
+      completeUnifiedSummary,
+      retryUnifiedSummarySync,
       advanceUnifiedVisit,
       completeUnifiedArrival,
       retryUnifiedArrivalSync,
