@@ -1,21 +1,15 @@
 import { test, expect } from '../fixtures/test';
 import { LoginPage } from '../pages/LoginPage';
 import { UsersPage } from '../pages/UsersPage';
-import { createTestUser, deleteTestUser, getUserIdByEmail, setUserEmailToNull } from '../helpers/userSeed';
+import {
+  createTestUser,
+  deleteTestUser,
+  exhaustEmailRateLimit,
+  getUserIdByEmail,
+  setUserEmailToNull,
+} from '../helpers/userSeed';
 
 test('WEB-USR-01: Creating a user with all fields succeeds and sends the setup email', async ({ page }) => {
-  // A documented, already-confirmed defect (regression plan, Critical Fail): createUserAction()
-  // calls sendAppUserPasswordReset() IMMEDIATELY after createAppUser(), in the SAME try
-  // block — when that call hits the Supabase rate limit for reset-password emails (common on
-  // this shared QA project), the whole action returns an error instead of a success message,
-  // even though the user was ALREADY created in the database. The test below doesn't use
-  // test.fail() — it intentionally FAILS (red) whenever the rate limit is hit.
-  test.info().annotations.push({
-    type: 'note',
-    description:
-      'Known app defect (Critical): user creation and sending the setup email share the same try block — when the email send hits the Supabase rate limit, the whole action returns an error even though the user was already created in the database. NOTE: this test depends on the CURRENT state of the Supabase email quota — an occasional green pass does NOT mean the bug is fixed, only that the quota was not exhausted at that moment. Fix: split user creation and the email send into separate try blocks.',
-  });
-
   const login = new LoginPage(page);
   await login.goto();
   await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
@@ -39,9 +33,8 @@ test('WEB-USR-01: Creating a user with all fields succeeds and sends the setup e
 
     await users.expectUserCreatedAndEmailSent();
   } finally {
-    // The documented defect above: the account is created in the database even when the
-    // final message fails (an email rate limit), so we clean up regardless of the outcome —
-    // so reruns don't pile up accounts.
+    // The account is created in the database regardless of whether the setup email send
+    // succeeds (see WEB-USR-15) — clean up unconditionally so reruns don't pile up accounts.
     const userId = await getUserIdByEmail(email);
     if (userId) {
       await deleteTestUser(userId);
@@ -390,4 +383,56 @@ test('WEB-USR-14: /dashboard/users is unreachable for non-user-manager accounts'
   const users = new UsersPage(page);
   await users.goto();
   await expect(page).toHaveURL(/\/login/);
+});
+
+// Deliberately LAST in this file: exhaustEmailRateLimit() burns the shared Supabase email
+// quota so this test's own send is guaranteed to fail — placed after every other test in this
+// file that depends on a REAL email actually going through (WEB-USR-01, WEB-USR-10), so it
+// doesn't retroactively turn their occasional, documented quota flakiness into a guaranteed
+// failure within the same run.
+test('WEB-USR-15: Creating a user when the setup email fails still succeeds, with retry guidance', async ({ page }) => {
+  // createUserAction() splits user creation and the email send into separate try blocks
+  // (the fix for the WEB-USR-01 defect) — when the email send hits the Supabase rate limit,
+  // the account is still created and a distinct success message tells the manager to retry
+  // the email via "Send password reset" instead of reporting a hard failure. Deliberately
+  // exhausting the shared quota first (see exhaustEmailRateLimit) makes this DETERMINISTIC,
+  // unlike WEB-USR-01/WEB-AUTH-07/WEB-USR-10 which only observe this by chance.
+  await exhaustEmailRateLimit();
+
+  const login = new LoginPage(page);
+  await login.goto();
+  await login.login(process.env.QA_MANAGER_EMAIL!, process.env.QA_MANAGER_PASSWORD!);
+
+  const users = new UsersPage(page);
+  await users.goto();
+  await users.openAddUserForm();
+
+  const stamp = Date.now();
+  const email = `qa-usr-15-${stamp}@brewtracker.com`;
+
+  try {
+    await users.fillAndSubmit({
+      fullName: 'QA USR-15 Test User',
+      email,
+      phone: `+3816${String(stamp).slice(-8)}`,
+      address: 'Test Address 1',
+      region: 'Italy',
+      role: 'driver',
+    });
+
+    await expect(
+      page.getByText(
+        'User created, but the password setup email could not be sent. Use "Send password reset" to retry.',
+      ),
+    ).toBeVisible();
+    await expect(page.getByText('Unable to create user. Try again.')).toHaveCount(0);
+
+    const userId = await getUserIdByEmail(email);
+    expect(userId).not.toBeNull();
+  } finally {
+    const userId = await getUserIdByEmail(email);
+    if (userId) {
+      await deleteTestUser(userId);
+    }
+  }
 });

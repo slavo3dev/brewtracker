@@ -286,6 +286,12 @@ test('WEB-CLI-12: Editing an assignment persists the new par level and active fl
     await card.getByLabel('Active assignment').uncheck();
     await card.getByRole('button', { name: 'Save Changes' }).click();
 
+    // Save Changes doesn't wait for updateClientProduct() to resolve — the form only calls
+    // onCancel() (closing back to the "Edit" button) AFTER that await succeeds, so this is the
+    // reliable signal that the write has actually finished. Without it, the goto() below could
+    // race ahead of the save and reload the OLD (par 10, active) data.
+    await expect(card.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
+
     // Deactivating hides "Edit" behind the now-inactive card state — reload and re-expand to
     // confirm the change was actually persisted server-side, not just reflected locally.
     await page.goto(`/dashboard/clients/${clientId}`);

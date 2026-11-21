@@ -18,8 +18,13 @@ export default defineConfig({
   // defaults to test-results/results.json (gitignored) so `npm run test:regression` works
   // without the caller having to set it. Consumed by scripts/generate-regression-table.ts to
   // turn a run into an English regression status table.
+  // open: 'never' — the html reporter's default ('on-failure') opens AND serves the report
+  // over HTTP on a failing run, which keeps the playwright process alive until someone
+  // manually hits Ctrl+C. `npm run test:regression` chains a regression-table generation step
+  // after this command; with the default, that step (and the Bug Note / Suggested Fix columns
+  // it produces) would never run on exactly the failing runs where it's needed most.
   reporter: [
-    ['html'],
+    ['html', { open: 'never' }],
     ['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_NAME ?? 'test-results/results.json' }],
   ],
 
