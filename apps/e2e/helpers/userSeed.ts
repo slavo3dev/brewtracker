@@ -47,6 +47,41 @@ export async function createTestUser(params: {
 }
 
 /**
+ * Deliberately exhausts the shared Supabase project's auth-email rate limit, so a test that
+ * needs to observe the "email send failed" branch (e.g. WEB-USR-15) can do so DETERMINISTICALLY
+ * instead of waiting for the limit to already be exhausted by chance (the way WEB-AUTH-07/
+ * WEB-USR-01/WEB-USR-10 do, which is why those are documented as quota-dependent and
+ * occasionally green even when correct).
+ *
+ * This has a real side effect on the shared QA project: it burns part of its hourly email
+ * quota, which can make unrelated reset/invite emails fail for anyone else using this same
+ * project around the same time. Keep call sites to tests that specifically need to assert the
+ * failure branch, not as a general-purpose precondition.
+ */
+export async function exhaustEmailRateLimit(maxAttempts = 20): Promise<void> {
+  const supabase = supabaseAdmin();
+
+  // Must be a REAL, existing account — Supabase only queues an actual outbound email (and
+  // only THAT counts against the send quota) for an address that resolves to a real user, by
+  // design (so the API can't be used to probe which emails are registered). A made-up address
+  // returns success without ever being rate-limited, no matter how many times it's called.
+  const realEmail = process.env.QA_MANAGER_EMAIL!;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const { error } = await supabase.auth.resetPasswordForEmail(realEmail);
+    if (error) {
+      // The limit is now exhausted — the next real send (from the test itself) will fail too.
+      return;
+    }
+  }
+
+  throw new Error(
+    `Unable to exhaust the email rate limit after ${maxAttempts} attempts — the quota may have ` +
+      'been raised, or was already partially consumed by other activity in a way that needs more attempts.',
+  );
+}
+
+/**
  * Sets users.email to NULL directly via the database — simulates the "user without an
  * email" edge case (WEB-USR-11). Does not change the auth.users email (that remains a real,
  * valid account), only the denormalized display field the Users page uses.

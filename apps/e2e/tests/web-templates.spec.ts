@@ -350,7 +350,10 @@ test('WEB-TPL-13: Activation is blocked when the same machine is already schedul
   // the sum easily exceeds the default 30s budget for the WHOLE test. Confirmed by a
   // screenshot from a real failure (WEB-TPL-15, same pattern): the button was still
   // "Updating…"/"Creating…" at the moment of the timeout, not a locator/race bug.
-  test.setTimeout(60000);
+  // Bumped from 60s to 90s: a run with the full 221-test suite (41+ accumulated templates
+  // rendering on every page load) pushed even this past 60s with no specific assertion
+  // failing — isolated reruns pass comfortably in ~28s, confirming load, not a logic bug.
+  test.setTimeout(90000);
 
   const nameA = `QA TPL-13-A ${Date.now()}`;
   const nameB = `QA TPL-13-B ${Date.now()}`;
@@ -387,8 +390,9 @@ test('WEB-TPL-13: Activation is blocked when the same machine is already schedul
 
 test('WEB-TPL-16: Adding a conflicting stop to an active template is blocked', async ({ page }) => {
   // See the note in WEB-TPL-13: two full create+addStop+activate cycles easily exceed the
-  // default 30s budget under load.
-  test.setTimeout(60000);
+  // default 30s budget under load. Bumped to 90s for the same reason as WEB-TPL-13 (a
+  // full-suite run pushed it past 60s under load; isolated reruns pass comfortably).
+  test.setTimeout(90000);
 
   const nameA = `QA TPL-16-A ${Date.now()}`;
   const nameB = `QA TPL-16-B ${Date.now()}`;
@@ -490,8 +494,9 @@ test('WEB-TPL-10: Removing a stop that is not the last (or any stop on an inacti
 
 test('WEB-TPL-14: Conflict check falls back to the client when stops have no machine', async ({ page }) => {
   // See the note in WEB-TPL-13: two full create+addStop+activate cycles easily exceed the
-  // default 30s budget under load.
-  test.setTimeout(60000);
+  // default 30s budget under load. Bumped to 90s for the same reason as WEB-TPL-13 (a
+  // full-suite run pushed it past 60s under load; isolated reruns pass comfortably).
+  test.setTimeout(90000);
 
   const nameA = `QA TPL-14-A ${Date.now()}`;
   const nameB = `QA TPL-14-B ${Date.now()}`;
@@ -557,8 +562,9 @@ test('WEB-TPL-15: No conflict for different days (no overlap)', async ({ page })
 
 test('WEB-TPL-17: Editing an active template into a conflict is blocked', async ({ page }) => {
   // See the note in WEB-TPL-13: two full create+addStop+activate cycles easily exceed the
-  // default 30s budget under load.
-  test.setTimeout(60000);
+  // default 30s budget under load. Bumped to 90s for the same reason as WEB-TPL-13 (a
+  // full-suite run pushed it past 60s under load; isolated reruns pass comfortably).
+  test.setTimeout(90000);
 
   const nameA = `QA TPL-17-A ${Date.now()}`;
   const nameB = `QA TPL-17-B ${Date.now()}`;

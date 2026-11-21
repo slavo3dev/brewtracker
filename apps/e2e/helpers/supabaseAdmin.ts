@@ -14,9 +14,22 @@ const ALLOWED_TEST_PROJECT_REF = 'ybsrvlwgnxkutqhmcvdu';
 
 let verified = false;
 
+const ALLOWED_TEST_PROJECT_ORIGIN = `https://${ALLOWED_TEST_PROJECT_REF}.supabase.co`;
+
 function assertSafeTestProject() {
   const url = process.env.SUPABASE_URL;
-  if (!url || !url.includes(ALLOWED_TEST_PROJECT_REF)) {
+  // An origin comparison (not .includes()) — a substring check would let a URL like
+  // "https://otherproject.supabase.co?approved=<ALLOWED_TEST_PROJECT_REF>" through despite
+  // targeting a completely different host. new URL() throws on a malformed value, which
+  // falls through to the same rejection (fail-closed).
+  let origin: string | null = null;
+  try {
+    origin = url ? new URL(url).origin : null;
+  } catch {
+    origin = null;
+  }
+
+  if (origin !== ALLOWED_TEST_PROJECT_ORIGIN) {
     throw new Error(
       `Refusing to run: SUPABASE_URL ("${url ?? 'unset'}") is not the explicitly approved ` +
         `isolated test project (${ALLOWED_TEST_PROJECT_REF}). This admin client bypasses RLS ` +

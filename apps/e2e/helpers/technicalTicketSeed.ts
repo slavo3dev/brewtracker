@@ -1,7 +1,7 @@
 import { supabaseAdmin } from './supabaseAdmin';
 
 const TICKET_ID = '3b692462-72e9-413a-b16d-23924a10410c'; // "QA TT-05 ticket without photo"
-const KNOWN_TECH_ID = '8e3c70cc-1e26-4e09-8970-8e626bc4dae6'; // "Test"
+const KNOWN_TECH_ID = '92822696-2eab-4747-8faa-40dcd6508a03'; // "Test"
 
 export async function resetTicketToOpen() {
   const supabase = supabaseAdmin();
