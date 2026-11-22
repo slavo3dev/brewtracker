@@ -21,6 +21,7 @@ import {
   loadMultiMachineServiceVisit,
   saveMultiMachineServiceVisit,
   removeMultiMachineServiceVisit,
+  recoverInterruptedBeforePhotoUploads,
 } from "./multi-machine-visit.storage";
 
 import { useAfterServiceStep } from "../../hooks/useAfterServiceStep";
@@ -590,9 +591,22 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     setRestoreErrorMessage(null);
 
     try {
-      const storedUnifiedVisit = await loadMultiMachineServiceVisit(userId);
+      const loadedUnifiedVisit = await loadMultiMachineServiceVisit(userId);
 
       if (!isCurrentRequest()) return;
+
+      const storedUnifiedVisit = loadedUnifiedVisit
+        ? recoverInterruptedBeforePhotoUploads(loadedUnifiedVisit)
+        : null;
+
+      if (
+        storedUnifiedVisit !== null &&
+        storedUnifiedVisit !== loadedUnifiedVisit
+      ) {
+        await saveMultiMachineServiceVisit(storedUnifiedVisit);
+
+        if (!isCurrentRequest()) return;
+      }
 
       const storedVisit = await loadServiceVisit(userId);
 

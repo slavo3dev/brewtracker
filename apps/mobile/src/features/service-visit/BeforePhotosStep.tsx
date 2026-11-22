@@ -91,19 +91,11 @@ export default function BeforePhotosStep() {
 
   const [permission, requestPermission] = useCameraPermissions();
 
-  const {
-    activeVisit,
-    unifiedVisit,
-    unifiedBeforePhotos,
-    saveBeforePhoto,
-    updateBeforePhotoUpload,
-    removeBeforePhoto,
-    completeBeforePhotos,
-  } = useServiceVisit();
+  const { unifiedVisit, unifiedBeforePhotos } = useServiceVisit();
 
   const activeMachine =
     unifiedVisit?.currentStep === "machine_service"
-      ? unifiedVisit.machines[unifiedVisit.activeMachineIndex] ?? null
+      ? (unifiedVisit.machines[unifiedVisit.activeMachineIndex] ?? null)
       : null;
 
   const [captureState, setCaptureState] = useState<CaptureState>("overview");
@@ -124,7 +116,8 @@ export default function BeforePhotosStep() {
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const machineIdentity = activeMachine?.machineId ?? activeVisit?.machineId;
+  const machineIdentity = activeMachine?.machineId;
+
   const machineIdentityRef = useRef(machineIdentity);
   machineIdentityRef.current = machineIdentity;
 
@@ -135,21 +128,17 @@ export default function BeforePhotosStep() {
     setErrorMessage(null);
   }, [machineIdentity]);
 
-  if (!activeVisit && !activeMachine) {
+  if (!unifiedVisit || !activeMachine) {
     return null;
   }
 
-  const visit = activeVisit;
-  const beforePhotos = activeMachine
-    ? activeMachine.beforePhotos
-    : activeVisit?.beforePhotos ?? [];
+  const beforePhotos = activeMachine.beforePhotos;
 
   const exteriorPhoto =
     beforePhotos.find((photo) => photo.kind === "exterior") ?? null;
 
   const interiorPhoto =
-    beforePhotos.find((photo) => photo.kind === "interior_hopper") ??
-    null;
+    beforePhotos.find((photo) => photo.kind === "interior_hopper") ?? null;
 
   const requiredPhotosUploaded =
     exteriorPhoto?.uploadStatus === "uploaded" &&
@@ -222,28 +211,22 @@ export default function BeforePhotosStep() {
   }
 
   async function attemptUpload(
-    visit: ServiceVisit | MultiMachineServiceVisit,
+    visit: MultiMachineServiceVisit,
     machineId: string,
     kind: BeforePhotoKind,
     localUri: string,
   ): Promise<void> {
     setUploadingKind(kind);
 
-    const isUnified = isUnifiedVisit(visit);
-
     const updateUpload = async (
       input: Parameters<typeof unifiedBeforePhotos.updateBeforePhotoUpload>[3],
     ) => {
-      if (isUnifiedVisit(visit)) {
-        await unifiedBeforePhotos.updateBeforePhotoUpload(
-          machineId,
-          kind,
-          localUri,
-          input,
-        );
-      } else {
-        await updateBeforePhotoUpload(visit, kind, input);
-      }
+      await unifiedBeforePhotos.updateBeforePhotoUpload(
+        machineId,
+        kind,
+        localUri,
+        input,
+      );
     };
 
     try {
@@ -252,10 +235,9 @@ export default function BeforePhotosStep() {
         uploadError: null,
       });
 
-      const photos = isUnifiedVisit(visit)
-        ? visit.machines.find((machine) => machine.machineId === machineId)
-            ?.beforePhotos ?? []
-        : visit.beforePhotos;
+      const photos =
+        visit.machines.find((machine) => machine.machineId === machineId)
+          ?.beforePhotos ?? [];
 
       const localPhoto = photos.find(
         (photo) => photo.kind === kind && photo.localUri === localUri,
@@ -274,7 +256,7 @@ export default function BeforePhotosStep() {
         stage: "before",
         kind,
         localUri,
-        ...(isUnified ? { schemaVersion: 2 as const } : {}),
+        schemaVersion: 2,
       });
 
       await updateUpload({
@@ -295,7 +277,10 @@ export default function BeforePhotosStep() {
           uploadError: message,
         });
       } catch (updateError) {
-        console.warn("Unable to persist before-photo upload failure:", updateError);
+        console.warn(
+          "Unable to persist before-photo upload failure:",
+          updateError,
+        );
       }
     } finally {
       setUploadingKind(null);
@@ -313,8 +298,8 @@ export default function BeforePhotosStep() {
       return;
     }
 
-    const selectedVisit = unifiedVisit ?? activeVisit;
-    const selectedMachineId = activeMachine?.machineId ?? activeVisit?.machineId;
+    const selectedVisit = unifiedVisit;
+    const selectedMachineId = activeMachine?.machineId;
 
     if (!selectedVisit || !selectedMachineId) {
       setErrorMessage("The active machine could not be found.");
@@ -324,7 +309,9 @@ export default function BeforePhotosStep() {
     const savingMachineId = machineIdentityRef.current;
 
     if (savingMachineId !== selectedMachineId) {
-      setErrorMessage("The active machine changed. Please capture the photo again.");
+      setErrorMessage(
+        "The active machine changed. Please capture the photo again.",
+      );
       return;
     }
 
@@ -336,9 +323,7 @@ export default function BeforePhotosStep() {
 
       const localUri = await persistBeforePhotoLocally({
         visitId: selectedVisit.id,
-        ...(isUnifiedVisit(selectedVisit)
-          ? { machineId: selectedMachineId }
-          : {}),
+        machineId: selectedMachineId,
         kind: activeKind,
         temporaryUri: temporaryPhotoUri,
       });
@@ -350,17 +335,14 @@ export default function BeforePhotosStep() {
         );
       }
 
-      const updatedVisit = isUnifiedVisit(selectedVisit)
-        ? await unifiedBeforePhotos.saveBeforePhoto(selectedMachineId, {
-            kind: activeKind,
-            localUri,
-            capturedAt,
-          })
-        : await saveBeforePhoto({
-            kind: activeKind,
-            localUri,
-            capturedAt,
-          });
+      const updatedVisit = await unifiedBeforePhotos.saveBeforePhoto(
+        selectedMachineId,
+        {
+          kind: activeKind,
+          localUri,
+          capturedAt,
+        },
+      );
 
       // Preserve the previous photo until replacement upload and
       // database persistence have been confirmed. Cleanup must not
@@ -371,12 +353,7 @@ export default function BeforePhotosStep() {
       setTemporaryPhotoUri(null);
       setCaptureState("overview");
 
-      void attemptUpload(
-        updatedVisit,
-        selectedMachineId,
-        savedKind,
-        localUri,
-      );
+      void attemptUpload(updatedVisit, selectedMachineId, savedKind, localUri);
     } catch (error) {
       setCaptureState("preview");
 
@@ -396,18 +373,14 @@ export default function BeforePhotosStep() {
     setErrorMessage(null);
 
     try {
-      if (unifiedVisit) {
-        if (!activeMachine) {
-          throw new Error("The active machine could not be found.");
-        }
-
-        await unifiedBeforePhotos.removeBeforePhoto(
-          activeMachine.machineId,
-          photo.kind,
-        );
-      } else {
-        await removeBeforePhoto(photo.kind);
+      if (!activeMachine) {
+        throw new Error("The active machine could not be found.");
       }
+
+      await unifiedBeforePhotos.removeBeforePhoto(
+        activeMachine.machineId,
+        photo.kind,
+      );
 
       await deleteLocalBeforePhoto(photo.localUri);
       await deleteUploadedBeforePhoto(photo.storagePath, photo.databaseId);
@@ -427,8 +400,8 @@ export default function BeforePhotosStep() {
 
     setErrorMessage(null);
 
-    const selectedVisit = unifiedVisit ?? activeVisit;
-    const selectedMachineId = activeMachine?.machineId ?? activeVisit?.machineId;
+    const selectedVisit = unifiedVisit;
+    const selectedMachineId = activeMachine?.machineId;
 
     if (!selectedVisit || !selectedMachineId) {
       setErrorMessage("The active machine could not be found.");
@@ -452,17 +425,11 @@ export default function BeforePhotosStep() {
     setErrorMessage(null);
 
     try {
-      if (unifiedVisit) {
-        if (!activeMachine) {
-          throw new Error("The active machine could not be found.");
-        }
-
-        await unifiedBeforePhotos.completeBeforePhotos(
-          activeMachine.machineId,
-        );
-      } else {
-        await completeBeforePhotos();
+      if (!activeMachine) {
+        throw new Error("The active machine could not be found.");
       }
+
+      await unifiedBeforePhotos.completeBeforePhotos(activeMachine.machineId);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -708,7 +675,9 @@ export default function BeforePhotosStep() {
           <ActivityIndicator color="#ffffff" />
         ) : (
           <Text style={styles.primaryButtonText}>
-            Continue to Meter Reading
+            {activeMachine.drinkCountRequired
+              ? "Continue to Drink Count"
+              : "Continue to Machine Refill"}
           </Text>
         )}
       </Pressable>
