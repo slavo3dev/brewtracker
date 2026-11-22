@@ -17,8 +17,20 @@ import {
 import { useCurrentLocation } from "../maps/useCurrentLocation";
 import { useServiceVisit } from "./ServiceVisitProvider";
 
-export default function ArrivalStep() {
-  const { activeVisit, completeArrival } = useServiceVisit();
+type Props = {
+  mode: "legacy" | "unified";
+};
+
+export default function ArrivalStep({ mode }: Props) {
+  const {
+    activeVisit,
+    unifiedVisit,
+    completeArrival,
+    completeUnifiedArrival,
+    retryUnifiedArrivalSync,
+  } = useServiceVisit();
+
+  const visit = mode === "unified" ? unifiedVisit : activeVisit;
 
   const {
     position,
@@ -36,18 +48,15 @@ export default function ArrivalStep() {
   const [overrideReason, setOverrideReason] = useState("");
 
   const targetPosition = useMemo<GeoPoint | null>(() => {
-    if (
-      activeVisit?.target.latitude == null ||
-      activeVisit.target.longitude == null
-    ) {
+    if (visit?.target.latitude == null || visit.target.longitude == null) {
       return null;
     }
 
     return {
-      latitude: activeVisit.target.latitude,
-      longitude: activeVisit.target.longitude,
+      latitude: visit.target.latitude,
+      longitude: visit.target.longitude,
     };
-  }, [activeVisit?.target.latitude, activeVisit?.target.longitude]);
+  }, [visit?.target.latitude, visit?.target.longitude]);
 
   const currentDistance = useMemo(() => {
     if (!position || !targetPosition) {
@@ -57,11 +66,14 @@ export default function ArrivalStep() {
     return distanceMeters(position, targetPosition);
   }, [position, targetPosition]);
 
-  if (!activeVisit) {
+  if (!visit) {
     return null;
   }
 
-  const visit = activeVisit;
+  const arrivalPendingSync =
+    mode === "unified" &&
+    unifiedVisit?.currentStep === "arrival" &&
+    unifiedVisit.arrivalVerification !== null;
 
   const radius = visit.target.geofenceRadiusMeters;
 
@@ -80,6 +92,9 @@ export default function ArrivalStep() {
     showOverride && normalizedOverrideReason.length >= 10 && !submitting;
 
   function getLocationMessage(): string {
+    if (!visit) {
+      return "No active service visit.";
+    }
     if (!targetPosition) {
       return "This client has no valid geofence coordinates.";
     }
@@ -131,7 +146,10 @@ export default function ArrivalStep() {
     setErrorMessage(null);
 
     try {
-      await completeArrival({
+      const confirmArrival =
+        mode === "unified" ? completeUnifiedArrival : completeArrival;
+
+      await confirmArrival({
         method: "geofence",
         driverPosition: position,
         targetPosition,
@@ -158,7 +176,10 @@ export default function ArrivalStep() {
     setErrorMessage(null);
 
     try {
-      await completeArrival({
+      const confirmArrival =
+        mode === "unified" ? completeUnifiedArrival : completeArrival;
+
+      await confirmArrival({
         method: "manual_override",
         driverPosition: position,
         targetPosition,
@@ -177,192 +198,248 @@ export default function ArrivalStep() {
     }
   }
 
+  async function handleRetryArrivalSync(): Promise<void> {
+    if (!arrivalPendingSync || submitting) {
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      await retryUnifiedArrivalSync();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to synchronize arrival. Please try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <View>
-      <View style={styles.locationCard}>
-        <View style={styles.locationHeader}>
-          <View>
-            <Text style={styles.title}>Verify arrival</Text>
-          </View>
+      {arrivalPendingSync ? (
+        <View style={styles.locationCard}>
+          <Text style={styles.title}>Arrival verified</Text>
 
-          <View
-            style={[
-              styles.statusBadge,
-              isInsideGeofence && styles.statusBadgeSuccess,
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusBadgeText,
-                isInsideGeofence && styles.statusBadgeTextSuccess,
-              ]}
-            >
-              {isInsideGeofence ? "In range" : "Not verified"}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={styles.clientName}>{visit.target.clientName}</Text>
-
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Allowed radius</Text>
-
-          <Text style={styles.detailValue}>
-            {formatFeet(radius)}
+          <Text style={styles.messageText}>
+            Your arrival has been saved on this device, but it has not been
+            confirmed by the server yet.
           </Text>
-        </View>
 
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Current distance</Text>
-
-          <Text style={styles.detailValue}>
-            {currentDistance == null
-              ? "Unavailable"
-              : formatDistanceMeters(currentDistance)}
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.messageCard,
-            isInsideGeofence && styles.messageCardSuccess,
-          ]}
-        >
-          {locationStatus === "loading" ? (
-            <ActivityIndicator color="#9c5621" style={styles.messageSpinner} />
+          {errorMessage ? (
+            <Text style={styles.errorText}>{errorMessage}</Text>
           ) : null}
 
-          <Text
-            style={[
-              styles.messageText,
-              isInsideGeofence && styles.messageTextSuccess,
-            ]}
+          <Pressable
+            accessibilityRole="button"
+            disabled={submitting}
+            style={[styles.primaryButton, submitting && styles.buttonDisabled]}
+            onPress={() => {
+              void handleRetryArrivalSync();
+            }}
           >
-            {getLocationMessage()}
-          </Text>
+            {submitting ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Retry Arrival Sync</Text>
+            )}
+          </Pressable>
         </View>
+      ) : (
+        <>
+          <View style={styles.locationCard}>
+            <View style={styles.locationHeader}>
+              <View>
+                <Text style={styles.title}>Verify arrival</Text>
+              </View>
 
-        {locationStatus === "permission_denied" ||
-        locationStatus === "error" ? (
+              <View
+                style={[
+                  styles.statusBadge,
+                  isInsideGeofence && styles.statusBadgeSuccess,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusBadgeText,
+                    isInsideGeofence && styles.statusBadgeTextSuccess,
+                  ]}
+                >
+                  {isInsideGeofence ? "In range" : "Not verified"}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.clientName}>{visit.target.clientName}</Text>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Allowed radius</Text>
+
+              <Text style={styles.detailValue}>{formatFeet(radius)}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Current distance</Text>
+
+              <Text style={styles.detailValue}>
+                {currentDistance == null
+                  ? "Unavailable"
+                  : formatDistanceMeters(currentDistance)}
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.messageCard,
+                isInsideGeofence && styles.messageCardSuccess,
+              ]}
+            >
+              {locationStatus === "loading" ? (
+                <ActivityIndicator
+                  color="#9c5621"
+                  style={styles.messageSpinner}
+                />
+              ) : null}
+
+              <Text
+                style={[
+                  styles.messageText,
+                  isInsideGeofence && styles.messageTextSuccess,
+                ]}
+              >
+                {getLocationMessage()}
+              </Text>
+            </View>
+
+            {locationStatus === "permission_denied" ||
+            locationStatus === "error" ? (
+              <Pressable
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.retryButton,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={() => {
+                  void retry();
+                }}
+              >
+                <Text style={styles.retryButtonText}>Try Location Again</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {errorMessage ? (
+            <View style={styles.errorCard}>
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            </View>
+          ) : null}
+
           <Pressable
             accessibilityRole="button"
             style={({ pressed }) => [
-              styles.retryButton,
-              pressed && styles.buttonPressed,
+              styles.primaryButton,
+              !canConfirmNormally && styles.buttonDisabled,
+              pressed && canConfirmNormally && styles.buttonPressed,
             ]}
+            disabled={!canConfirmNormally}
             onPress={() => {
-              void retry();
+              void handleConfirmArrival();
             }}
           >
-            <Text style={styles.retryButtonText}>Try Location Again</Text>
+            {submitting && !showOverride ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Confirm Arrival</Text>
+            )}
           </Pressable>
-        ) : null}
-      </View>
 
-      {errorMessage ? (
-        <View style={styles.errorCard}>
-          <Text style={styles.errorText}>{errorMessage}</Text>
-        </View>
-      ) : null}
-
-      <Pressable
-        accessibilityRole="button"
-        style={({ pressed }) => [
-          styles.primaryButton,
-          !canConfirmNormally && styles.buttonDisabled,
-          pressed && canConfirmNormally && styles.buttonPressed,
-        ]}
-        disabled={!canConfirmNormally}
-        onPress={() => {
-          void handleConfirmArrival();
-        }}
-      >
-        {submitting && !showOverride ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text style={styles.primaryButtonText}>Confirm Arrival</Text>
-        )}
-      </Pressable>
-
-      {!showOverride ? (
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.overrideLink,
-            pressed && styles.buttonPressed,
-          ]}
-          onPress={() => {
-            setErrorMessage(null);
-            setShowOverride(true);
-          }}
-        >
-          <Text style={styles.overrideLinkText}>
-            GPS issue? Request manual override
-          </Text>
-        </Pressable>
-      ) : (
-        <View style={styles.overrideCard}>
-          <Text style={styles.overrideTitle}>Manual arrival override</Text>
-
-          <Text style={styles.overrideDescription}>
-            Explain why GPS verification cannot be completed. This reason will
-            be saved with the service visit for manager review.
-          </Text>
-
-          <TextInput
-            editable={!submitting}
-            multiline
-            numberOfLines={4}
-            maxLength={300}
-            placeholder="Example: GPS signal is inaccurate inside the underground parking area."
-            placeholderTextColor="#a89c8f"
-            style={styles.overrideInput}
-            textAlignVertical="top"
-            value={overrideReason}
-            onChangeText={setOverrideReason}
-          />
-
-          <Text style={styles.characterHint}>
-            At least 10 characters · {overrideReason.length}/300
-          </Text>
-
-          <View style={styles.overrideActions}>
+          {!showOverride ? (
             <Pressable
               accessibilityRole="button"
               style={({ pressed }) => [
-                styles.cancelOverrideButton,
+                styles.overrideLink,
                 pressed && styles.buttonPressed,
               ]}
-              disabled={submitting}
               onPress={() => {
-                setShowOverride(false);
-                setOverrideReason("");
                 setErrorMessage(null);
+                setShowOverride(true);
               }}
             >
-              <Text style={styles.cancelOverrideText}>Cancel</Text>
+              <Text style={styles.overrideLinkText}>
+                GPS issue? Request manual override
+              </Text>
             </Pressable>
+          ) : (
+            <View style={styles.overrideCard}>
+              <Text style={styles.overrideTitle}>Manual arrival override</Text>
 
-            <Pressable
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.submitOverrideButton,
-                !canSubmitOverride && styles.buttonDisabled,
-                pressed && canSubmitOverride && styles.buttonPressed,
-              ]}
-              disabled={!canSubmitOverride}
-              onPress={() => {
-                void handleManualOverride();
-              }}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.submitOverrideText}>Submit Override</Text>
-              )}
-            </Pressable>
-          </View>
-        </View>
+              <Text style={styles.overrideDescription}>
+                Explain why GPS verification cannot be completed. This reason
+                will be saved with the service visit for manager review.
+              </Text>
+
+              <TextInput
+                editable={!submitting}
+                multiline
+                numberOfLines={4}
+                maxLength={300}
+                placeholder="Example: GPS signal is inaccurate inside the underground parking area."
+                placeholderTextColor="#a89c8f"
+                style={styles.overrideInput}
+                textAlignVertical="top"
+                value={overrideReason}
+                onChangeText={setOverrideReason}
+              />
+
+              <Text style={styles.characterHint}>
+                At least 10 characters · {overrideReason.length}/300
+              </Text>
+
+              <View style={styles.overrideActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.cancelOverrideButton,
+                    pressed && styles.buttonPressed,
+                  ]}
+                  disabled={submitting}
+                  onPress={() => {
+                    setShowOverride(false);
+                    setOverrideReason("");
+                    setErrorMessage(null);
+                  }}
+                >
+                  <Text style={styles.cancelOverrideText}>Cancel</Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.submitOverrideButton,
+                    !canSubmitOverride && styles.buttonDisabled,
+                    pressed && canSubmitOverride && styles.buttonPressed,
+                  ]}
+                  disabled={!canSubmitOverride}
+                  onPress={() => {
+                    void handleManualOverride();
+                  }}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={styles.submitOverrideText}>
+                      Submit Override
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </>
       )}
     </View>
   );

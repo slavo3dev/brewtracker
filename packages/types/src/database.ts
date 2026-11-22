@@ -1768,7 +1768,7 @@ export type Database = {
           client_id: string;
           created_at: string;
           id: string;
-          machine_id: string;
+          machine_id: string | null;
           signed_at: string;
           signed_by: string;
           source_visit_id: string;
@@ -1780,7 +1780,7 @@ export type Database = {
           client_id: string;
           created_at?: string;
           id?: string;
-          machine_id: string;
+          machine_id?: string | null;
           signed_at: string;
           signed_by: string;
           source_visit_id: string;
@@ -1792,7 +1792,7 @@ export type Database = {
           client_id?: string;
           created_at?: string;
           id?: string;
-          machine_id?: string;
+          machine_id?: string | null;
           signed_at?: string;
           signed_by?: string;
           source_visit_id?: string;

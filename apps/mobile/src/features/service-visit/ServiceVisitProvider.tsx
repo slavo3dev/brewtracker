@@ -158,6 +158,8 @@ type ServiceVisitContextValue = {
 
   clearCompletedVisit: () => Promise<void>;
 
+  clearCompletedUnifiedVisit: () => Promise<void>;
+
   retryRestore: () => Promise<void>;
 
   clearLocalVisit: () => Promise<void>;
@@ -233,7 +235,10 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     getAuthGeneration,
   });
 
-  const { commitVisitMutation: commitUnifiedVisitMutation } = useVisitMutation({
+  const {
+    commitVisitMutation: commitUnifiedVisitMutation,
+    runVisitLifecycle: runUnifiedVisitLifecycle,
+  } = useVisitMutation({
     activeVisit: unifiedVisit,
     setActiveVisit: setUnifiedVisit,
     persistVisit: saveMultiMachineServiceVisit,
@@ -1176,6 +1181,75 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     setErrorMessage(null);
   }, [runVisitLifecycle, userId]);
 
+  const clearCompletedUnifiedVisit = useCallback(async (): Promise<void> => {
+    if (authStatus !== "authenticated" || !userId) {
+      throw new Error("You must be signed in to clear a service visit.");
+    }
+
+    const expectedUserId = userId;
+    const expectedGeneration = getAuthGeneration();
+    const expectedVisitId = unifiedVisit?.id ?? null;
+
+    await runUnifiedVisitLifecycle(async () => {
+      const storedVisit = await loadMultiMachineServiceVisit(expectedUserId);
+
+      if (!storedVisit) {
+        return null;
+      }
+
+      if (!expectedVisitId || storedVisit.id !== expectedVisitId) {
+        throw new Error(
+          "The saved unified visit changed. Local data was preserved.",
+        );
+      }
+
+      if (storedVisit.userId !== expectedUserId) {
+        throw new Error("The saved visit belongs to another user.");
+      }
+
+      if (storedVisit.status === "in_progress") {
+        throw new Error("An in-progress visit cannot be removed.");
+      }
+
+      if (
+        storedVisit.status === "completed" &&
+        storedVisit.summary.syncStatus !== "synced"
+      ) {
+        throw new Error(
+          "The completed service visit must sync successfully before it can be removed.",
+        );
+      }
+
+      if (
+        storedVisit.status !== "completed" &&
+        storedVisit.status !== "cancelled"
+      ) {
+        throw new Error(
+          "This unified visit cannot be removed in its current state.",
+        );
+      }
+
+      // Recheck authentication immediately before deleting local data.
+      if (getAuthGeneration() !== expectedGeneration) {
+        throw new Error(
+          "Authentication changed. The saved visit was preserved.",
+        );
+      }
+
+      await removeMultiMachineServiceVisit(expectedUserId);
+
+      return null;
+    });
+
+    setErrorMessage(null);
+  }, [
+    authStatus,
+    getAuthGeneration,
+    runUnifiedVisitLifecycle,
+    unifiedVisit,
+    userId,
+  ]);
+
   const isVisitForStop = useCallback(
     (stopId: string): boolean => {
       return [unifiedVisit, activeVisit].some(
@@ -1244,6 +1318,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
       cancelVisit,
       clearCompletedVisit,
+      clearCompletedUnifiedVisit,
 
       retryRestore,
       clearLocalVisit,
@@ -1303,6 +1378,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
       cancelVisit,
       clearCompletedVisit,
+      clearCompletedUnifiedVisit,
 
       retryRestore,
       clearLocalVisit,

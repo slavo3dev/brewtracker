@@ -95,7 +95,18 @@ function getRecommendedDeliveryValue(
 }
 
 export default function RestockDropStep() {
-  const { activeVisit, completeRestockDrop } = useServiceVisit();
+  const { unifiedVisit, unifiedRestock } = useServiceVisit();
+
+  const visit = unifiedVisit;
+
+  const { completeRestockDrop, retryRestockSync } = unifiedRestock;
+
+  const savedDelivery = visit?.restockDrop ?? null;
+
+  const hasUnfinishedDelivery =
+    savedDelivery !== null &&
+    savedDelivery.sourceVisitId === visit?.id &&
+    savedDelivery.syncStatus !== "synced";
 
   const [products, setProducts] = useState<ClientInventoryProduct[]>([]);
 
@@ -111,7 +122,7 @@ export default function RestockDropStep() {
     let cancelled = false;
 
     async function loadProducts() {
-      if (!activeVisit) {
+      if (!visit) {
         setProducts([]);
         setLoading(false);
         return;
@@ -121,7 +132,7 @@ export default function RestockDropStep() {
       setErrorMessage(null);
 
       try {
-        const result = await loadClientInventoryProducts(activeVisit.clientId);
+        const result = await loadClientInventoryProducts(visit.clientId);
 
         if (!cancelled) {
           setProducts(result);
@@ -134,11 +145,11 @@ export default function RestockDropStep() {
            * the driver's actual entered quantities instead of
            * recalculating the recommendation.
            */
-          const savedDelivery = activeVisit.restockDrop;
+          const savedDelivery = visit?.restockDrop ?? null;
 
           if (
             savedDelivery &&
-            savedDelivery.sourceVisitId === activeVisit.id &&
+            savedDelivery.sourceVisitId === visit?.id &&
             savedDelivery.syncStatus !== "synced"
           ) {
             const restoredValues: DeliveryValues = Object.fromEntries(
@@ -151,9 +162,7 @@ export default function RestockDropStep() {
               ]),
             );
 
-            setValues((current) =>
-              Object.keys(current).length > 0 ? current : restoredValues,
-            );
+            setValues(restoredValues);
           }
         }
       } catch (error) {
@@ -176,9 +185,9 @@ export default function RestockDropStep() {
     return () => {
       cancelled = true;
     };
-  }, [activeVisit?.clientId, activeVisit?.id, activeVisit?.restockDrop]);
+  }, [visit?.clientId, visit?.id, visit?.restockDrop]);
 
-  const reserveBefore = activeVisit?.inventoryAudit ?? null;
+  const reserveBefore = visit?.inventoryAudit ?? null;
 
   const rows = useMemo<DeliveryRow[]>(() => {
     if (!reserveBefore) {
@@ -257,6 +266,9 @@ export default function RestockDropStep() {
     field: "issueQuantity" | "looseQuantity",
     value: string,
   ) {
+    if (hasUnfinishedDelivery || submitting) {
+      return;
+    }
     const normalized =
       field === "issueQuantity"
         ? normalizeWholeInput(value)
@@ -337,11 +349,13 @@ export default function RestockDropStep() {
   const canSubmit =
     !loading &&
     !submitting &&
-    productsWithoutPar.length === 0 &&
-    missingQuantityCount === 0 &&
-    !hasInvalidQuantity;
+    (hasUnfinishedDelivery
+      ? savedDelivery !== null && savedDelivery.items.length > 0
+      : productsWithoutPar.length === 0 &&
+        missingQuantityCount === 0 &&
+        !hasInvalidQuantity);
 
-  if (!activeVisit) {
+  if (!visit) {
     return null;
   }
 
@@ -354,6 +368,10 @@ export default function RestockDropStep() {
     setErrorMessage(null);
 
     try {
+      if (hasUnfinishedDelivery) {
+        await retryRestockSync();
+        return;
+      }
       await completeRestockDrop({
         quantities: deliveryRows.map((row) => {
           const value = values[row.product.productId] ?? emptyDeliveryValue();
@@ -478,7 +496,7 @@ export default function RestockDropStep() {
 
                 <TextInput
                   value={value.issueQuantity}
-                  editable={!submitting}
+                  editable={!hasUnfinishedDelivery && !submitting}
                   keyboardType="number-pad"
                   placeholder="0"
                   onChangeText={(text) =>
@@ -496,7 +514,7 @@ export default function RestockDropStep() {
 
                   <TextInput
                     value={value.looseQuantity}
-                    editable={!submitting}
+                    editable={!hasUnfinishedDelivery && !submitting}
                     keyboardType={
                       row.product.packaging.allowsPartialBaseUnit
                         ? "decimal-pad"
@@ -522,6 +540,17 @@ export default function RestockDropStep() {
         );
       })}
 
+      {hasUnfinishedDelivery ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>Delivery saved locally</Text>
+
+          <Text style={styles.emptyText}>
+            Your delivery quantities have been preserved. Synchronization is
+            incomplete. Retry when your connection is available.
+          </Text>
+        </View>
+      ) : null}
+
       <Pressable
         accessibilityRole="button"
         disabled={!canSubmit}
@@ -540,7 +569,9 @@ export default function RestockDropStep() {
           <ActivityIndicator color="#ffffff" />
         ) : (
           <Text style={styles.confirmButtonText}>
-            Confirm Delivery & Continue
+            {hasUnfinishedDelivery
+              ? "Retry Delivery Synchronization"
+              : "Confirm Delivery & Continue"}
           </Text>
         )}
       </Pressable>

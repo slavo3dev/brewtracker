@@ -22,6 +22,7 @@ import MachineRefillStep from "../features/service-visit/MachineRefillStep";
 import AfterServiceStep from "../features/service-visit/AfterServiceStep";
 import SummaryStep from "../features/service-visit/SummaryStep";
 import TechBridge from "../features/technical-tickets/TechBridge";
+import UnifiedServiceVisitScreen from "./UnifiedServiceVisitScreen";
 
 type Props = {
   onBack: () => void;
@@ -39,6 +40,7 @@ export default function ServiceVisitScreen({
     retryRestore,
     clearCompletedVisit,
     retrySummarySync,
+    unifiedVisit,
   } = useServiceVisit();
 
   const [submitting, setSubmitting] = useState(false);
@@ -86,6 +88,25 @@ export default function ServiceVisitScreen({
           </Pressable>
         </View>
       </SafeAreaView>
+    );
+  }
+
+  const unifiedNeedsAttention =
+    unifiedVisit?.status === "in_progress" ||
+    (unifiedVisit?.status === "completed" &&
+      unifiedVisit.summary.syncStatus !== "synced");
+
+  const legacyNeedsAttention =
+    activeVisit?.status === "in_progress" ||
+    (activeVisit?.status === "completed" &&
+      activeVisit.summary.syncStatus !== "synced");
+
+  if (unifiedVisit && (unifiedNeedsAttention || !legacyNeedsAttention)) {
+    return (
+      <UnifiedServiceVisitScreen
+        onBack={onBack}
+        onVisitCompleted={onVisitCompleted}
+      />
     );
   }
 
@@ -281,7 +302,7 @@ export default function ServiceVisitScreen({
             </View>
           )
         ) : activeVisit.currentStep === "arrival" ? (
-          <ArrivalStep />
+          <ArrivalStep mode="legacy" />
         ) : activeVisit.currentStep === "machine_scan" ? (
           <MachineScanStep />
         ) : activeVisit.currentStep === "before_photos" ? (

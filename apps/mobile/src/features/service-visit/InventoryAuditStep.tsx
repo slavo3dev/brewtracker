@@ -105,11 +105,12 @@ function getInventoryAuditErrorMessage(
 }
 
 export default function InventoryAuditStep() {
-  const {
-    activeVisit,
-    completeInventoryAudit,
-    retryInventoryAuditSync,
-  } = useServiceVisit();
+  const { unifiedVisit, unifiedInventoryAudit } = useServiceVisit();
+
+  const visit = unifiedVisit;
+
+  const { completeInventoryAudit, retryInventoryAuditSync } =
+    unifiedInventoryAudit;
 
   const [products, setProducts] = useState<ClientInventoryProduct[]>([]);
 
@@ -125,13 +126,13 @@ export default function InventoryAuditStep() {
     Map<string, number | null>
   >(new Map());
 
-  const clientId = activeVisit?.clientId ?? null;
+  const clientId = visit?.clientId ?? null;
 
-  const savedAudit = activeVisit?.inventoryAudit;
+  const savedAudit = visit?.inventoryAudit;
 
   const hasUnfinishedAudit =
     savedAudit != null &&
-    savedAudit.sourceVisitId === activeVisit?.id &&
+    savedAudit.sourceVisitId === visit?.id &&
     savedAudit.syncStatus !== "synced";
 
   const savedAuditErrorMessage =
@@ -177,8 +178,8 @@ export default function InventoryAuditStep() {
          * fallback, so they can still be loaded offline
          * after they have previously been cached.
          */
-        const savedAudit = activeVisit?.inventoryAudit;
-        const activeVisitId = activeVisit?.id;
+        const savedAudit = visit?.inventoryAudit;
+        const activeVisitId = visit?.id;
 
         const hasUnfinishedAudit =
           savedAudit != null &&
@@ -286,7 +287,7 @@ export default function InventoryAuditStep() {
     return () => {
       cancelled = true;
     };
-  }, [clientId, activeVisit?.id, activeVisit?.inventoryAudit]);
+  }, [clientId, visit?.id, visit?.inventoryAudit]);
 
   const groupedProducts = useMemo(() => {
     const groups = new Map<
@@ -304,7 +305,7 @@ export default function InventoryAuditStep() {
     return Array.from(groups.entries());
   }, [products]);
 
-  if (!activeVisit) {
+  if (!visit) {
     return null;
   }
 
@@ -479,7 +480,7 @@ export default function InventoryAuditStep() {
       <View style={styles.clientCard}>
         <Text style={styles.clientLabel}>Location</Text>
 
-        <Text style={styles.clientName}>{activeVisit.target.clientName}</Text>
+        <Text style={styles.clientName}>{visit.target.clientName}</Text>
       </View>
 
       {products.length === 0 ? (
@@ -617,9 +618,9 @@ export default function InventoryAuditStep() {
       {hasUnfinishedAudit && !hasUnsafeAuditRecovery ? (
         <View style={styles.warningCard}>
           <Text style={styles.warningText}>
-            Your inventory quantities are saved locally and cannot
-            be edited. Synchronization is not complete.
-            Check your connection and retry to continue.
+            Your inventory quantities are saved locally and cannot be edited.
+            Synchronization is not complete. Check your connection and retry to
+            continue.
           </Text>
         </View>
       ) : null}
@@ -627,14 +628,10 @@ export default function InventoryAuditStep() {
       {hasLegacyAuditWithoutConfiguration ? (
         <View style={styles.warningCard}>
           <Text style={styles.warningText}>
-            This audit was saved by an older app version.
-            Your original quantities are preserved.
-
-            Retry will check whether the saved quantities
-            match the available product packaging.
-
-            If verification fails, manager reconciliation
-            will be required.
+            This audit was saved by an older app version. Your original
+            quantities are preserved. Retry will check whether the saved
+            quantities match the available product packaging. If verification
+            fails, manager reconciliation will be required.
           </Text>
         </View>
       ) : null}
