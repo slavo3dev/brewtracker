@@ -263,9 +263,34 @@ function StopRow({
             </span>
           </div>
           <p className="mt-2 text-sm text-steam-400">{address}</p>
-          <p className="mt-1 text-sm text-steam-400">
-            Machine: {stop.machine?.name ?? stop.machine?.serial_number ?? "—"}
-          </p>
+          <div className="mt-2">
+            <p className="text-sm font-medium text-espresso-800">
+              Machines ({stop.stop_machines.length})
+            </p>
+
+            <ul className="mt-1 space-y-1">
+              {[...stop.stop_machines]
+                .sort((a, b) => a.sequence_number - b.sequence_number)
+                .map((assignment) => (
+                  <li
+                    key={assignment.id}
+                    className="flex flex-wrap items-center gap-2 text-sm text-steam-400"
+                  >
+                    <span>
+                      {assignment.machine?.name ??
+                        assignment.machine?.serial_number ??
+                        assignment.machine_id}
+                    </span>
+
+                    {assignment.drink_count_required && (
+                      <span className="rounded-full bg-copper-100 px-2 py-0.5 text-xs font-medium text-copper-600">
+                        Drink Count
+                      </span>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          </div>
           <p className="mt-1 text-sm text-steam-400">
             Scheduled: {formatDate(stop.scheduled_start_at)} →{" "}
             {formatDate(stop.scheduled_end_at)}

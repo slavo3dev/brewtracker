@@ -65,15 +65,22 @@ export async function addStopAction(
 
   const routeId = String(formData.get("routeId") ?? "");
   const clientId = String(formData.get("clientId") ?? "");
-  const machineId = optionalText(formData.get("machineId"));
+  const machineIds = formData
+  .getAll("machineIds")
+  .map((value) => String(value).trim())
+  .filter(Boolean);
+
+  const machines = machineIds.map((machineId) => ({
+    machineId,
+    drinkCountRequired:
+      formData.get(`drinkCountRequired:${machineId}`) === "on",
+  }));
   const scheduledStartAt = optionalText(formData.get("scheduledStartAt"));
   const scheduledEndAt = optionalText(formData.get("scheduledEndAt"));
   const notes = optionalText(formData.get("notes"));
-  const drinkCountRequired = formData.get("drinkCountRequired") === "on";
-  
-  if (!routeId || !clientId) {
+  if (!routeId || !clientId || machines.length === 0) {
     return {
-      error: "Route and client are required.",
+      error: "Route, client and at least one machine are required.",
       success: null,
     };
   }
@@ -82,11 +89,10 @@ export async function addStopAction(
     await addRouteStop({
       routeId,
       clientId,
-      machineId,
+      machines,
       scheduledStartAt,
       scheduledEndAt,
       notes,
-      drinkCountRequired,
     });
 
     revalidatePath("/dashboard/routes");
