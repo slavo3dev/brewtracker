@@ -193,30 +193,22 @@ export async function uploadBeforePhoto({
     throw error;
   }
 
-  try {
-    const databaseId = await createServiceVisitPhoto({
-      userId,
-      visitId,
-      stopId,
-      machineId,
-      stage,
-      kind,
-      storagePath,
-      capturedAt,
-      schemaVersion,
-    });
+  const databaseId = await createServiceVisitPhoto({
+    userId,
+    visitId,
+    stopId,
+    machineId,
+    stage,
+    kind,
+    storagePath,
+    capturedAt,
+    schemaVersion,
+  });
 
-    return {
-      storagePath,
-      databaseId,
-    };
-  } catch (error) {
-    await supabase.storage
-      .from(SERVICE_VISIT_PHOTOS_BUCKET)
-      .remove([storagePath]);
-
-    throw error;
-  }
+  return {
+    storagePath,
+    databaseId,
+  };
 }
 
 export async function deleteLocalBeforePhoto(

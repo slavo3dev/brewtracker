@@ -171,7 +171,7 @@ export function useVisitMutation<TVisit>({
 
   const runVisitLifecycle = useCallback(
     (
-      operation: () => Promise<TVisit | null>,
+      operation: (currentVisit: TVisit | null) => Promise<TVisit | null>,
     ): Promise<TVisit | null> => {
       const requestedGeneration = readAuthGeneration();
       const requestedUserId = authenticatedUserIdRef.current;
@@ -186,7 +186,7 @@ export function useVisitMutation<TVisit>({
           );
         }
 
-        const nextVisit = await operation();
+        const nextVisit = await operation(activeVisitRef.current);
 
         if (
           readAuthGeneration() !== requestedGeneration ||

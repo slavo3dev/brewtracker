@@ -193,6 +193,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   const [unifiedVisit, setUnifiedVisit] =
     useState<MultiMachineServiceVisit | null>(null);
 
+  const unifiedVisitRef = useRef<MultiMachineServiceVisit | null>(null);
+
   const restoreRequestRef = useRef(0);
 
   const restoreInProgressRef = useRef(false);
@@ -249,6 +251,10 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     authGeneration,
     getAuthGeneration,
   });
+
+  useEffect(() => {
+    unifiedVisitRef.current = unifiedVisit;
+  }, [unifiedVisit]);
 
   const advanceUnifiedVisit = useCallback(
     (): Promise<MultiMachineServiceVisit> =>
@@ -569,6 +575,22 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       );
     }
 
+    if (unifiedVisitRef.current?.status === "in_progress") {
+      throw new Error(
+        "An active service visit is already loaded. " +
+          "Finish the visit before restoring another.",
+      );
+    }
+
+    if (authStatus !== "authenticated" || !userId) {
+      restoreRequestRef.current += 1;
+      setActiveVisit(null);
+      setUnifiedVisit(null);
+      setRestoringVisit(false);
+      setRestoreErrorMessage(null);
+      return;
+    }
+
     const requestId = ++restoreRequestRef.current;
     const generation = getAuthGeneration();
 
@@ -579,71 +601,90 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       restoreRequestRef.current === requestId &&
       getAuthGeneration() === generation;
 
-    if (authStatus !== "authenticated" || !userId) {
-      setActiveVisit(null);
-      setUnifiedVisit(null);
-      setRestoringVisit(false);
-      setRestoreErrorMessage(null);
-      return;
-    }
-
     setRestoringVisit(true);
     setRestoreErrorMessage(null);
 
     try {
-      const loadedUnifiedVisit = await loadMultiMachineServiceVisit(userId);
+      let restoredLegacyVisit: ServiceVisit | null = null;
+
+      await runUnifiedVisitLifecycle(async (currentVisit) => {
+        if (!isCurrentRequest()) {
+          throw new Error("The restoration request is no longer current.");
+        }
+
+        if (currentVisit !== null) {
+          throw new Error(
+            "A unified service visit is already loaded. " +
+              "Restoration cannot replace the active visit.",
+          );
+        }
+
+        const loadedUnifiedVisit = await loadMultiMachineServiceVisit(userId);
+
+        if (!isCurrentRequest()) {
+          throw new Error("The restoration request is no longer current.");
+        }
+
+        const storedLegacyVisit = await loadServiceVisit(userId);
+
+        if (!isCurrentRequest()) {
+          throw new Error("The restoration request is no longer current.");
+        }
+
+        const validLegacyVisit = storedLegacyVisit
+          ? validateRestoredVisit(storedLegacyVisit, userId)
+          : null;
+
+        if (storedLegacyVisit && !validLegacyVisit) {
+          throw new Error(
+            "The saved service visit is invalid or uses an unsupported local format.",
+          );
+        }
+
+        const blocksNewVisit = (
+          visit: { status: string; summary: { syncStatus: string } } | null,
+        ) =>
+          visit?.status === "in_progress" ||
+          (visit?.status === "completed" &&
+            visit.summary.syncStatus !== "synced");
+
+        if (
+          blocksNewVisit(loadedUnifiedVisit) &&
+          blocksNewVisit(validLegacyVisit)
+        ) {
+          throw new Error(
+            "Both legacy and unified service visits require attention. " +
+              "Resolve the saved visits before starting another service.",
+          );
+        }
+
+        const recoveredVisit = loadedUnifiedVisit
+          ? recoverInterruptedBeforePhotoUploads(loadedUnifiedVisit)
+          : null;
+
+        if (recoveredVisit && recoveredVisit !== loadedUnifiedVisit) {
+          if (!isCurrentRequest()) {
+            throw new Error("The restoration request is no longer current.");
+          }
+
+          await saveMultiMachineServiceVisit(recoveredVisit);
+        }
+
+        if (!isCurrentRequest()) {
+          throw new Error("The restoration request is no longer current.");
+        }
+
+        restoredLegacyVisit = validLegacyVisit;
+
+        return recoveredVisit;
+      });
 
       if (!isCurrentRequest()) return;
 
-      const storedUnifiedVisit = loadedUnifiedVisit
-        ? recoverInterruptedBeforePhotoUploads(loadedUnifiedVisit)
-        : null;
-
-      if (
-        storedUnifiedVisit !== null &&
-        storedUnifiedVisit !== loadedUnifiedVisit
-      ) {
-        await saveMultiMachineServiceVisit(storedUnifiedVisit);
-
-        if (!isCurrentRequest()) return;
-      }
-
-      const storedVisit = await loadServiceVisit(userId);
-
-      if (!isCurrentRequest()) return;
-
-      const validVisit = storedVisit
-        ? validateRestoredVisit(storedVisit, userId)
-        : null;
-
-      if (storedVisit && !validVisit) {
-        throw new Error(
-          "The saved service visit is invalid or uses an unsupported local format.",
-        );
-      }
-
-      const blocksNewVisit = (
-        visit: { status: string; summary: { syncStatus: string } } | null,
-      ) =>
-        visit?.status === "in_progress" ||
-        (visit?.status === "completed" &&
-          visit.summary.syncStatus !== "synced");
-
-      if (blocksNewVisit(storedUnifiedVisit) && blocksNewVisit(validVisit)) {
-        throw new Error(
-          "Both legacy and unified service visits require attention. Resolve the saved visits before starting another service.",
-        );
-      }
-
-      if (!isCurrentRequest()) return;
-
-      setUnifiedVisit(storedUnifiedVisit);
-      setActiveVisit(validVisit);
+      setActiveVisit(restoredLegacyVisit);
     } catch (error) {
       if (!isCurrentRequest()) return;
 
-      setActiveVisit(null);
-      setUnifiedVisit(null);
       setRestoreErrorMessage(
         error instanceof Error
           ? error.message
@@ -660,7 +701,12 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         setRestoringVisit(false);
       }
     }
-  }, [authStatus, userId, getAuthGeneration]);
+  }, [
+    authStatus,
+    userId,
+    getAuthGeneration,
+    runUnifiedVisitLifecycle,
+  ]);
 
   useEffect(() => {
     void restoreVisit();
