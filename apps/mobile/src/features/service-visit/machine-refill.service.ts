@@ -51,7 +51,7 @@ export async function saveMachineServiceConfirmation(
       p_machine_id: input.machineId,
       p_confirmed_at: input.confirmedAt,
       p_outcome: input.outcome,
-      p_reason: reason,
+      p_reason: reason ?? undefined,
     },
   );
 

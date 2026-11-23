@@ -20,6 +20,7 @@ import InventoryAuditStep from "../features/service-visit/InventoryAuditStep";
 import RestockDropStep from "../features/service-visit/RestockDropStep";
 import MachineScanStep from "../features/service-visit/MachineScanStep";
 import BeforePhotosStep from "../features/service-visit/BeforePhotosStep";
+import UnifiedDrinkCountStep from "../features/service-visit/UnifiedDrinkCountStep";
 
 type Props = {
   onBack: () => void;
@@ -181,6 +182,10 @@ export default function UnifiedServiceVisitScreen({
               <MachineScanStep key={machine?.machineId ?? "machine-scan"} />
             ) : currentStep === "before_photos" ? (
               <BeforePhotosStep key={machine?.machineId ?? "before-photos"} />
+            ) : currentStep === "drink_count" ? (
+              <UnifiedDrinkCountStep
+                key={machine?.machineId ?? "drink-count"}
+              />
             ) : (
               <View style={styles.card}>
                 <Text style={styles.description}>

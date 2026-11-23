@@ -281,34 +281,37 @@ export async function saveClientReserveBefore(
     }
   }
 
+  type ReserveBeforeArgs =
+    Database["public"]["Functions"]["save_client_reserve_before_service_v2"]["Args"];
+
+  const args: Omit<ReserveBeforeArgs, "p_machine_id"> & {
+    p_machine_id: string | null;
+  } = {
+    p_source_visit_id: input.sourceVisitId,
+    p_client_id: input.clientId,
+    p_stop_id: input.stopId,
+    p_machine_id: input.machineId,
+    p_recorded_at: input.recordedAt,
+    p_items: input.quantities.map((quantity) => ({
+      product_id: quantity.productId,
+      issue_quantity: quantity.issueQuantity,
+      loose_quantity: quantity.looseQuantity,
+      expected_packaging: {
+        base_unit: quantity.expectedPackaging.baseUnit,
+        issue_unit: quantity.expectedPackaging.issueUnit,
+        units_per_issue_unit: quantity.expectedPackaging.unitsPerIssueUnit,
+        allows_loose_units: quantity.expectedPackaging.allowsLooseUnits,
+        allows_partial_base_unit:
+          quantity.expectedPackaging.allowsPartialBaseUnit,
+      },
+    })),
+  };
+
+  // The SQL RPC accepts NULL for multi-machine client-level visits.
+  // Supabase-generated types do not represent this parameter nullability.
   const { data, error } = await supabase.rpc(
     "save_client_reserve_before_service_v2",
-    {
-      p_source_visit_id: input.sourceVisitId,
-
-      p_client_id: input.clientId,
-
-      p_stop_id: input.stopId,
-
-      p_machine_id: input.machineId,
-
-      p_recorded_at: input.recordedAt,
-
-      p_items: input.quantities.map((quantity) => ({
-        product_id: quantity.productId,
-        issue_quantity: quantity.issueQuantity,
-        loose_quantity: quantity.looseQuantity,
-
-        expected_packaging: {
-          base_unit: quantity.expectedPackaging.baseUnit,
-          issue_unit: quantity.expectedPackaging.issueUnit,
-          units_per_issue_unit: quantity.expectedPackaging.unitsPerIssueUnit,
-          allows_loose_units: quantity.expectedPackaging.allowsLooseUnits,
-          allows_partial_base_unit:
-            quantity.expectedPackaging.allowsPartialBaseUnit,
-        },
-      })),
-    },
+    args as ReserveBeforeArgs,
   );
 
   if (error) {
