@@ -38,31 +38,38 @@ export async function createServiceVisitPhoto(
     throw new Error(`User mismatch: auth=${user.id} visit=${input.userId}`);
   }
 
-  const { data, error } = await supabase
-    .from("service_visit_photos")
-    .upsert(
-      {
-        uploaded_by: input.userId,
-        source_visit_id: input.visitId,
-        stop_id: input.stopId,
-        machine_id: input.machineId,
-        stage: input.stage,
-        kind: input.kind,
-        storage_path: input.storagePath,
-        captured_at: input.capturedAt,
-      },
-      {
-        onConflict: "source_visit_id,machine_id,stage,kind",
-      },
-    )
-    .select("id")
-    .single();
+  const { data, error } = await supabase.rpc(
+    "upsert_service_visit_photo",
+    {
+      p_source_visit_id: input.visitId,
+      p_stop_id: input.stopId,
+      p_machine_id: input.machineId,
+      p_stage: input.stage,
+      p_kind: input.kind,
+      p_storage_path: input.storagePath,
+      p_captured_at: input.capturedAt,
+    },
+  );
 
   if (error) {
     throw error;
   }
 
-  return data.id;
+  const result = data?.[0];
+
+  if (!result) {
+    throw new Error(
+      "The photo metadata could not be saved. Check photo ownership and permissions.",
+    );
+  }
+
+  if (!result.accepted) {
+    throw new Error(
+      "This photo was superseded by a newer capture.",
+    );
+  }
+
+  return result.photo_id;
 }
 
 export async function deleteServiceVisitPhoto(id: string): Promise<void> {

@@ -4,6 +4,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { supabase } from "../../lib/supabase";
 import { prepareServicePhoto } from "./photos/prepare-service-photo";
 import { createServiceVisitPhoto } from "./service-visit-photo.service";
+import { withPhotoUploadLock } from "./photo-upload-lock";
 
 const SERVICE_VISIT_BUCKET = "service-visit-photos";
 
@@ -77,43 +78,48 @@ export async function uploadAfterPhoto(input: {
   machineId: string;
   localUri: string;
   capturedAt: string;
+  storagePathMode?: "legacy" | "per_machine";
 }): Promise<{
   storagePath: string;
   databaseId: string;
 }> {
   const storagePath =
-    `${input.userId}/${input.visitId}` + "/after/exterior.jpg";
+    `${input.userId}/${input.visitId}/machines/${input.machineId}` +
+    `/after/${encodeURIComponent(input.capturedAt)}-exterior.jpg`;
 
-  const bytes = await readFileAsArrayBuffer(input.localUri);
+  return withPhotoUploadLock(storagePath, async () => {
+    const bytes = await readFileAsArrayBuffer(input.localUri);
 
-  const { error: uploadError } = await supabase.storage
-    .from(SERVICE_VISIT_BUCKET)
-    .upload(storagePath, bytes, {
-      contentType: "image/jpeg",
-      cacheControl: "3600",
-      upsert: true,
+    const { error: uploadError } = await supabase.storage
+      .from(SERVICE_VISIT_BUCKET)
+      .upload(storagePath, bytes, {
+        contentType: "image/jpeg",
+        cacheControl: "3600",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const databaseId = await createServiceVisitPhoto({
+      userId: input.userId,
+      visitId: input.visitId,
+      stopId: input.stopId,
+      machineId: input.machineId,
+      stage: "after",
+      kind: "exterior",
+      storagePath,
+      capturedAt: input.capturedAt,
     });
 
-  if (uploadError) {
-    throw uploadError;
-  }
-
-  const databaseId = await createServiceVisitPhoto({
-    userId: input.userId,
-    visitId: input.visitId,
-    stopId: input.stopId,
-    machineId: input.machineId,
-    stage: "after",
-    kind: "exterior",
-    storagePath,
-    capturedAt: input.capturedAt,
+    return {
+      storagePath,
+      databaseId,
+    };
   });
-
-  return {
-    storagePath,
-    databaseId,
-  };
 }
+
 
 export async function deleteLocalMedia(uri: string | null): Promise<void> {
   if (!uri) {

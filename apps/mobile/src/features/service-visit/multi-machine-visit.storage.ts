@@ -9,7 +9,8 @@ function getStorageKey(userId: string): string {
   return `${STORAGE_KEY_PREFIX}:${userId}`;
 }
 
-export function recoverInterruptedBeforePhotoUploads(
+
+export function recoverInterruptedPhotoUploads(
   visit: MultiMachineServiceVisit,
 ): MultiMachineServiceVisit {
   let changed = false;
@@ -29,9 +30,29 @@ export function recoverInterruptedBeforePhotoUploads(
       };
     });
 
+    const afterPhoto = machine.afterService.afterPhoto;
+
+    const recoveredAfterPhoto =
+      afterPhoto?.uploadStatus === "uploading"
+        ? {
+            ...afterPhoto,
+            uploadStatus: "failed" as const,
+            uploadError:
+              "Photo upload was interrupted. Reconnect and retry.",
+          }
+        : afterPhoto;
+
+    if (recoveredAfterPhoto !== afterPhoto) {
+      changed = true;
+    }
+
     return {
       ...machine,
       beforePhotos,
+      afterService: {
+        ...machine.afterService,
+        afterPhoto: recoveredAfterPhoto,
+      },
     };
   });
 

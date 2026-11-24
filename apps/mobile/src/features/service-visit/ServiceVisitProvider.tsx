@@ -21,7 +21,7 @@ import {
   loadMultiMachineServiceVisit,
   saveMultiMachineServiceVisit,
   removeMultiMachineServiceVisit,
-  recoverInterruptedBeforePhotoUploads,
+  recoverInterruptedPhotoUploads,
 } from "./multi-machine-visit.storage";
 
 import { useAfterServiceStep } from "../../hooks/useAfterServiceStep";
@@ -38,6 +38,9 @@ import { useSummaryStep } from "../../hooks/useSummaryStep";
 import { useMachineRefillStep } from "../../hooks/useMachineRefillStep";
 import { useClientConfirmation } from "../../hooks/useClientConfirmation";
 import { useUnifiedSummaryStep } from "../../hooks/useUnifiedSummaryStep";
+import { useUnifiedMachineRefillStep } from "../../hooks/useUnifiedMachineRefillStep";
+import { useUnifiedAfterServiceStep } from "../../hooks/useUnifiedAfterServiceStep";
+import { hasUnsyncedMachinePhotos } from "./state/multi-machine-photo-sync";
 import {
   loadServiceVisit,
   removeServiceVisit,
@@ -74,7 +77,9 @@ type ServiceVisitContextValue = {
   unifiedBeforePhotos: ReturnType<typeof useUnifiedBeforePhotosStep>;
   unifiedInventoryAudit: ReturnType<typeof useUnifiedInventoryAuditStep>;
   unifiedDrinkCount: ReturnType<typeof useUnifiedDrinkCountStep>;
+  unifiedMachineRefill: ReturnType<typeof useUnifiedMachineRefillStep>;
   unifiedRestock: ReturnType<typeof useUnifiedRestockStep>;
+  unifiedAfterService: ReturnType<typeof useUnifiedAfterServiceStep>;
   completeUnifiedSummary: () => Promise<MultiMachineServiceVisit>;
   retryUnifiedSummarySync: () => Promise<MultiMachineServiceVisit>;
   advanceUnifiedVisit: () => Promise<MultiMachineServiceVisit>;
@@ -476,6 +481,16 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     clearError,
   });
 
+  const unifiedMachineRefill = useUnifiedMachineRefillStep({
+    commitVisitMutation: commitUnifiedVisitMutation,
+    clearError,
+  });
+
+  const unifiedAfterService = useUnifiedAfterServiceStep({
+    commitVisitMutation: commitUnifiedVisitMutation,
+    clearError,
+  });
+
   const unifiedRestock = useUnifiedRestockStep({
     commitVisitMutation: commitUnifiedVisitMutation,
     clearError,
@@ -659,7 +674,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         }
 
         const recoveredVisit = loadedUnifiedVisit
-          ? recoverInterruptedBeforePhotoUploads(loadedUnifiedVisit)
+          ? recoverInterruptedPhotoUploads(loadedUnifiedVisit)
           : null;
 
         if (recoveredVisit && recoveredVisit !== loadedUnifiedVisit) {
@@ -1281,6 +1296,15 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       }
 
       if (
+        storedVisit.status === "completed" &&
+        hasUnsyncedMachinePhotos(storedVisit)
+      ) {
+        throw new Error(
+          "Some machine photos have not uploaded yet. Retry photo synchronization before finishing.",
+        );
+      }
+
+      if (
         storedVisit.status !== "completed" &&
         storedVisit.status !== "cancelled"
       ) {
@@ -1331,6 +1355,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedBeforePhotos,
       unifiedInventoryAudit,
       unifiedDrinkCount,
+      unifiedMachineRefill,
+      unifiedAfterService,
       unifiedRestock,
       completeUnifiedSummary,
       retryUnifiedSummarySync,
@@ -1391,6 +1417,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedBeforePhotos,
       unifiedInventoryAudit,
       unifiedDrinkCount,
+      unifiedMachineRefill,
+      unifiedAfterService,
       unifiedRestock,
       completeUnifiedSummary,
       retryUnifiedSummarySync,

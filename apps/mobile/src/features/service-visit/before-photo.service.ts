@@ -3,6 +3,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { supabase } from "../../lib/supabase";
 import type { BeforePhotoKind } from "./service-visit.types";
 import { prepareServicePhoto } from "./photos/prepare-service-photo";
+import { withPhotoUploadLock } from "./photo-upload-lock";
 import {
   createServiceVisitPhoto,
   deleteServiceVisitPhoto,
@@ -159,6 +160,7 @@ function createStoragePath({
  * the photo stays in the persisted visit with status "failed" so a
  * manual retry or the future SYNC photo worker can upload it later.
  */
+
 export async function uploadBeforePhoto({
   userId,
   visitId,
@@ -170,8 +172,6 @@ export async function uploadBeforePhoto({
   localUri,
   schemaVersion,
 }: UploadBeforePhotoInput): Promise<UploadBeforePhotoResult> {
-  const imageArrayBuffer = await readPhotoAsArrayBuffer(localUri);
-
   const storagePath = createStoragePath({
     userId,
     visitId,
@@ -181,35 +181,40 @@ export async function uploadBeforePhoto({
     capturedAt,
   });
 
-  const { error } = await supabase.storage
-    .from(SERVICE_VISIT_PHOTOS_BUCKET)
-    .upload(storagePath, imageArrayBuffer, {
-      contentType: "image/jpeg",
-      cacheControl: "3600",
-      upsert: true,
+  return withPhotoUploadLock(storagePath, async () => {
+    const imageArrayBuffer = await readPhotoAsArrayBuffer(localUri);
+
+    const { error } = await supabase.storage
+      .from(SERVICE_VISIT_PHOTOS_BUCKET)
+      .upload(storagePath, imageArrayBuffer, {
+        contentType: "image/jpeg",
+        cacheControl: "3600",
+        upsert: true,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const databaseId = await createServiceVisitPhoto({
+      userId,
+      visitId,
+      stopId,
+      machineId,
+      stage,
+      kind,
+      storagePath,
+      capturedAt,
+      schemaVersion,
     });
 
-  if (error) {
-    throw error;
-  }
-
-  const databaseId = await createServiceVisitPhoto({
-    userId,
-    visitId,
-    stopId,
-    machineId,
-    stage,
-    kind,
-    storagePath,
-    capturedAt,
-    schemaVersion,
+    return {
+      storagePath,
+      databaseId,
+    };
   });
-
-  return {
-    storagePath,
-    databaseId,
-  };
 }
+
 
 export async function deleteLocalBeforePhoto(
   localUri: string | null | undefined,

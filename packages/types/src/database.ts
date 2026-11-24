@@ -2902,6 +2902,21 @@ export type Database = {
         }
         Returns: undefined
       }
+      upsert_service_visit_photo: {
+        Args: {
+          p_captured_at: string
+          p_kind: Database["public"]["Enums"]["service_photo_kind"]
+          p_machine_id: string
+          p_source_visit_id: string
+          p_stage: Database["public"]["Enums"]["service_photo_stage"]
+          p_stop_id: string
+          p_storage_path: string
+        }
+        Returns: {
+          accepted: boolean
+          photo_id: string
+        }[]
+      }
       warehouse_is_in_current_user_region: {
         Args: { target_warehouse_id: string }
         Returns: boolean
