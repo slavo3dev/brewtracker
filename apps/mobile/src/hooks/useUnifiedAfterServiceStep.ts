@@ -1,7 +1,10 @@
-
 import { useCallback } from "react";
 
 import type { MultiMachineServiceVisit } from "../features/service-visit/multi-machine-visit.types";
+import {
+  canApplyPhotoUploadUpdate,
+  PhotoUploadUpdateRejectedError,
+} from "../features/service-visit/state/photo-upload-transition";
 import type {
   SaveAfterPhotoInput,
   UpdateMediaUploadInput,
@@ -37,9 +40,7 @@ function requireActiveMachine(
     machine.currentStep !== "after_service" ||
     machine.completedAt !== null
   ) {
-    throw new Error(
-      "The selected machine is not in the after-service step.",
-    );
+    throw new Error("The selected machine is not in the after-service step.");
   }
 
   return machine;
@@ -52,9 +53,7 @@ export function useUnifiedAfterServiceStep({
   const saveAfterPhoto = useCallback(
     async (machineId: string, input: SaveAfterPhotoInput) => {
       if (!input.localUri.trim()) {
-        throw new Error(
-          "The locally stored after-service photo is missing.",
-        );
+        throw new Error("The locally stored after-service photo is missing.");
       }
 
       const result = await commitVisitMutation((visit) => {
@@ -93,11 +92,7 @@ export function useUnifiedAfterServiceStep({
   );
 
   const updateAfterPhotoUpload = useCallback(
-    (
-      machineId: string,
-      localUri: string,
-      input: UpdateMediaUploadInput,
-    ) =>
+    (machineId: string, localUri: string, input: UpdateMediaUploadInput) =>
       commitVisitMutation((visit) => {
         const machine = visit.machines.find(
           (item) => item.machineId === machineId,
@@ -111,7 +106,20 @@ export function useUnifiedAfterServiceStep({
 
         // Ignore stale upload callbacks after a retake.
         if (!photo || photo.localUri !== localUri) {
-          return visit;
+          throw new PhotoUploadUpdateRejectedError();
+        }
+
+        if (
+          !canApplyPhotoUploadUpdate(photo.uploadStatus, input.uploadStatus)
+        ) {
+          throw new PhotoUploadUpdateRejectedError();
+        }
+
+        if (
+          !input.uploadAttemptId ||
+          photo.uploadAttemptId !== input.uploadAttemptId
+        ) {
+          throw new PhotoUploadUpdateRejectedError();
         }
 
         return {

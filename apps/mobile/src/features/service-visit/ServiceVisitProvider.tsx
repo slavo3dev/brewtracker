@@ -48,7 +48,10 @@ import {
 } from "./service-visit.storage";
 import { markServiceStopArrived } from "./service-visit-stop.service";
 import { assertStopCanStartService } from "../routes/route.service";
-
+import {
+  claimBeforePhotoUpload,
+  claimAfterPhotoUpload,
+} from "./state/multi-machine-photo-claim";
 import {
   createInitialStepStates,
   type BeforePhotoKind,
@@ -73,8 +76,16 @@ import { validateRestoredVisit } from "./state/service-visit.validation";
 type ServiceVisitContextValue = {
   activeVisit: ServiceVisit | null;
   unifiedVisit: MultiMachineServiceVisit | null;
-
   unifiedBeforePhotos: ReturnType<typeof useUnifiedBeforePhotosStep>;
+  claimUnifiedBeforePhotoUpload: (
+    machineId: string,
+    kind: BeforePhotoKind,
+    localUri: string,
+  ) => Promise<MultiMachineServiceVisit>;
+  claimUnifiedAfterPhotoUpload: (
+    machineId: string,
+    localUri: string,
+  ) => Promise<MultiMachineServiceVisit>;
   unifiedInventoryAudit: ReturnType<typeof useUnifiedInventoryAuditStep>;
   unifiedDrinkCount: ReturnType<typeof useUnifiedDrinkCountStep>;
   unifiedMachineRefill: ReturnType<typeof useUnifiedMachineRefillStep>;
@@ -256,6 +267,26 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     authGeneration,
     getAuthGeneration,
   });
+
+  const claimUnifiedBeforePhotoUpload = useCallback(
+    (
+      machineId: string,
+      kind: BeforePhotoKind,
+      localUri: string,
+    ): Promise<MultiMachineServiceVisit> =>
+      commitUnifiedVisitMutation((visit) =>
+        claimBeforePhotoUpload(visit, machineId, kind, localUri),
+      ),
+    [commitUnifiedVisitMutation],
+  );
+
+  const claimUnifiedAfterPhotoUpload = useCallback(
+    (machineId: string, localUri: string): Promise<MultiMachineServiceVisit> =>
+      commitUnifiedVisitMutation((visit) =>
+        claimAfterPhotoUpload(visit, machineId, localUri),
+      ),
+    [commitUnifiedVisitMutation],
+  );
 
   useEffect(() => {
     unifiedVisitRef.current = unifiedVisit;
@@ -716,12 +747,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         setRestoringVisit(false);
       }
     }
-  }, [
-    authStatus,
-    userId,
-    getAuthGeneration,
-    runUnifiedVisitLifecycle,
-  ]);
+  }, [authStatus, userId, getAuthGeneration, runUnifiedVisitLifecycle]);
 
   useEffect(() => {
     void restoreVisit();
@@ -1353,6 +1379,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       activeVisit,
       unifiedVisit,
       unifiedBeforePhotos,
+      claimUnifiedBeforePhotoUpload,
+      claimUnifiedAfterPhotoUpload,
       unifiedInventoryAudit,
       unifiedDrinkCount,
       unifiedMachineRefill,
@@ -1415,6 +1443,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       activeVisit,
       unifiedVisit,
       unifiedBeforePhotos,
+      claimUnifiedBeforePhotoUpload,
+      claimUnifiedAfterPhotoUpload,
       unifiedInventoryAudit,
       unifiedDrinkCount,
       unifiedMachineRefill,

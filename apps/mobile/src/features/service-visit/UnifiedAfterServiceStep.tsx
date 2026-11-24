@@ -1,4 +1,3 @@
-
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,6 +14,7 @@ import {
   persistAfterPhotoLocally,
   uploadAfterPhoto,
 } from "./after-service-media.service";
+import { PhotoUploadNotEligibleError } from "./state/multi-machine-photo-claim";
 import type { MultiMachineServiceVisit } from "./multi-machine-visit.types";
 
 function friendlyUploadError(error: unknown): string {
@@ -41,6 +41,7 @@ export default function UnifiedAfterServiceStep() {
     unifiedVisit,
     unifiedAfterService,
     advanceUnifiedVisit,
+    claimUnifiedAfterPhotoUpload,
   } = useServiceVisit();
 
   const machine =
@@ -56,11 +57,7 @@ export default function UnifiedAfterServiceStep() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  if (
-    !unifiedVisit ||
-    !machine ||
-    machine.currentStep !== "after_service"
-  ) {
+  if (!unifiedVisit || !machine || machine.currentStep !== "after_service") {
     return null;
   }
 
@@ -83,25 +80,37 @@ export default function UnifiedAfterServiceStep() {
 
     if (!photo || photo.localUri !== localUri) return;
 
+    let claimedAttemptId: string | null = null;
+
     uploadingRef.current.add(localUri);
 
     try {
-      await unifiedAfterService.updateAfterPhotoUpload(
+      const claimedVisit = await claimUnifiedAfterPhotoUpload(
         targetMachineId,
         localUri,
-        {
-          uploadStatus: "uploading",
-          uploadError: null,
-        },
       );
 
+      const claimedPhoto = claimedVisit.machines.find(
+        (item) => item.machineId === targetMachineId,
+      )?.afterService.afterPhoto;
+
+      if (!claimedPhoto || claimedPhoto.localUri !== localUri) {
+        throw new PhotoUploadNotEligibleError();
+      }
+
+      if (!claimedPhoto.uploadAttemptId) {
+        throw new Error("The claimed after-photo has no upload attempt ID.");
+      }
+
+      claimedAttemptId = claimedPhoto.uploadAttemptId;
+
       const uploaded = await uploadAfterPhoto({
-        userId: savedVisit.userId,
-        visitId: savedVisit.id,
-        stopId: savedVisit.stopId,
+        userId: claimedVisit.userId,
+        visitId: claimedVisit.id,
+        stopId: claimedVisit.stopId,
         machineId: targetMachineId,
-        localUri,
-        capturedAt: photo.capturedAt,
+        localUri: claimedPhoto.localUri,
+        capturedAt: claimedPhoto.capturedAt,
       });
 
       await unifiedAfterService.updateAfterPhotoUpload(
@@ -109,6 +118,7 @@ export default function UnifiedAfterServiceStep() {
         localUri,
         {
           uploadStatus: "uploaded",
+          uploadAttemptId: claimedAttemptId,
           storagePath: uploaded.storagePath,
           databaseId: uploaded.databaseId,
           uploadError: null,
@@ -116,7 +126,20 @@ export default function UnifiedAfterServiceStep() {
         },
       );
     } catch (error) {
+      if (error instanceof PhotoUploadNotEligibleError) {
+        return;
+      }
+
       const message = friendlyUploadError(error);
+
+      if (!claimedAttemptId) {
+        console.warn(
+          "After-photo upload failed before an attempt ID was established.",
+          error,
+        );
+        setErrorMessage(message);
+        return;
+      }
 
       try {
         await unifiedAfterService.updateAfterPhotoUpload(
@@ -124,6 +147,7 @@ export default function UnifiedAfterServiceStep() {
           localUri,
           {
             uploadStatus: "failed",
+            uploadAttemptId: claimedAttemptId,
             uploadError: message,
           },
         );
@@ -202,9 +226,7 @@ export default function UnifiedAfterServiceStep() {
       await advanceUnifiedVisit();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to continue.",
+        error instanceof Error ? error.message : "Unable to continue.",
       );
     } finally {
       setSubmitting(false);
@@ -214,11 +236,7 @@ export default function UnifiedAfterServiceStep() {
   if (cameraOpen) {
     return (
       <View style={styles.cameraContainer}>
-        <CameraView
-          ref={cameraRef}
-          style={styles.camera}
-          facing="back"
-        />
+        <CameraView ref={cameraRef} style={styles.camera} facing="back" />
         <View style={styles.actions}>
           <Pressable
             style={styles.secondaryButton}
@@ -247,16 +265,13 @@ export default function UnifiedAfterServiceStep() {
     <View style={styles.card}>
       <Text style={styles.title}>Completed machine photo</Text>
       <Text style={styles.description}>
-        Capture the machine after completing service.
-        The photo is saved locally before uploading.
+        Capture the machine after completing service. The photo is saved locally
+        before uploading.
       </Text>
 
       {afterPhoto ? (
         <>
-          <Image
-            source={{ uri: afterPhoto.localUri }}
-            style={styles.preview}
-          />
+          <Image source={{ uri: afterPhoto.localUri }} style={styles.preview} />
           <Text style={styles.description}>
             {afterPhoto.uploadStatus === "uploaded"
               ? "Uploaded"
@@ -304,10 +319,7 @@ export default function UnifiedAfterServiceStep() {
       ) : null}
 
       <Pressable
-        style={[
-          styles.primaryButton,
-          !canContinue && styles.disabledButton,
-        ]}
+        style={[styles.primaryButton, !canContinue && styles.disabledButton]}
         disabled={!canContinue}
         onPress={() => void handleContinue()}
       >

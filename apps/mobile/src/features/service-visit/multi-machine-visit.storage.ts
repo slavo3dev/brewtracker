@@ -9,7 +9,6 @@ function getStorageKey(userId: string): string {
   return `${STORAGE_KEY_PREFIX}:${userId}`;
 }
 
-
 export function recoverInterruptedPhotoUploads(
   visit: MultiMachineServiceVisit,
 ): MultiMachineServiceVisit {
@@ -26,6 +25,7 @@ export function recoverInterruptedPhotoUploads(
       return {
         ...photo,
         uploadStatus: "failed" as const,
+        uploadAttemptId: null,
         uploadError: "Photo upload was interrupted. Reconnect and retry.",
       };
     });
@@ -37,8 +37,8 @@ export function recoverInterruptedPhotoUploads(
         ? {
             ...afterPhoto,
             uploadStatus: "failed" as const,
-            uploadError:
-              "Photo upload was interrupted. Reconnect and retry.",
+            uploadAttemptId: null,
+            uploadError: "Photo upload was interrupted. Reconnect and retry.",
           }
         : afterPhoto;
 

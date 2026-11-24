@@ -5,7 +5,7 @@ import {
   claimAfterPhotoUpload,
   PhotoUploadNotEligibleError,
 } from "./state/multi-machine-photo-claim";
-import { PhotoUploadAlreadyRunningError } from "./photo-upload-lock";
+import { PhotoUploadUpdateRejectedError } from "./state/photo-upload-transition";
 import type { MultiMachineServiceVisit } from "./multi-machine-visit.types";
 import type {
   BeforePhotoKind,
@@ -59,6 +59,7 @@ export async function syncMultiMachinePhotos({
 
   for (const machine of visit.machines) {
     for (const photo of machine.beforePhotos) {
+      let claimedAttemptId: string | null = null;
       if (
         photo.uploadStatus !== "pending_upload" &&
         photo.uploadStatus !== "failed"
@@ -83,9 +84,11 @@ export async function syncMultiMachinePhotos({
               item.kind === photo.kind && item.localUri === photo.localUri,
           );
 
-        if (!claimedPhoto) {
+        if (!claimedPhoto || !claimedPhoto.uploadAttemptId) {
           throw new PhotoUploadNotEligibleError();
         }
+
+        claimedAttemptId = claimedPhoto.uploadAttemptId;
 
         result.attempted += 1;
 
@@ -103,6 +106,7 @@ export async function syncMultiMachinePhotos({
 
         await updateBeforePhoto(machine.machineId, photo.kind, photo.localUri, {
           uploadStatus: "uploaded",
+          uploadAttemptId: claimedAttemptId,
           storagePath: uploaded.storagePath,
           databaseId: uploaded.databaseId,
           uploadedAt: new Date().toISOString(),
@@ -113,12 +117,20 @@ export async function syncMultiMachinePhotos({
       } catch (error) {
         if (
           error instanceof PhotoUploadNotEligibleError ||
-          error instanceof PhotoUploadAlreadyRunningError
+          error instanceof PhotoUploadUpdateRejectedError
         ) {
           continue;
         }
 
         result.failed += 1;
+
+        if (!claimedAttemptId) {
+          console.warn(
+            "Before-photo sync failed before an upload attempt was established:",
+            error,
+          );
+          continue;
+        }
 
         try {
           await updateBeforePhoto(
@@ -127,10 +139,9 @@ export async function syncMultiMachinePhotos({
             photo.localUri,
             {
               uploadStatus: "failed",
+              uploadAttemptId: claimedAttemptId,
               uploadError:
-                error instanceof Error
-                  ? error.message
-                  : "Photo upload failed.",
+                error instanceof Error ? error.message : "Photo upload failed.",
             },
           );
         } catch (statusError) {
@@ -143,6 +154,8 @@ export async function syncMultiMachinePhotos({
     }
 
     const afterPhoto = machine.afterService.afterPhoto;
+
+    let claimedAfterAttemptId: string | null = null;
 
     if (
       !afterPhoto ||
@@ -165,9 +178,15 @@ export async function syncMultiMachinePhotos({
         (item) => item.machineId === machine.machineId,
       )?.afterService.afterPhoto;
 
-      if (!claimedPhoto || claimedPhoto.localUri !== afterPhoto.localUri) {
+      if (
+        !claimedPhoto ||
+        claimedPhoto.localUri !== afterPhoto.localUri ||
+        !claimedPhoto.uploadAttemptId
+      ) {
         throw new PhotoUploadNotEligibleError();
       }
+
+      claimedAfterAttemptId = claimedPhoto.uploadAttemptId;
 
       result.attempted += 1;
 
@@ -183,6 +202,7 @@ export async function syncMultiMachinePhotos({
 
       await updateAfterPhoto(machine.machineId, afterPhoto.localUri, {
         uploadStatus: "uploaded",
+        uploadAttemptId: claimedAfterAttemptId,
         storagePath: uploaded.storagePath,
         databaseId: uploaded.databaseId,
         uploadedAt: new Date().toISOString(),
@@ -193,25 +213,28 @@ export async function syncMultiMachinePhotos({
     } catch (error) {
       if (
         error instanceof PhotoUploadNotEligibleError ||
-        error instanceof PhotoUploadAlreadyRunningError
+        error instanceof PhotoUploadUpdateRejectedError
       ) {
         continue;
       }
 
       result.failed += 1;
 
-      try {
-        await updateAfterPhoto(
-          machine.machineId,
-          afterPhoto.localUri,
-          {
-            uploadStatus: "failed",
-            uploadError:
-              error instanceof Error
-                ? error.message
-                : "Photo upload failed.",
-          },
+      if (!claimedAfterAttemptId) {
+        console.warn(
+          "After-photo sync failed before an upload attempt was established:",
+          error,
         );
+        continue;
+      }
+
+      try {
+        await updateAfterPhoto(machine.machineId, afterPhoto.localUri, {
+          uploadStatus: "failed",
+          uploadAttemptId: claimedAfterAttemptId,
+          uploadError:
+            error instanceof Error ? error.message : "Photo upload failed.",
+        });
       } catch (statusError) {
         console.warn(
           "Unable to persist after-photo upload failure:",

@@ -7,6 +7,10 @@ import type {
   UpdateBeforePhotoUploadInput,
 } from "../features/service-visit/service-visit.types";
 import { advanceActiveMachine } from "../features/service-visit/state/multi-machine-visit.transitions";
+import {
+  canApplyPhotoUploadUpdate,
+  PhotoUploadUpdateRejectedError,
+} from "../features/service-visit/state/photo-upload-transition";
 
 type CommitVisitMutation = (
   mutation: (
@@ -19,20 +23,22 @@ type Params = {
   clearError: () => void;
 };
 
-function requireMachine(
-  visit: MultiMachineServiceVisit,
-  machineId: string,
-) {
-  if (visit.status !== "in_progress" ||
-      visit.currentStep !== "machine_service") {
+function requireMachine(visit: MultiMachineServiceVisit, machineId: string) {
+  if (
+    visit.status !== "in_progress" ||
+    visit.currentStep !== "machine_service"
+  ) {
     throw new Error("Machine service is not active.");
   }
 
   const machine = visit.machines[visit.activeMachineIndex];
 
-  if (!machine || machine.machineId !== machineId ||
-      machine.currentStep !== "before_photos" ||
-      machine.completedAt !== null) {
+  if (
+    !machine ||
+    machine.machineId !== machineId ||
+    machine.currentStep !== "before_photos" ||
+    machine.completedAt !== null
+  ) {
     throw new Error("The selected machine is not in the before-photo step.");
   }
 
@@ -106,7 +112,20 @@ export function useUnifiedBeforePhotosStep({
         if (!photo) {
           // A replaced or removed photo must not be restored
           // by an asynchronous upload callback.
-          return visit;
+          throw new PhotoUploadUpdateRejectedError();
+        }
+
+        if (
+          !canApplyPhotoUploadUpdate(photo.uploadStatus, input.uploadStatus)
+        ) {
+          throw new PhotoUploadUpdateRejectedError();
+        }
+
+        if (
+          !input.uploadAttemptId ||
+          photo.uploadAttemptId !== input.uploadAttemptId
+        ) {
+          throw new PhotoUploadUpdateRejectedError();
         }
 
         return {
@@ -116,8 +135,7 @@ export function useUnifiedBeforePhotosStep({
               ? {
                   ...item,
                   beforePhotos: item.beforePhotos.map((existing) =>
-                    existing.kind === kind &&
-                    existing.localUri === localUri
+                    existing.kind === kind && existing.localUri === localUri
                       ? {
                           ...existing,
                           uploadStatus: input.uploadStatus,

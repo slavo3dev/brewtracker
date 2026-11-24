@@ -17,6 +17,7 @@ import {
   uploadBeforePhoto,
 } from "./before-photo.service";
 import { useServiceVisit } from "./ServiceVisitProvider";
+import { PhotoUploadNotEligibleError } from "./state/multi-machine-photo-claim";
 import type {
   BeforePhotoKind,
   BeforePhotoRecord,
@@ -91,7 +92,8 @@ export default function BeforePhotosStep() {
 
   const [permission, requestPermission] = useCameraPermissions();
 
-  const { unifiedVisit, unifiedBeforePhotos } = useServiceVisit();
+  const { unifiedVisit, unifiedBeforePhotos, claimUnifiedBeforePhotoUpload } =
+    useServiceVisit();
 
   const activeMachine =
     unifiedVisit?.currentStep === "machine_service"
@@ -218,6 +220,8 @@ export default function BeforePhotosStep() {
   ): Promise<void> {
     setUploadingKind(kind);
 
+    let claimedAttemptId: string | null = null;
+
     const updateUpload = async (
       input: Parameters<typeof unifiedBeforePhotos.updateBeforePhotoUpload>[3],
     ) => {
@@ -230,27 +234,32 @@ export default function BeforePhotosStep() {
     };
 
     try {
-      await updateUpload({
-        uploadStatus: "uploading",
-        uploadError: null,
-      });
-
-      const photos =
-        visit.machines.find((machine) => machine.machineId === machineId)
-          ?.beforePhotos ?? [];
-
-      const localPhoto = photos.find(
-        (photo) => photo.kind === kind && photo.localUri === localUri,
+      const claimedVisit = await claimUnifiedBeforePhotoUpload(
+        machineId,
+        kind,
+        localUri,
       );
 
+      const localPhoto = claimedVisit.machines
+        .find((machine) => machine.machineId === machineId)
+        ?.beforePhotos.find(
+          (photo) => photo.kind === kind && photo.localUri === localUri,
+        );
+
       if (!localPhoto) {
-        throw new Error("The local photo metadata could not be found.");
+        throw new Error("The claimed photo could not be found.");
       }
 
+      if (!localPhoto.uploadAttemptId) {
+        throw new Error("The claimed photo has no upload attempt ID.");
+      }
+
+      claimedAttemptId = localPhoto.uploadAttemptId;
+
       const result = await uploadBeforePhoto({
-        userId: visit.userId,
-        visitId: visit.id,
-        stopId: visit.stopId,
+        userId: claimedVisit.userId,
+        visitId: claimedVisit.id,
+        stopId: claimedVisit.stopId,
         machineId,
         capturedAt: localPhoto.capturedAt,
         stage: "before",
@@ -261,19 +270,31 @@ export default function BeforePhotosStep() {
 
       await updateUpload({
         uploadStatus: "uploaded",
+        uploadAttemptId: localPhoto.uploadAttemptId,
         storagePath: result.storagePath,
         databaseId: result.databaseId,
         uploadError: null,
         uploadedAt: new Date().toISOString(),
       });
     } catch (error) {
+      if (error instanceof PhotoUploadNotEligibleError) {
+        return;
+      }
       console.warn("Before-photo upload failed:", error);
 
       const message = getFriendlyUploadError(error);
 
+      if (!claimedAttemptId) {
+        console.warn(
+          "Before-photo upload failed before an attempt ID was established.",
+        );
+        return;
+      }
+
       try {
         await updateUpload({
           uploadStatus: "failed",
+          uploadAttemptId: claimedAttemptId,
           uploadError: message,
         });
       } catch (updateError) {

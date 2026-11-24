@@ -1,4 +1,4 @@
-
+import * as Crypto from "expo-crypto";
 import type { MultiMachineServiceVisit } from "../multi-machine-visit.types";
 import type { BeforePhotoKind } from "../service-visit.types";
 
@@ -15,9 +15,7 @@ export function claimBeforePhotoUpload(
   kind: BeforePhotoKind,
   localUri: string,
 ): MultiMachineServiceVisit {
-  const machine = visit.machines.find(
-    (item) => item.machineId === machineId,
-  );
+  const machine = visit.machines.find((item) => item.machineId === machineId);
 
   const photo = machine?.beforePhotos.find(
     (item) => item.kind === kind && item.localUri === localUri,
@@ -25,11 +23,12 @@ export function claimBeforePhotoUpload(
 
   if (
     !photo ||
-    (photo.uploadStatus !== "pending_upload" &&
-      photo.uploadStatus !== "failed")
+    (photo.uploadStatus !== "pending_upload" && photo.uploadStatus !== "failed")
   ) {
     throw new PhotoUploadNotEligibleError();
   }
+
+  const uploadAttemptId = Crypto.randomUUID();
 
   return {
     ...visit,
@@ -38,12 +37,12 @@ export function claimBeforePhotoUpload(
         ? {
             ...item,
             beforePhotos: item.beforePhotos.map((existing) =>
-              existing.kind === kind &&
-              existing.localUri === localUri
+              existing.kind === kind && existing.localUri === localUri
                 ? {
                     ...existing,
                     uploadStatus: "uploading" as const,
                     uploadError: null,
+                    uploadAttemptId,
                   }
                 : existing,
             ),
@@ -59,20 +58,19 @@ export function claimAfterPhotoUpload(
   machineId: string,
   localUri: string,
 ): MultiMachineServiceVisit {
-  const machine = visit.machines.find(
-    (item) => item.machineId === machineId,
-  );
+  const machine = visit.machines.find((item) => item.machineId === machineId);
 
   const photo = machine?.afterService.afterPhoto;
 
   if (
     !photo ||
     photo.localUri !== localUri ||
-    (photo.uploadStatus !== "pending_upload" &&
-      photo.uploadStatus !== "failed")
+    (photo.uploadStatus !== "pending_upload" && photo.uploadStatus !== "failed")
   ) {
     throw new PhotoUploadNotEligibleError();
   }
+
+  const uploadAttemptId = Crypto.randomUUID();
 
   return {
     ...visit,
@@ -86,6 +84,7 @@ export function claimAfterPhotoUpload(
                 ...photo,
                 uploadStatus: "uploading" as const,
                 uploadError: null,
+                uploadAttemptId,
               },
             },
           }
