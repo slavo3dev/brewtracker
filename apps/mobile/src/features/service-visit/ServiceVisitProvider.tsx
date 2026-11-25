@@ -201,6 +201,22 @@ function createVisitId(): string {
   return `visit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function getServiceVisitId(visit: ServiceVisit): string {
+  return visit.id;
+}
+
+function getServiceVisitUserId(visit: ServiceVisit): string {
+  return visit.userId;
+}
+
+function getUnifiedServiceVisitId(visit: MultiMachineServiceVisit): string {
+  return visit.id;
+}
+
+function getUnifiedServiceVisitUserId(visit: MultiMachineServiceVisit): string {
+  return visit.userId;
+}
+
 export function ServiceVisitProvider({ children }: PropsWithChildren) {
   const {
     session,
@@ -251,8 +267,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     activeVisit,
     setActiveVisit,
     persistVisit: saveServiceVisit,
-    getVisitId: (visit) => visit.id,
-    getVisitUserId: (visit) => visit.userId,
+    getVisitId: getServiceVisitId,
+    getVisitUserId: getServiceVisitUserId,
     authenticatedUserId: authStatus === "authenticated" ? userId : null,
     authGeneration,
     getAuthGeneration,
@@ -266,8 +282,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     activeVisit: unifiedVisit,
     setActiveVisit: setUnifiedVisit,
     persistVisit: saveMultiMachineServiceVisit,
-    getVisitId: (visit) => visit.id,
-    getVisitUserId: (visit) => visit.userId,
+    getVisitId: getUnifiedServiceVisitId,
+    getVisitUserId: getUnifiedServiceVisitUserId,
     authenticatedUserId: authStatus === "authenticated" ? userId : null,
     authGeneration,
     getAuthGeneration,
@@ -528,8 +544,8 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     clearError,
   });
 
-  const retryUnifiedPhotoSync = useCallback(
-    async (): Promise<MachinePhotoSyncResult> => {
+  const retryUnifiedPhotoSync =
+    useCallback(async (): Promise<MachinePhotoSyncResult> => {
       if (photoSyncInProgressRef.current) {
         throw new Error("Photo synchronization is already running.");
       }
@@ -563,14 +579,12 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       } finally {
         photoSyncInProgressRef.current = false;
       }
-    },
-    [
+    }, [
       commitUnifiedVisitMutation,
       readCurrentUnifiedVisit,
       unifiedBeforePhotos.updateBeforePhotoUpload,
       unifiedAfterService.updateAfterPhotoUpload,
-    ],
-  );
+    ]);
 
   const { completeUnifiedSummary, retryUnifiedSummarySync } =
     useUnifiedSummaryStep({

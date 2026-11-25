@@ -21,10 +21,7 @@ type Props = {
   errorMessage: string | null;
   warningMessage: string | null;
   onRefresh: () => void;
-  onStopPress?: (
-    routeId: string,
-    stop: TodayRouteStop,
-  ) => void;
+  onStopPress?: (routeId: string, stop: TodayRouteStop) => void;
 };
 
 function formatTime(value: string | null): string | null {
@@ -83,9 +80,7 @@ function StopRow({
       onPress={onPress}
     >
       <View style={styles.sequenceCircle}>
-        <Text style={styles.sequenceText}>
-          {stop.sequenceNumber}
-        </Text>
+        <Text style={styles.sequenceText}>{stop.sequenceNumber}</Text>
       </View>
 
       <View style={styles.stopContent}>
@@ -119,22 +114,19 @@ function StopRow({
 
         <View style={styles.stopMeta}>
           {scheduledTime ? (
-            <Text style={styles.stopMetaText}>
-              {scheduledTime}
-            </Text>
+            <Text style={styles.stopMetaText}>{scheduledTime}</Text>
           ) : null}
 
-          {stop.machine ? (
-            <Text style={styles.stopMetaText} numberOfLines={1}>
-              {stop.machine.name ??
-                stop.machine.model ??
-                "Assigned machine"}
-            </Text>
-          ) : (
-            <Text style={styles.stopMetaText}>
-              No machine assigned
-            </Text>
-          )}
+          <Text style={styles.stopMetaText} numberOfLines={1}>
+            {stop.machines.length > 1
+              ? `${stop.machines.length} machines assigned`
+              : stop.machines.length === 1
+                ? (stop.machines[0].machine.name ??
+                  stop.machines[0].machine.model ??
+                  stop.machines[0].machine.serialNumber ??
+                  "Assigned machine")
+                : "No machine assigned"}
+          </Text>
         </View>
       </View>
     </Pressable>
@@ -165,9 +157,7 @@ export default function TodayRouteCard({
               Starts at {route.warehouse.name}
             </Text>
           ) : (
-            <Text style={styles.subtitle}>
-              Your assigned stops for today
-            </Text>
+            <Text style={styles.subtitle}>Your assigned stops for today</Text>
           )}
         </View>
 
@@ -191,9 +181,7 @@ export default function TodayRouteCard({
         <View style={styles.stateContainer}>
           <ActivityIndicator color="#7a3f2c" />
 
-          <Text style={styles.stateText}>
-            Loading today&apos;s route…
-          </Text>
+          <Text style={styles.stateText}>Loading today&apos;s route…</Text>
         </View>
       ) : null}
 
@@ -215,21 +203,15 @@ export default function TodayRouteCard({
 
       {!loading && !errorMessage && route === null ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>
-            No route assigned today
-          </Text>
+          <Text style={styles.emptyTitle}>No route assigned today</Text>
 
           <Text style={styles.emptyText}>
-            Contact your manager if you expect to have scheduled
-            stops.
+            Contact your manager if you expect to have scheduled stops.
           </Text>
         </View>
       ) : null}
 
-      {!loading &&
-      !errorMessage &&
-      route &&
-      route.stops.length === 0 ? (
+      {!loading && !errorMessage && route && route.stops.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyTitle}>No stops added yet</Text>
 

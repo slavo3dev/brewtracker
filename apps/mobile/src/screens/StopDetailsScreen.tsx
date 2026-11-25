@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import {
   distanceMeters,
   formatDistanceMeters,
@@ -292,23 +293,39 @@ export default function StopDetailsScreen({
             }
           />
 
-          <DetailRow
-            label="Machine"
-            value={
-              stop.machine?.name ?? stop.machine?.model ?? "No machine assigned"
-            }
-          />
+          {stop.machines.length === 0 ? (
+            <DetailRow label="Machine" value="No machine assigned" />
+          ) : (
+            stop.machines.map((assignment, index) => (
+              <Fragment key={assignment.machineId}>
+                <DetailRow
+                  label={
+                    stop.machines.length > 1
+                      ? `Machine ${index + 1}`
+                      : "Machine"
+                  }
+                  value={
+                    assignment.machine.name ??
+                    assignment.machine.model ??
+                    assignment.machine.serialNumber ??
+                    "Assigned machine"
+                  }
+                />
 
-          {stop.machine?.model && stop.machine.name !== stop.machine.model ? (
-            <DetailRow label="Model" value={stop.machine.model} />
-          ) : null}
+                {assignment.machine.model &&
+                assignment.machine.name !== assignment.machine.model ? (
+                  <DetailRow label="Model" value={assignment.machine.model} />
+                ) : null}
 
-          {stop.machine?.serialNumber ? (
-            <DetailRow
-              label="Serial number"
-              value={stop.machine.serialNumber}
-            />
-          ) : null}
+                {assignment.machine.serialNumber ? (
+                  <DetailRow
+                    label="Serial number"
+                    value={assignment.machine.serialNumber}
+                  />
+                ) : null}
+              </Fragment>
+            ))
+          )}
 
           <DetailRow
             label="Distance"
