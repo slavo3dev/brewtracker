@@ -6,6 +6,7 @@ import {
   PhotoUploadNotEligibleError,
 } from "./state/multi-machine-photo-claim";
 import { PhotoUploadUpdateRejectedError } from "./state/photo-upload-transition";
+import { hasUnsyncedMachinePhotos } from "./state/multi-machine-photo-sync";
 import type { MultiMachineServiceVisit } from "./multi-machine-visit.types";
 import type {
   BeforePhotoKind,
@@ -37,12 +38,15 @@ type SyncMachinePhotosInput = {
   commitVisitMutation: CommitVisitMutation;
   updateBeforePhoto: UpdateBeforePhoto;
   updateAfterPhoto: UpdateAfterPhoto;
+  readCurrentVisit: () => Promise<MultiMachineServiceVisit | null>;
 };
 
 export type MachinePhotoSyncResult = {
   attempted: number;
   uploaded: number;
   failed: number;
+  skippedUploading: number;
+  allPhotosSynced: boolean;
 };
 
 export async function syncMultiMachinePhotos({
@@ -50,16 +54,25 @@ export async function syncMultiMachinePhotos({
   commitVisitMutation,
   updateBeforePhoto,
   updateAfterPhoto,
+  readCurrentVisit,
 }: SyncMachinePhotosInput): Promise<MachinePhotoSyncResult> {
   const result: MachinePhotoSyncResult = {
     attempted: 0,
     uploaded: 0,
     failed: 0,
+    skippedUploading: 0,
+    allPhotosSynced: false,
   };
 
   for (const machine of visit.machines) {
     for (const photo of machine.beforePhotos) {
       let claimedAttemptId: string | null = null;
+      let remoteUploadSucceeded = false;
+      let uploadedResult: Awaited<ReturnType<typeof uploadBeforePhoto>> | null = null;
+      if (photo.uploadStatus === "uploading") {
+        result.skippedUploading += 1;
+        continue;
+      }
       if (
         photo.uploadStatus !== "pending_upload" &&
         photo.uploadStatus !== "failed"
@@ -104,6 +117,9 @@ export async function syncMultiMachinePhotos({
           schemaVersion: 2,
         });
 
+        remoteUploadSucceeded = true;
+        uploadedResult = uploaded;
+
         await updateBeforePhoto(machine.machineId, photo.kind, photo.localUri, {
           uploadStatus: "uploaded",
           uploadAttemptId: claimedAttemptId,
@@ -119,6 +135,35 @@ export async function syncMultiMachinePhotos({
           error instanceof PhotoUploadNotEligibleError ||
           error instanceof PhotoUploadUpdateRejectedError
         ) {
+          continue;
+        }
+
+        if (remoteUploadSucceeded && uploadedResult && claimedAttemptId) {
+          try {
+            await updateBeforePhoto(
+              machine.machineId,
+              photo.kind,
+              photo.localUri,
+              {
+                uploadStatus: "uploaded",
+                uploadAttemptId: claimedAttemptId,
+                storagePath: uploadedResult.storagePath,
+                databaseId: uploadedResult.databaseId,
+                uploadedAt: new Date().toISOString(),
+                uploadError: null,
+              },
+            );
+
+            result.uploaded += 1;
+          } catch (retryError) {
+            console.warn(
+              "Before photo uploaded remotely, but local status could not be persisted:",
+              retryError,
+            );
+
+            result.failed += 1;
+          }
+
           continue;
         }
 
@@ -156,6 +201,15 @@ export async function syncMultiMachinePhotos({
     const afterPhoto = machine.afterService.afterPhoto;
 
     let claimedAfterAttemptId: string | null = null;
+    let remoteAfterUploadSucceeded = false;
+    let uploadedAfterResult:
+      | Awaited<ReturnType<typeof uploadAfterPhoto>>
+      | null = null;
+
+    if (afterPhoto?.uploadStatus === "uploading") {
+      result.skippedUploading += 1;
+      continue;
+    }
 
     if (
       !afterPhoto ||
@@ -200,6 +254,9 @@ export async function syncMultiMachinePhotos({
         storagePathMode: "per_machine",
       });
 
+      remoteAfterUploadSucceeded = true;
+      uploadedAfterResult = uploaded;
+
       await updateAfterPhoto(machine.machineId, afterPhoto.localUri, {
         uploadStatus: "uploaded",
         uploadAttemptId: claimedAfterAttemptId,
@@ -215,6 +272,38 @@ export async function syncMultiMachinePhotos({
         error instanceof PhotoUploadNotEligibleError ||
         error instanceof PhotoUploadUpdateRejectedError
       ) {
+        continue;
+      }
+
+      if (
+        remoteAfterUploadSucceeded &&
+        uploadedAfterResult &&
+        claimedAfterAttemptId
+      ) {
+        try {
+          await updateAfterPhoto(
+            machine.machineId,
+            afterPhoto.localUri,
+            {
+              uploadStatus: "uploaded",
+              uploadAttemptId: claimedAfterAttemptId,
+              storagePath: uploadedAfterResult.storagePath,
+              databaseId: uploadedAfterResult.databaseId,
+              uploadedAt: new Date().toISOString(),
+              uploadError: null,
+            },
+          );
+
+          result.uploaded += 1;
+        } catch (retryError) {
+          console.warn(
+            "After photo uploaded remotely, but local status could not be persisted:",
+            retryError,
+          );
+
+          result.failed += 1;
+        }
+
         continue;
       }
 
@@ -243,6 +332,16 @@ export async function syncMultiMachinePhotos({
       }
     }
   }
+
+  const latestVisit = await readCurrentVisit();
+
+  if (!latestVisit || latestVisit.id !== visit.id) {
+    throw new Error(
+      "The active service visit changed during photo synchronization.",
+    );
+  }
+
+  result.allPhotosSynced = !hasUnsyncedMachinePhotos(latestVisit);
 
   return result;
 }

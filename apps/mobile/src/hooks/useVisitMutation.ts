@@ -149,6 +149,12 @@ export function useVisitMutation<TVisit>({
           );
         }
 
+        if (activeVisitRef.current !== currentVisit) {
+          throw new Error(
+            "The active service visit changed while saving the mutation.",
+          );
+        }
+
         activeVisitRef.current = updatedVisit;
         setActiveVisit(updatedVisit);
 
@@ -167,6 +173,40 @@ export function useVisitMutation<TVisit>({
       return operation;
     },
     [persistVisit, setActiveVisit, getVisitId, getVisitUserId],
+  );
+
+  const readCurrentVisit = useCallback(
+    (): Promise<TVisit | null> => {
+      const requestedGeneration = readAuthGeneration();
+      const requestedUserId = authenticatedUserIdRef.current;
+
+      return mutationQueueRef.current.then(() => {
+        if (
+          readAuthGeneration() !== requestedGeneration ||
+          authenticatedUserIdRef.current !== requestedUserId
+        ) {
+          throw new Error(
+            "The authentication session changed before reading the visit.",
+          );
+        }
+
+        const currentVisit = activeVisitRef.current;
+
+        if (
+          currentVisit &&
+          getVisitUserId &&
+          (!requestedUserId ||
+            getVisitUserId(currentVisit) !== requestedUserId)
+        ) {
+          throw new Error(
+            "The active visit does not belong to the authenticated user.",
+          );
+        }
+
+        return currentVisit;
+      });
+    },
+    [getVisitUserId, readAuthGeneration],
   );
 
   const runVisitLifecycle = useCallback(
@@ -216,5 +256,6 @@ export function useVisitMutation<TVisit>({
   return {
     commitVisitMutation,
     runVisitLifecycle,
+    readCurrentVisit
   };
 }

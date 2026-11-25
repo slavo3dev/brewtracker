@@ -81,6 +81,9 @@ export default function UnifiedAfterServiceStep() {
     if (!photo || photo.localUri !== localUri) return;
 
     let claimedAttemptId: string | null = null;
+    let uploadedResult:
+    | Awaited<ReturnType<typeof uploadAfterPhoto>>
+    | null = null;
 
     uploadingRef.current.add(localUri);
 
@@ -113,6 +116,8 @@ export default function UnifiedAfterServiceStep() {
         capturedAt: claimedPhoto.capturedAt,
       });
 
+      uploadedResult = uploaded;
+
       await unifiedAfterService.updateAfterPhotoUpload(
         targetMachineId,
         localUri,
@@ -127,6 +132,34 @@ export default function UnifiedAfterServiceStep() {
       );
     } catch (error) {
       if (error instanceof PhotoUploadNotEligibleError) {
+        return;
+      }
+
+      if (uploadedResult && claimedAttemptId) {
+        try {
+          await unifiedAfterService.updateAfterPhotoUpload(
+            targetMachineId,
+            localUri,
+            {
+              uploadStatus: "uploaded",
+              uploadAttemptId: claimedAttemptId,
+              storagePath: uploadedResult.storagePath,
+              databaseId: uploadedResult.databaseId,
+              uploadError: null,
+              uploadedAt: new Date().toISOString(),
+            },
+          );
+        } catch (retryError) {
+          console.warn(
+            "After photo uploaded remotely, but local status could not be persisted:",
+            retryError,
+          );
+
+          setErrorMessage(
+            "The photo was uploaded, but its local status could not be saved. Please restart the app to recover synchronization.",
+          );
+        }
+
         return;
       }
 

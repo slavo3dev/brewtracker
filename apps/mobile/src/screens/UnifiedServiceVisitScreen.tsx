@@ -23,6 +23,7 @@ import BeforePhotosStep from "../features/service-visit/BeforePhotosStep";
 import UnifiedDrinkCountStep from "../features/service-visit/UnifiedDrinkCountStep";
 import UnifiedMachineRefillStep from "../features/service-visit/UnifiedMachineRefillStep";
 import UnifiedAfterServiceStep from "../features/service-visit/UnifiedAfterServiceStep";
+import { hasUnsyncedMachinePhotos } from "../features/service-visit/state/multi-machine-photo-sync";
 
 type Props = {
   onBack: () => void;
@@ -33,8 +34,12 @@ export default function UnifiedServiceVisitScreen({
   onBack,
   onVisitCompleted,
 }: Props) {
-  const { unifiedVisit, retryUnifiedSummarySync, clearCompletedUnifiedVisit } =
-    useServiceVisit();
+  const {
+    unifiedVisit,
+    retryUnifiedSummarySync,
+    retryUnifiedPhotoSync,
+    clearCompletedUnifiedVisit,
+  } = useServiceVisit();
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -46,7 +51,11 @@ export default function UnifiedServiceVisitScreen({
   const visit = unifiedVisit;
 
   const isCompleted = visit.status === "completed";
-  const isSynced = visit.summary.syncStatus === "synced";
+
+  const isSummarySynced = visit.summary.syncStatus === "synced";
+  const hasPendingPhotos = hasUnsyncedMachinePhotos(visit);
+
+  const isSynced = isSummarySynced && !hasPendingPhotos;
 
   const currentStep = isCompleted ? null : getUnifiedVisitStep(visit);
 
@@ -83,11 +92,41 @@ export default function UnifiedServiceVisitScreen({
   }
 
   async function handleRetrySync(): Promise<void> {
+    if (submitting) return;
+
     setSubmitting(true);
     setErrorMessage(null);
 
     try {
-      await retryUnifiedSummarySync();
+      if (hasPendingPhotos) {
+        const result = await retryUnifiedPhotoSync();
+
+        if (!result.allPhotosSynced) {
+          if (result.failed > 0) {
+            setErrorMessage(
+              `${result.failed} photo upload(s) could not be synchronized. Please retry.`,
+            );
+          } else if (result.skippedUploading > 0) {
+            setErrorMessage(
+              `${result.skippedUploading} photo(s) were marked as uploading during synchronization. ` +
+                "They may still be uploading. If they remain stuck, restart the app " +
+                "to recover interrupted uploads, then retry.",
+            );
+          } else {
+            setErrorMessage(
+              "Some machine photos are not synchronized yet. " +
+                "Please retry photo synchronization before finishing.",
+            );
+          }
+
+          return;
+        }
+      }
+
+      if (!isSummarySynced) {
+        await retryUnifiedSummarySync();
+      }
+
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -124,10 +163,11 @@ export default function UnifiedServiceVisitScreen({
 
             <Text style={styles.description}>
               {isSynced
-                ? "All machine services have been completed and synchronized."
-                : "The completed visit is saved locally. Synchronize it before finishing."}
+                ? "All machine services and photos have been synchronized."
+                : hasPendingPhotos
+                  ? "Some machine photos still need synchronization. Retry photo uploads before finishing."
+                  : "The completed visit is saved locally. Synchronize it before finishing."}
             </Text>
-
             {!isSynced && visit.summary.syncError ? (
               <Text style={styles.errorText}>{visit.summary.syncError}</Text>
             ) : null}

@@ -221,6 +221,9 @@ export default function BeforePhotosStep() {
     setUploadingKind(kind);
 
     let claimedAttemptId: string | null = null;
+    let uploadedResult:
+      | Awaited<ReturnType<typeof uploadBeforePhoto>>
+      | null = null;
 
     const updateUpload = async (
       input: Parameters<typeof unifiedBeforePhotos.updateBeforePhotoUpload>[3],
@@ -268,6 +271,8 @@ export default function BeforePhotosStep() {
         schemaVersion: 2,
       });
 
+      uploadedResult = result;
+
       await updateUpload({
         uploadStatus: "uploaded",
         uploadAttemptId: localPhoto.uploadAttemptId,
@@ -280,6 +285,27 @@ export default function BeforePhotosStep() {
       if (error instanceof PhotoUploadNotEligibleError) {
         return;
       }
+
+      if (uploadedResult && claimedAttemptId) {
+        try {
+          await updateUpload({
+            uploadStatus: "uploaded",
+            uploadAttemptId: claimedAttemptId,
+            storagePath: uploadedResult.storagePath,
+            databaseId: uploadedResult.databaseId,
+            uploadError: null,
+            uploadedAt: new Date().toISOString(),
+          });
+        } catch (retryError) {
+          console.warn(
+            "Before photo uploaded remotely, but local status could not be persisted:",
+            retryError,
+          );
+        }
+
+        return;
+      }
+
       console.warn("Before-photo upload failed:", error);
 
       const message = getFriendlyUploadError(error);

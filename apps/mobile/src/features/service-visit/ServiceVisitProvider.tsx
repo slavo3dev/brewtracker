@@ -72,6 +72,10 @@ import {
 
 import { transitionToNextStep } from "./state/service-visit.transitions";
 import { validateRestoredVisit } from "./state/service-visit.validation";
+import {
+  syncMultiMachinePhotos,
+  type MachinePhotoSyncResult,
+} from "./multi-machine-photo-sync.service";
 
 type ServiceVisitContextValue = {
   activeVisit: ServiceVisit | null;
@@ -93,6 +97,7 @@ type ServiceVisitContextValue = {
   unifiedAfterService: ReturnType<typeof useUnifiedAfterServiceStep>;
   completeUnifiedSummary: () => Promise<MultiMachineServiceVisit>;
   retryUnifiedSummarySync: () => Promise<MultiMachineServiceVisit>;
+  retryUnifiedPhotoSync: () => Promise<MachinePhotoSyncResult>;
   advanceUnifiedVisit: () => Promise<MultiMachineServiceVisit>;
   completeUnifiedArrival: (
     input: CompleteArrivalInput,
@@ -209,14 +214,13 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   const [unifiedVisit, setUnifiedVisit] =
     useState<MultiMachineServiceVisit | null>(null);
 
-  const unifiedVisitRef = useRef<MultiMachineServiceVisit | null>(null);
-
   const restoreRequestRef = useRef(0);
 
   const restoreInProgressRef = useRef(false);
   const pendingRestoreCountRef = useRef(0);
 
   const unifiedStartInProgressRef = useRef(false);
+  const photoSyncInProgressRef = useRef(false);
 
   const [restoringVisit, setRestoringVisit] = useState(true);
 
@@ -257,6 +261,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   const {
     commitVisitMutation: commitUnifiedVisitMutation,
     runVisitLifecycle: runUnifiedVisitLifecycle,
+    readCurrentVisit: readCurrentUnifiedVisit,
   } = useVisitMutation({
     activeVisit: unifiedVisit,
     setActiveVisit: setUnifiedVisit,
@@ -287,10 +292,6 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       ),
     [commitUnifiedVisitMutation],
   );
-
-  useEffect(() => {
-    unifiedVisitRef.current = unifiedVisit;
-  }, [unifiedVisit]);
 
   const advanceUnifiedVisit = useCallback(
     (): Promise<MultiMachineServiceVisit> =>
@@ -527,6 +528,50 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     clearError,
   });
 
+  const retryUnifiedPhotoSync = useCallback(
+    async (): Promise<MachinePhotoSyncResult> => {
+      if (photoSyncInProgressRef.current) {
+        throw new Error("Photo synchronization is already running.");
+      }
+
+      photoSyncInProgressRef.current = true;
+
+      try {
+        const visit = await readCurrentUnifiedVisit();
+
+        if (!visit) {
+          throw new Error("There is no service visit to synchronize.");
+        }
+
+        if (!hasUnsyncedMachinePhotos(visit)) {
+          return {
+            attempted: 0,
+            uploaded: 0,
+            failed: 0,
+            skippedUploading: 0,
+            allPhotosSynced: true,
+          };
+        }
+
+        return await syncMultiMachinePhotos({
+          visit,
+          commitVisitMutation: commitUnifiedVisitMutation,
+          readCurrentVisit: readCurrentUnifiedVisit,
+          updateBeforePhoto: unifiedBeforePhotos.updateBeforePhotoUpload,
+          updateAfterPhoto: unifiedAfterService.updateAfterPhotoUpload,
+        });
+      } finally {
+        photoSyncInProgressRef.current = false;
+      }
+    },
+    [
+      commitUnifiedVisitMutation,
+      readCurrentUnifiedVisit,
+      unifiedBeforePhotos.updateBeforePhotoUpload,
+      unifiedAfterService.updateAfterPhotoUpload,
+    ],
+  );
+
   const { completeUnifiedSummary, retryUnifiedSummarySync } =
     useUnifiedSummaryStep({
       commitVisitMutation: commitUnifiedVisitMutation,
@@ -621,13 +666,6 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       );
     }
 
-    if (unifiedVisitRef.current?.status === "in_progress") {
-      throw new Error(
-        "An active service visit is already loaded. " +
-          "Finish the visit before restoring another.",
-      );
-    }
-
     if (authStatus !== "authenticated" || !userId) {
       restoreRequestRef.current += 1;
       setActiveVisit(null);
@@ -651,6 +689,18 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
     setRestoreErrorMessage(null);
 
     try {
+      const currentUnifiedVisit = await readCurrentUnifiedVisit();
+
+      if (!isCurrentRequest()) {
+        return;
+      }
+
+      if (currentUnifiedVisit?.status === "in_progress") {
+        throw new Error(
+          "An active service visit is already loaded. " +
+            "Finish the visit before restoring another.",
+        );
+      }
       let restoredLegacyVisit: ServiceVisit | null = null;
 
       await runUnifiedVisitLifecycle(async (currentVisit) => {
@@ -687,17 +737,18 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
           );
         }
 
-        const blocksNewVisit = (
-          visit: { status: string; summary: { syncStatus: string } } | null,
-        ) =>
-          visit?.status === "in_progress" ||
-          (visit?.status === "completed" &&
-            visit.summary.syncStatus !== "synced");
+        const unifiedVisitBlocksNewVisit =
+          loadedUnifiedVisit?.status === "in_progress" ||
+          (loadedUnifiedVisit?.status === "completed" &&
+            (loadedUnifiedVisit.summary.syncStatus !== "synced" ||
+              hasUnsyncedMachinePhotos(loadedUnifiedVisit)));
 
-        if (
-          blocksNewVisit(loadedUnifiedVisit) &&
-          blocksNewVisit(validLegacyVisit)
-        ) {
+        const legacyVisitBlocksNewVisit =
+          validLegacyVisit?.status === "in_progress" ||
+          (validLegacyVisit?.status === "completed" &&
+            validLegacyVisit.summary.syncStatus !== "synced");
+
+        if (unifiedVisitBlocksNewVisit && legacyVisitBlocksNewVisit) {
           throw new Error(
             "Both legacy and unified service visits require attention. " +
               "Resolve the saved visits before starting another service.",
@@ -747,7 +798,13 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
         setRestoringVisit(false);
       }
     }
-  }, [authStatus, userId, getAuthGeneration, runUnifiedVisitLifecycle]);
+  }, [
+    authStatus,
+    userId,
+    getAuthGeneration,
+    runUnifiedVisitLifecycle,
+    readCurrentUnifiedVisit,
+  ]);
 
   useEffect(() => {
     void restoreVisit();
@@ -828,10 +885,11 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
         if (
           unifiedVisit?.status === "completed" &&
-          unifiedVisit.summary.syncStatus !== "synced"
+          (unifiedVisit.summary.syncStatus !== "synced" ||
+            hasUnsyncedMachinePhotos(unifiedVisit))
         ) {
           throw new Error(
-            "Sync the completed service visit before starting another service.",
+            "Sync the completed service visit and all machine photos before starting another service.",
           );
         }
 
@@ -853,39 +911,69 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
           throw new Error("The authentication session changed.");
         }
 
-        const savedVisit = await loadMultiMachineServiceVisit(userId);
+        const createdVisit = await runUnifiedVisitLifecycle(
+          async (currentVisit) => {
+            if (currentVisit) {
+              if (
+                currentVisit.status === "in_progress" &&
+                currentVisit.stopId === input.stopId
+              ) {
+                return currentVisit;
+              }
 
-        if (getAuthGeneration() !== generation) {
-          throw new Error("The authentication session changed.");
+              if (
+                currentVisit.status === "in_progress" ||
+                (currentVisit.status === "completed" &&
+                  (currentVisit.summary.syncStatus !== "synced" ||
+                    hasUnsyncedMachinePhotos(currentVisit)))
+              ) {
+                throw new Error(
+                  "Resolve the existing unified service visit before starting another.",
+                );
+              }
+            }
+
+            const savedVisit = await loadMultiMachineServiceVisit(userId);
+
+            if (getAuthGeneration() !== generation) {
+              throw new Error("The authentication session changed.");
+            }
+
+            if (
+              savedVisit?.status === "in_progress" ||
+              (savedVisit?.status === "completed" &&
+                (savedVisit.summary.syncStatus !== "synced" ||
+                  hasUnsyncedMachinePhotos(savedVisit)))
+            ) {
+              throw new Error(
+                "A saved service visit requires attention. Restore or sync it before starting another.",
+              );
+            }
+
+            const visit = createMultiMachineVisit({
+              ...input,
+              userId,
+            });
+
+            await saveMultiMachineServiceVisit(visit);
+
+            if (getAuthGeneration() !== generation) {
+              throw new Error(
+                "The authentication session changed while saving the visit.",
+              );
+            }
+
+            return visit;
+          },
+        );
+
+        if (!createdVisit) {
+          throw new Error("Unable to start the unified service visit.");
         }
 
-        if (
-          savedVisit?.status === "in_progress" ||
-          (savedVisit?.status === "completed" &&
-            savedVisit.summary.syncStatus !== "synced")
-        ) {
-          throw new Error(
-            "A saved service visit requires attention. Restore or sync it before starting another.",
-          );
-        }
-
-        const visit = createMultiMachineVisit({
-          ...input,
-          userId,
-        });
-
-        await saveMultiMachineServiceVisit(visit);
-
-        if (getAuthGeneration() !== generation) {
-          throw new Error(
-            "The authentication session changed while saving the visit.",
-          );
-        }
-
-        setUnifiedVisit(visit);
         setErrorMessage(null);
 
-        return visit;
+        return createdVisit;
       } finally {
         unifiedStartInProgressRef.current = false;
       }
@@ -898,6 +986,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedVisit,
       activeVisit,
       getAuthGeneration,
+      runUnifiedVisitLifecycle,
     ],
   );
 
@@ -923,10 +1012,11 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
 
       if (
         unifiedVisit?.status === "completed" &&
-        unifiedVisit.summary.syncStatus !== "synced"
+        (unifiedVisit.summary.syncStatus !== "synced" ||
+          hasUnsyncedMachinePhotos(unifiedVisit))
       ) {
         throw new Error(
-          "Sync the completed unified service visit before starting another service.",
+          "Sync the completed unified service visit and all machine photos before starting another service.",
         );
       }
 
@@ -1388,6 +1478,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedRestock,
       completeUnifiedSummary,
       retryUnifiedSummarySync,
+      retryUnifiedPhotoSync,
       advanceUnifiedVisit,
       completeUnifiedArrival,
       retryUnifiedArrivalSync,
@@ -1452,6 +1543,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedRestock,
       completeUnifiedSummary,
       retryUnifiedSummarySync,
+      retryUnifiedPhotoSync,
       advanceUnifiedVisit,
       completeUnifiedArrival,
       retryUnifiedArrivalSync,
