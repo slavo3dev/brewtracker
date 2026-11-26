@@ -4,7 +4,7 @@ type SaveClientReserveAfterServiceInput = {
   sourceVisitId: string;
   clientId: string;
   stopId: string;
-  machineId: string;
+  machineId: string | null;
   calculatedAt: string;
 };
 

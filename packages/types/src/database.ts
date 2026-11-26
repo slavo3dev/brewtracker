@@ -2777,7 +2777,7 @@ export type Database = {
         Args: {
           p_calculated_at: string
           p_client_id: string
-          p_machine_id: string
+          p_machine_id: string | null
           p_source_visit_id: string
           p_stop_id: string
         }

@@ -1,9 +1,8 @@
-
+import { calculateClientReserveAfter } from "./client-reserve-after.calculate";
 import { saveClientReserveAfterService } from "./client-reserve-after.service";
 import { saveServiceVisit } from "./service-visit.storage";
 
 import type {
-  ClientReserveAfterItemRecord,
   ServiceVisit,
 } from "./service-visit.types";
 
@@ -50,27 +49,10 @@ export async function syncReserveAfter(
     );
   }
 
-  const deliveryByProduct = new Map(
-    clientDelivery.items.map((item) => [
-      item.productId,
-      item.actualQuantity,
-    ]),
+  const items = calculateClientReserveAfter(
+    inventoryAudit.items,
+    clientDelivery.items,
   );
-
-  const items: ClientReserveAfterItemRecord[] =
-    inventoryAudit.items.map((item) => {
-      const deliveredQuantity =
-        deliveryByProduct.get(item.productId) ?? 0;
-
-      return {
-        productId: item.productId,
-        reserveBeforeQuantity: item.normalizedQuantity,
-        deliveredQuantity,
-        reserveAfterQuantity:
-          item.normalizedQuantity + deliveredQuantity,
-        normalizedUnit: item.normalizedUnit,
-      };
-    });
 
   const calculatedAt =
     visit.reserveAfter?.calculatedAt ??

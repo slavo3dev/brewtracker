@@ -10,7 +10,7 @@ export const UNIFIED_STEP_TITLES: Record<UnifiedVisitStepId, string> = {
   drink_count: "Drink Count",
   machine_refill: "Machine Refill",
   after_service: "After-Service Photo",
-  reserve_after: "Client Reserve After Service",
+  reserve_after: "Synchronizing Client Inventory",
   summary: "Review & Complete",
 };
 
@@ -19,7 +19,7 @@ export function getUnifiedVisitProgress(visit: MultiMachineServiceVisit): {
   total: number;
 } {
   const sharedStepsBefore = 3;
-  const sharedStepsAfter = 2;
+  const sharedStepsAfter = 1;
 
   const machineStepCount = (machine: (typeof visit.machines)[number]) =>
     machine.drinkCountRequired ? 5 : 4;
@@ -44,10 +44,7 @@ export function getUnifiedVisitProgress(visit: MultiMachineServiceVisit): {
   }
 
   if (visit.currentStep === "reserve_after") {
-    return {
-      current: sharedStepsBefore + totalMachineSteps + 1,
-      total,
-    };
+    return { current: total, total };
   }
 
   if (visit.currentStep === "summary") {

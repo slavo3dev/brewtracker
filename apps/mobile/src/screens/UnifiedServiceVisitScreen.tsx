@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -36,6 +36,7 @@ export default function UnifiedServiceVisitScreen({
 }: Props) {
   const {
     unifiedVisit,
+    unifiedReserveAfter,
     retryUnifiedSummarySync,
     retryUnifiedPhotoSync,
     clearCompletedUnifiedVisit,
@@ -43,6 +44,46 @@ export default function UnifiedServiceVisitScreen({
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (
+      !unifiedVisit ||
+      unifiedVisit.status !== "in_progress" ||
+      unifiedVisit.currentStep !== "reserve_after" ||
+      unifiedVisit.reserveAfter?.syncStatus === "failed" ||
+      unifiedVisit.reserveAfter?.syncStatus === "synced"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function synchronize(): Promise<void> {
+      try {
+        await unifiedReserveAfter.syncReserveAfter();
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Unable to synchronize final client inventory.",
+          );
+        }
+      }
+    }
+
+    void synchronize();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    unifiedVisit?.id,
+    unifiedVisit?.status,
+    unifiedVisit?.currentStep,
+    unifiedVisit?.reserveAfter?.syncStatus,
+    unifiedReserveAfter.syncReserveAfter,
+  ]);
 
   if (!unifiedVisit) {
     return null;
@@ -85,6 +126,25 @@ export default function UnifiedServiceVisitScreen({
         error instanceof Error
           ? error.message
           : "Unable to close the completed visit.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRetryReserveAfter(): Promise<void> {
+    if (submitting) return;
+
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      await unifiedReserveAfter.retryReserveAfterSync();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to synchronize final client inventory.",
       );
     } finally {
       setSubmitting(false);
@@ -236,6 +296,49 @@ export default function UnifiedServiceVisitScreen({
               <UnifiedAfterServiceStep
                 key={machine?.machineId ?? "after-service"}
               />
+            ) : currentStep === "reserve_after" ? (
+              <View style={styles.card}>
+                {visit.reserveAfter?.syncStatus === "failed" ? (
+                  <>
+                    <Text style={styles.description}>
+                      Final client inventory could not be synchronized.
+                      Your service visit is saved locally.
+                    </Text>
+
+                    {visit.reserveAfter.syncError ? (
+                      <Text style={styles.errorText}>
+                        {visit.reserveAfter.syncError}
+                      </Text>
+                    ) : null}
+
+                    <Pressable
+                      disabled={submitting}
+                      style={[
+                        styles.primaryButton,
+                        submitting && styles.disabledButton,
+                      ]}
+                      onPress={() => {
+                        void handleRetryReserveAfter();
+                      }}
+                    >
+                      {submitting ? (
+                        <ActivityIndicator color="#ffffff" />
+                      ) : (
+                        <Text style={styles.primaryButtonText}>
+                          Retry Sync
+                        </Text>
+                      )}
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <ActivityIndicator size="large" color="#7a3f2c" />
+                    <Text style={styles.description}>
+                      Calculating and synchronizing final client inventory...
+                    </Text>
+                  </>
+                )}
+              </View>
             ) : (
               <View style={styles.card}>
                 <Text style={styles.description}>

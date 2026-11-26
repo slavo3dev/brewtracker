@@ -108,7 +108,9 @@ export function assertMultiMachineVisitReadyForCompletion(
     visit.reserveAfter.syncStatus !== "synced" ||
     !visit.reserveAfter.databaseId
   ) {
-    throw new Error("Client reserve-after calculation must finish syncing.");
+    throw new Error(
+      "Final client reserve calculation must finish syncing before completion.",
+    );
   }
 
   const signature = visit.clientConfirmation.signature;

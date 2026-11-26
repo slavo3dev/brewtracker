@@ -30,6 +30,7 @@ import { useUnifiedBeforePhotosStep } from "../../hooks/useUnifiedBeforePhotosSt
 import { useUnifiedInventoryAuditStep } from "../../hooks/useUnifiedInventoryAuditStep";
 import { useUnifiedDrinkCountStep } from "../../hooks/useUnifiedDrinkCountStep";
 import { useUnifiedRestockStep } from "../../hooks/useUnifiedRestockStep";
+import { useUnifiedReserveAfterStep } from "../../hooks/useUnifiedReserveAfterStep";
 import { useInventoryAuditStep } from "../../hooks/useInventoryAuditStep";
 import { useDrinkCountStep } from "../../hooks/useDrinkCountStep";
 import { useRestockStep } from "../../hooks/useRestockStep";
@@ -94,6 +95,7 @@ type ServiceVisitContextValue = {
   unifiedDrinkCount: ReturnType<typeof useUnifiedDrinkCountStep>;
   unifiedMachineRefill: ReturnType<typeof useUnifiedMachineRefillStep>;
   unifiedRestock: ReturnType<typeof useUnifiedRestockStep>;
+  unifiedReserveAfter: ReturnType<typeof useUnifiedReserveAfterStep>;
   unifiedAfterService: ReturnType<typeof useUnifiedAfterServiceStep>;
   completeUnifiedSummary: () => Promise<MultiMachineServiceVisit>;
   retryUnifiedSummarySync: () => Promise<MultiMachineServiceVisit>;
@@ -540,6 +542,11 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
   });
 
   const unifiedRestock = useUnifiedRestockStep({
+    commitVisitMutation: commitUnifiedVisitMutation,
+    clearError,
+  });
+
+  const unifiedReserveAfter = useUnifiedReserveAfterStep({
     commitVisitMutation: commitUnifiedVisitMutation,
     clearError,
   });
@@ -1490,6 +1497,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedMachineRefill,
       unifiedAfterService,
       unifiedRestock,
+      unifiedReserveAfter,
       completeUnifiedSummary,
       retryUnifiedSummarySync,
       retryUnifiedPhotoSync,
@@ -1555,6 +1563,7 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedMachineRefill,
       unifiedAfterService,
       unifiedRestock,
+      unifiedReserveAfter,
       completeUnifiedSummary,
       retryUnifiedSummarySync,
       retryUnifiedPhotoSync,
