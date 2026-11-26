@@ -10,7 +10,7 @@ type UploadSignatureInput = {
   visitId: string;
   stopId: string;
   clientId: string;
-  machineId: string;
+  machineId: string | null;
   localUri: string;
   signedAt: string;
 };
@@ -136,8 +136,6 @@ export async function uploadSignature({
     .single();
 
   if (error) {
-    await supabase.storage.from(SIGNATURE_BUCKET).remove([storagePath]);
-
     throw error;
   }
 

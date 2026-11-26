@@ -124,6 +124,7 @@ export type BeforePhotoRecord = {
   databaseId: string | null;
   uploadStatus: BeforePhotoUploadStatus;
   uploadError: string | null;
+  uploadAttemptId?: string | null;
 
   capturedAt: string;
   uploadedAt: string | null;
@@ -141,6 +142,7 @@ export type UpdateBeforePhotoUploadInput = {
   databaseId?: string | null;
   uploadError?: string | null;
   uploadedAt?: string | null;
+  uploadAttemptId?: string | null;
 };
 
 export type MediaUploadStatus =
@@ -155,6 +157,7 @@ export type AfterPhotoRecord = {
   databaseId: string | null;
   uploadStatus: MediaUploadStatus;
   uploadError: string | null;
+  uploadAttemptId?: string | null;
   capturedAt: string;
   uploadedAt: string | null;
 };
@@ -174,6 +177,7 @@ export type UpdateMediaUploadInput = {
   databaseId?: string | null;
   uploadError?: string | null;
   uploadedAt?: string | null;
+  uploadAttemptId?: string | null;
 };
 
 export type ServiceSignatureRecord = {

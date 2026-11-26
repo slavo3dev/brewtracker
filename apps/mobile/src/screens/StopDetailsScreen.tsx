@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import {
   distanceMeters,
   formatDistanceMeters,
@@ -70,7 +71,8 @@ export default function StopDetailsScreen({
     retry: retryLocation,
   } = useCurrentLocation();
 
-  const { activeVisit, startVisit, isVisitForStop } = useServiceVisit();
+  const { activeVisit, unifiedVisit, startUnifiedVisit, isVisitForStop } =
+    useServiceVisit();
 
   const [startingService, setStartingService] = useState(false);
 
@@ -79,19 +81,30 @@ export default function StopDetailsScreen({
   const hasVisitForThisStop = isVisitForStop(stop.id);
 
   const hasUnsyncedCompletedVisit =
-    activeVisit?.status === "completed" &&
-    activeVisit.summary.syncStatus !== "synced";
+    (activeVisit?.status === "completed" &&
+      activeVisit.summary.syncStatus !== "synced") ||
+    (unifiedVisit?.status === "completed" &&
+      unifiedVisit.summary.syncStatus !== "synced");
 
-  const hasDifferentActiveVisit =
-    activeVisit !== null &&
-    activeVisit.stopId !== stop.id &&
-    (activeVisit.status === "in_progress" || hasUnsyncedCompletedVisit);
+  const hasDifferentActiveVisit = [activeVisit, unifiedVisit].some(
+    (visit) =>
+      visit !== null &&
+      visit.stopId !== stop.id &&
+      (visit.status === "in_progress" ||
+        (visit.status === "completed" &&
+          visit.summary.syncStatus !== "synced")),
+  );
 
   const isCompletedStop = stop.status === "completed";
   const isSkippedStop = stop.status === "skipped";
 
   const canRetrySyncForThisStop =
-    hasVisitForThisStop && hasUnsyncedCompletedVisit;
+    (activeVisit?.stopId === stop.id &&
+      activeVisit.status === "completed" &&
+      activeVisit.summary.syncStatus !== "synced") ||
+    (unifiedVisit?.stopId === stop.id &&
+      unifiedVisit.status === "completed" &&
+      unifiedVisit.summary.syncStatus !== "synced");
 
   const cannotStartService =
     !canRetrySyncForThisStop && (isCompletedStop || isSkippedStop);
@@ -170,49 +183,47 @@ export default function StopDetailsScreen({
       return;
     }
 
-    if (!stop.machine) {
-      setServiceError("No machine is assigned to this service stop.");
+    if (stop.machines.length === 0) {
+      setServiceError("No machines are assigned to this service stop.");
       return;
     }
 
-    if (!stop.machine.qrCode?.trim()) {
+    const machineWithoutQr = stop.machines.find(
+      (assignment) => !assignment.machine.qrCode?.trim(),
+    );
+
+    if (machineWithoutQr) {
       setServiceError(
-        "The assigned machine does not have a QR code. Ask a manager to update the machine record.",
+        "An assigned machine does not have a QR code. Ask a manager to update the machine record.",
       );
       return;
     }
+
+    const unifiedMachines = stop.machines.map((assignment) => ({
+      machineId: assignment.machineId,
+      sequenceNumber: assignment.sequenceNumber,
+      drinkCountRequired: assignment.drinkCountRequired,
+      machineTarget: {
+        ...assignment.machine,
+        qrCode: assignment.machine.qrCode?.trim() ?? "",
+      },
+    }));
 
     setStartingService(true);
     setServiceError(null);
 
     try {
-      await startVisit({
+      await startUnifiedVisit({
         routeId,
         stopId: stop.id,
         clientId: stop.clientId,
-        machineId: stop.machine.id,
-
         target: {
           clientName: stop.client.name,
           latitude: stop.client.latitude,
           longitude: stop.client.longitude,
           geofenceRadiusMeters: stop.client.geofenceRadiusMeters,
         },
-
-        machineTarget: {
-          id: stop.machine.id,
-          name: stop.machine.name,
-          model: stop.machine.model,
-          serialNumber: stop.machine.serialNumber,
-          qrCode: stop.machine.qrCode.trim(),
-          status: stop.machine.status,
-          installedAt: stop.machine.installedAt,
-          lastServiceAt: stop.machine.lastServiceAt,
-        },
-
-        tasks: {
-          drinkCountRequired: stop.drinkCountRequired,
-        },
+        machines: unifiedMachines,
       });
 
       onServiceStarted();
@@ -282,23 +293,39 @@ export default function StopDetailsScreen({
             }
           />
 
-          <DetailRow
-            label="Machine"
-            value={
-              stop.machine?.name ?? stop.machine?.model ?? "No machine assigned"
-            }
-          />
+          {stop.machines.length === 0 ? (
+            <DetailRow label="Machine" value="No machine assigned" />
+          ) : (
+            stop.machines.map((assignment, index) => (
+              <Fragment key={assignment.machineId}>
+                <DetailRow
+                  label={
+                    stop.machines.length > 1
+                      ? `Machine ${index + 1}`
+                      : "Machine"
+                  }
+                  value={
+                    assignment.machine.name ??
+                    assignment.machine.model ??
+                    assignment.machine.serialNumber ??
+                    "Assigned machine"
+                  }
+                />
 
-          {stop.machine?.model && stop.machine.name !== stop.machine.model ? (
-            <DetailRow label="Model" value={stop.machine.model} />
-          ) : null}
+                {assignment.machine.model &&
+                assignment.machine.name !== assignment.machine.model ? (
+                  <DetailRow label="Model" value={assignment.machine.model} />
+                ) : null}
 
-          {stop.machine?.serialNumber ? (
-            <DetailRow
-              label="Serial number"
-              value={stop.machine.serialNumber}
-            />
-          ) : null}
+                {assignment.machine.serialNumber ? (
+                  <DetailRow
+                    label="Serial number"
+                    value={assignment.machine.serialNumber}
+                  />
+                ) : null}
+              </Fragment>
+            ))
+          )}
 
           <DetailRow
             label="Distance"

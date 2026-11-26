@@ -3,6 +3,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { supabase } from "../../lib/supabase";
 import type { BeforePhotoKind } from "./service-visit.types";
 import { prepareServicePhoto } from "./photos/prepare-service-photo";
+import { withPhotoUploadLock } from "./photo-upload-lock";
 import {
   createServiceVisitPhoto,
   deleteServiceVisitPhoto,
@@ -13,6 +14,7 @@ const SERVICE_VISIT_PHOTOS_BUCKET = "service-visit-photos";
 
 type PersistBeforePhotoInput = {
   visitId: string;
+  machineId?: string;
   kind: BeforePhotoKind;
   temporaryUri: string;
 };
@@ -33,6 +35,8 @@ type UploadBeforePhotoInput = {
   kind: BeforePhotoKind;
 
   localUri: string;
+
+  schemaVersion?: 1 | 2;
 };
 
 export type UploadBeforePhotoResult = {
@@ -48,10 +52,17 @@ function requireDocumentDirectory(): string {
   return FileSystem.documentDirectory;
 }
 
-function getVisitBeforePhotoDirectory(visitId: string): string {
+function getVisitBeforePhotoDirectory(
+  visitId: string,
+  machineId?: string,
+): string {
   const documentDirectory = requireDocumentDirectory();
 
-  return `${documentDirectory}service-visits/` + `${visitId}/before`;
+  if (machineId) {
+    return `${documentDirectory}service-visits/${visitId}/machines/${machineId}/before`;
+  }
+
+  return `${documentDirectory}service-visits/${visitId}/before`;
 }
 
 function createLocalFileName(kind: BeforePhotoKind): string {
@@ -87,12 +98,13 @@ async function assertFileExists(fileUri: string): Promise<void> {
  */
 export async function persistBeforePhotoLocally({
   visitId,
+  machineId,
   kind,
   temporaryUri,
 }: PersistBeforePhotoInput): Promise<string> {
   const preparedPhoto = await prepareServicePhoto(temporaryUri);
 
-  const directoryUri = getVisitBeforePhotoDirectory(visitId);
+  const directoryUri = getVisitBeforePhotoDirectory(visitId, machineId);
 
   await ensureDirectoryExists(directoryUri);
 
@@ -125,9 +137,20 @@ async function readPhotoAsArrayBuffer(localUri: string): Promise<ArrayBuffer> {
 function createStoragePath({
   userId,
   visitId,
+  machineId,
   kind,
-}: Pick<UploadBeforePhotoInput, "userId" | "visitId" | "kind">): string {
-  return `${userId}/${visitId}/before/${kind}.jpg`;
+  schemaVersion,
+  capturedAt,
+}: Pick<
+  UploadBeforePhotoInput,
+  "userId" | "visitId" | "machineId" | "kind" | "schemaVersion" | "capturedAt"
+>): string {
+  if (schemaVersion !== 2) {
+    return `${userId}/${visitId}/before/${kind}.jpg`;
+  }
+
+  const captureId = encodeURIComponent(capturedAt);
+  return `${userId}/${visitId}/machines/${machineId}/before/${kind}-${captureId}.jpg`;
 }
 
 /**
@@ -137,6 +160,7 @@ function createStoragePath({
  * the photo stays in the persisted visit with status "failed" so a
  * manual retry or the future SYNC photo worker can upload it later.
  */
+
 export async function uploadBeforePhoto({
   userId,
   visitId,
@@ -146,28 +170,32 @@ export async function uploadBeforePhoto({
   stage,
   kind,
   localUri,
+  schemaVersion,
 }: UploadBeforePhotoInput): Promise<UploadBeforePhotoResult> {
-  const imageArrayBuffer = await readPhotoAsArrayBuffer(localUri);
-
   const storagePath = createStoragePath({
     userId,
     visitId,
+    machineId,
     kind,
+    schemaVersion,
+    capturedAt,
   });
 
-  const { error } = await supabase.storage
-    .from(SERVICE_VISIT_PHOTOS_BUCKET)
-    .upload(storagePath, imageArrayBuffer, {
-      contentType: "image/jpeg",
-      cacheControl: "3600",
-      upsert: true,
-    });
+  return withPhotoUploadLock(storagePath, async () => {
+    const imageArrayBuffer = await readPhotoAsArrayBuffer(localUri);
 
-  if (error) {
-    throw error;
-  }
+    const { error } = await supabase.storage
+      .from(SERVICE_VISIT_PHOTOS_BUCKET)
+      .upload(storagePath, imageArrayBuffer, {
+        contentType: "image/jpeg",
+        cacheControl: "3600",
+        upsert: true,
+      });
 
-  try {
+    if (error) {
+      throw error;
+    }
+
     const databaseId = await createServiceVisitPhoto({
       userId,
       visitId,
@@ -177,20 +205,16 @@ export async function uploadBeforePhoto({
       kind,
       storagePath,
       capturedAt,
+      schemaVersion,
     });
 
     return {
       storagePath,
       databaseId,
     };
-  } catch (error) {
-    await supabase.storage
-      .from(SERVICE_VISIT_PHOTOS_BUCKET)
-      .remove([storagePath]);
-
-    throw error;
-  }
+  });
 }
+
 
 export async function deleteLocalBeforePhoto(
   localUri: string | null | undefined,
@@ -214,17 +238,37 @@ export async function deleteUploadedBeforePhoto(
   storagePath: string | null | undefined,
   databaseId: string | null | undefined,
 ): Promise<void> {
-  if (storagePath) {
-    const { error } = await supabase.storage
-      .from(SERVICE_VISIT_PHOTOS_BUCKET)
-      .remove([storagePath]);
-
-    if (error) {
-      console.warn("Unable to remove replaced service photo:", error.message);
-    }
+  if (!storagePath) {
+    return;
   }
 
   if (databaseId) {
-    await deleteServiceVisitPhoto(databaseId);
+    const { data, error } = await supabase
+      .from("service_visit_photos")
+      .delete()
+      .eq("id", databaseId)
+      .eq("storage_path", storagePath)
+      .select("id");
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data?.length) {
+      // The row no longer references this photo, or deletion was denied.
+      // Do not remove its Storage object without confirming ownership.
+      return;
+    }
+  }
+
+  const { error: storageError } = await supabase.storage
+    .from(SERVICE_VISIT_PHOTOS_BUCKET)
+    .remove([storagePath]);
+
+  if (storageError) {
+    console.warn(
+      "Unable to remove service photo from storage:",
+      storageError.message,
+    );
   }
 }

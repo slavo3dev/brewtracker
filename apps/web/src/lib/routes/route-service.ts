@@ -13,7 +13,16 @@ export type RouteBuilderStop = StopRow & {
     ClientRow,
     "id" | "name" | "address" | "city" | "latitude" | "longitude"
   > | null;
-  machine: Pick<MachineRow, "id" | "name" | "serial_number"> | null;
+  stop_machines: Array<{
+    id: string;
+    machine_id: string;
+    sequence_number: number;
+    drink_count_required: boolean;
+    machine: Pick<
+      MachineRow,
+      "id" | "name" | "serial_number"
+    > | null;
+  }>;
 };
 
 export type RouteBuilderRoute = RouteRow & {
@@ -59,10 +68,16 @@ export async function getRouteBuilderData() {
               latitude,
               longitude
             ),
-            machine:machines (
+            stop_machines (
               id,
-              name,
-              serial_number
+              machine_id,
+              sequence_number,
+              drink_count_required,
+              machine:machines (
+                id,
+                name,
+                serial_number
+              )
             )
           )
         `,
@@ -119,43 +134,56 @@ export async function createRoute(input: {
   if (error) throw new Error(error.message);
 }
 
+export type RouteStopMachineInput = {
+  machineId: string;
+  drinkCountRequired: boolean;
+};
+
 export async function addRouteStop(input: {
   routeId: string;
   clientId: string;
-  machineId: string | null;
+  machines: RouteStopMachineInput[];
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   notes: string | null;
-  drinkCountRequired: boolean;
 }) {
+  if (input.machines.length === 0) {
+    throw new Error("Select at least one machine.");
+  }
+
+  const machineIds = input.machines.map(
+    (machine) => machine.machineId,
+  );
+
+  if (
+    machineIds.some((machineId) => !machineId) ||
+    new Set(machineIds).size !== machineIds.length
+  ) {
+    throw new Error("Machine assignments must be unique and valid.");
+  }
+
   const supabase = createAdminClient();
 
-  const { data: existingStops, error: stopsError } = await supabase
-    .from("stops")
-    .select("sequence_number")
-    .eq("route_id", input.routeId)
-    .order("sequence_number", { ascending: false })
-    .limit(1);
+  const { error } = await supabase.rpc(
+    "create_multi_machine_route_stop",
+    {
+      p_route_id: input.routeId,
+      p_client_id: input.clientId,
+      p_machines: input.machines.map((machine) => ({
+        machine_id: machine.machineId,
+        drink_count_required: machine.drinkCountRequired,
+      })),
+      p_scheduled_start_at: input.scheduledStartAt ?? undefined,
+      p_scheduled_end_at: input.scheduledEndAt ?? undefined,
+      p_notes: input.notes ?? undefined,
+    },
+  );
 
-  if (stopsError) throw new Error(stopsError.message);
-
-  const nextSequence = existingStops?.[0]?.sequence_number
-    ? existingStops[0].sequence_number + 1
-    : 1;
-
-  const { error } = await supabase.from("stops").insert({
-    route_id: input.routeId,
-    client_id: input.clientId,
-    machine_id: input.machineId,
-    scheduled_start_at: input.scheduledStartAt,
-    scheduled_end_at: input.scheduledEndAt,
-    notes: input.notes,
-    sequence_number: nextSequence,
-    status: "pending",
-    drink_count_required: input.drinkCountRequired,
-  });
-
-  if (error) throw new Error(error.message);
+  if (error) {
+    throw new Error(
+      `Unable to add route stop: ${error.message}`,
+    );
+  }
 }
 
 export async function updateStopSequence(input: {

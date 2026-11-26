@@ -32,6 +32,8 @@ type AuthStatus =
 
 type AuthContextValue = {
   session: Session | null;
+  authGeneration: number;
+  getAuthGeneration: () => number;
   profile: AuthUser | null;
   status: AuthStatus;
   errorMessage: string | null;
@@ -44,6 +46,18 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
+  const [authGeneration, setAuthGeneration] = useState(0);
+  const authGenerationRef = useRef(0);
+
+  const getAuthGeneration = useCallback(
+    () => authGenerationRef.current,
+    [],
+  );
+
+  const advanceAuthGeneration = useCallback(() => {
+    authGenerationRef.current += 1;
+    setAuthGeneration(authGenerationRef.current);
+  }, []);
   const [profile, setProfile] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>("initializing");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -100,7 +114,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       const previousUserId = sessionUserIdRef.current;
 
-      sessionUserIdRef.current = nextSession?.user.id ?? null;
+      const nextUserId = nextSession?.user.id ?? null;
+
+      if (previousUserId !== nextUserId) {
+        advanceAuthGeneration();
+      }
+
+      sessionUserIdRef.current = nextUserId;
 
       setSession(nextSession);
 
@@ -127,7 +147,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       await loadProfile(nextSession);
     },
-    [loadProfile],
+    [loadProfile, advanceAuthGeneration],
   );
 
   useEffect(() => {
@@ -284,6 +304,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     signingOutRef.current = true;
     profileRequestRef.current += 1;
 
+    // Invalidate operations started under the current session immediately.
+    advanceAuthGeneration();
+
     const userId = session?.user.id;
 
     try {
@@ -294,6 +317,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       await signOutService();
 
+      if (sessionUserIdRef.current !== null) {
+        advanceAuthGeneration();
+      }
+
       sessionUserIdRef.current = null;
 
       setSession(null);
@@ -303,7 +330,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     } finally {
       signingOutRef.current = false;
     }
-  }, [session?.user.id]);
+  }, [session?.user.id, advanceAuthGeneration]);
 
   const retryProfile = useCallback(async () => {
     if (!session) {
@@ -317,6 +344,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
+      authGeneration,
+      getAuthGeneration,
       profile,
       status,
       errorMessage,
@@ -324,7 +353,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       signOut,
       retryProfile,
     }),
-    [session, profile, status, errorMessage, signIn, signOut, retryProfile],
+    [session, authGeneration, getAuthGeneration, profile, status, errorMessage, signIn, signOut, retryProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -15,7 +15,7 @@ import {
 import { useServiceVisit } from "./ServiceVisitProvider";
 
 export default function MachineScanStep() {
-  const { activeVisit, completeMachineScan } = useServiceVisit();
+  const { unifiedVisit, completeUnifiedMachineScan } = useServiceVisit();
 
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -27,12 +27,12 @@ export default function MachineScanStep() {
 
   const lastScannedValue = useRef<string | null>(null);
 
-  if (!activeVisit) {
+  const machine =
+    unifiedVisit?.machines[unifiedVisit.activeMachineIndex]?.machineTarget;
+
+  if (!machine) {
     return null;
   }
-
-  const visit = activeVisit;
-  const machine = visit.machineTarget;
 
   async function handleBarcodeScanned(
     result: BarcodeScanningResult,
@@ -54,7 +54,7 @@ export default function MachineScanStep() {
     setErrorMessage(null);
 
     try {
-      await completeMachineScan({
+      await completeUnifiedMachineScan({
         scannedValue,
       });
     } catch (error) {

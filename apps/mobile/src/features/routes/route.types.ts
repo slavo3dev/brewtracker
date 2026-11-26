@@ -4,10 +4,18 @@ export type RouteStatus = Database["public"]["Enums"]["route_status"];
 
 export type StopStatus = Database["public"]["Enums"]["stop_status"];
 
+export type RouteStopMachine = {
+  machineId: string;
+  sequenceNumber: number;
+  drinkCountRequired: boolean;
+  machine: NonNullable<TodayRouteStop["machine"]>;
+};
+
 export type TodayRouteStop = {
   id: string;
   clientId: string;
   machineId: string | null;
+  machines: RouteStopMachine[];
   sequenceNumber: number;
   status: StopStatus;
   scheduledStartAt: string | null;
