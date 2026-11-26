@@ -16,6 +16,17 @@ export async function syncCompletedMultiMachineServiceVisit(
     throw new Error("At least one assigned machine is required.");
   }
 
+  console.log("[Unified Completion] Payload validation", {
+    schemaVersion: 2,
+    sourceVisitIdPresent: Boolean(visit.id),
+    routeIdPresent: Boolean(visit.routeId),
+    stopIdPresent: Boolean(visit.stopId),
+    clientIdPresent: Boolean(visit.clientId),
+    completedByPresent: Boolean(visit.userId),
+    completedAtPresent: Boolean(visit.completedAt),
+    visitSummaryPresent: true,
+  });
+
   const { data, error } =
     await supabase.functions.invoke<CompleteServiceVisitResult>(
       "complete-service-visit",
@@ -46,8 +57,7 @@ export async function syncCompletedMultiMachineServiceVisit(
                 id: machine.machineTarget.id,
                 name: machine.machineTarget.name ?? null,
                 model: machine.machineTarget.model ?? null,
-                serialNumber:
-                  machine.machineTarget.serialNumber ?? null,
+                serialNumber: machine.machineTarget.serialNumber ?? null,
               },
               drinkCount: machine.drinkCount,
               machineRefill: machine.machineRefill,
@@ -58,8 +68,44 @@ export async function syncCompletedMultiMachineServiceVisit(
     );
 
   if (error) {
+    let serverMessage: string | null = null;
+
+    if (error.context instanceof Response) {
+      try {
+        const responseBody: unknown = await error.context.json();
+
+        if (
+          responseBody &&
+          typeof responseBody === "object" &&
+          !Array.isArray(responseBody)
+        ) {
+          const details = responseBody as {
+            error?: unknown;
+            details?: unknown;
+            code?: unknown;
+          };
+
+          const message =
+            typeof details.error === "string" ? details.error : error.message;
+
+          const reason =
+            typeof details.details === "string" ? details.details : null;
+
+          const code = typeof details.code === "string" ? details.code : null;
+
+          serverMessage = [message, reason, code ? `Code: ${code}` : null]
+            .filter(Boolean)
+            .join(" — ");
+        }
+      } catch {
+        // Preserve the original Supabase error if parsing fails.
+      }
+    }
+
     throw new Error(
-      `Unable to sync completed multi-machine visit: ${error.message}`,
+      `Unable to sync completed multi-machine visit: ${
+        serverMessage ?? error.message
+      }`,
     );
   }
 

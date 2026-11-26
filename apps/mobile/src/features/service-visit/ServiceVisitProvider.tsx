@@ -99,6 +99,14 @@ type ServiceVisitContextValue = {
   unifiedAfterService: ReturnType<typeof useUnifiedAfterServiceStep>;
   completeUnifiedSummary: () => Promise<MultiMachineServiceVisit>;
   retryUnifiedSummarySync: () => Promise<MultiMachineServiceVisit>;
+  saveUnifiedSignature: (
+    input: SaveSignatureInput,
+  ) => Promise<MultiMachineServiceVisit>;
+  updateUnifiedSignatureUpload: (
+    localUri: string,
+    input: UpdateMediaUploadInput,
+  ) => Promise<MultiMachineServiceVisit>;
+  removeUnifiedSignature: () => Promise<MultiMachineServiceVisit>;
   retryUnifiedPhotoSync: () => Promise<MachinePhotoSyncResult>;
   advanceUnifiedVisit: () => Promise<MultiMachineServiceVisit>;
   completeUnifiedArrival: (
@@ -604,6 +612,15 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       commitVisitMutation,
       setErrorMessage,
     });
+
+  const {
+    saveSignature: saveUnifiedSignature,
+    updateSignatureUpload: updateUnifiedSignatureUpload,
+    removeSignature: removeUnifiedSignature,
+  } = useClientConfirmation<MultiMachineServiceVisit>({
+    commitVisitMutation: commitUnifiedVisitMutation,
+    setErrorMessage,
+  });
 
   const { completeSummary, retrySummarySync } = useSummaryStep({
     commitVisitMutation,
@@ -1500,6 +1517,9 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedReserveAfter,
       completeUnifiedSummary,
       retryUnifiedSummarySync,
+      saveUnifiedSignature,
+      updateUnifiedSignatureUpload,
+      removeUnifiedSignature,
       retryUnifiedPhotoSync,
       advanceUnifiedVisit,
       completeUnifiedArrival,
@@ -1566,6 +1586,9 @@ export function ServiceVisitProvider({ children }: PropsWithChildren) {
       unifiedReserveAfter,
       completeUnifiedSummary,
       retryUnifiedSummarySync,
+      saveUnifiedSignature,
+      updateUnifiedSignatureUpload,
+      removeUnifiedSignature,
       retryUnifiedPhotoSync,
       advanceUnifiedVisit,
       completeUnifiedArrival,

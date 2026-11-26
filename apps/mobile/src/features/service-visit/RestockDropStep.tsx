@@ -413,8 +413,6 @@ export default function RestockDropStep() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Client delivery</Text>
-
           <Text style={styles.description}>
             Your delivery has been saved on this device. Synchronization is
             still pending.
@@ -479,8 +477,6 @@ export default function RestockDropStep() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Client delivery</Text>
-
         <Text style={styles.description}>
           Confirm what you are actually delivering from the van to the client's
           reserve stock.

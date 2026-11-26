@@ -23,6 +23,7 @@ import BeforePhotosStep from "../features/service-visit/BeforePhotosStep";
 import UnifiedDrinkCountStep from "../features/service-visit/UnifiedDrinkCountStep";
 import UnifiedMachineRefillStep from "../features/service-visit/UnifiedMachineRefillStep";
 import UnifiedAfterServiceStep from "../features/service-visit/UnifiedAfterServiceStep";
+import UnifiedSummaryStep from "../features/service-visit/UnifiedSummaryStep";
 import { hasUnsyncedMachinePhotos } from "../features/service-visit/state/multi-machine-photo-sync";
 
 type Props = {
@@ -44,6 +45,7 @@ export default function UnifiedServiceVisitScreen({
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [signatureDrawing, setSignatureDrawing] = useState(false);
 
   useEffect(() => {
     if (
@@ -186,7 +188,6 @@ export default function UnifiedServiceVisitScreen({
       if (!isSummarySynced) {
         await retryUnifiedSummarySync();
       }
-
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -210,7 +211,10 @@ export default function UnifiedServiceVisitScreen({
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        scrollEnabled={!signatureDrawing}
+      >
         {errorMessage ? (
           <Text style={styles.errorText}>{errorMessage}</Text>
         ) : null}
@@ -301,8 +305,8 @@ export default function UnifiedServiceVisitScreen({
                 {visit.reserveAfter?.syncStatus === "failed" ? (
                   <>
                     <Text style={styles.description}>
-                      Final client inventory could not be synchronized.
-                      Your service visit is saved locally.
+                      Final client inventory could not be synchronized. Your
+                      service visit is saved locally.
                     </Text>
 
                     {visit.reserveAfter.syncError ? (
@@ -324,9 +328,7 @@ export default function UnifiedServiceVisitScreen({
                       {submitting ? (
                         <ActivityIndicator color="#ffffff" />
                       ) : (
-                        <Text style={styles.primaryButtonText}>
-                          Retry Sync
-                        </Text>
+                        <Text style={styles.primaryButtonText}>Retry Sync</Text>
                       )}
                     </Pressable>
                   </>
@@ -339,10 +341,15 @@ export default function UnifiedServiceVisitScreen({
                   </>
                 )}
               </View>
+            ) : currentStep === "summary" ? (
+              <UnifiedSummaryStep
+                onSignatureStart={() => setSignatureDrawing(true)}
+                onSignatureEnd={() => setSignatureDrawing(false)}
+              />
             ) : (
               <View style={styles.card}>
                 <Text style={styles.description}>
-                  Unified step component will be connected next.
+                  Unable to display the current service step.
                 </Text>
               </View>
             )}

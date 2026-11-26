@@ -61,8 +61,7 @@ export async function syncUnifiedRestockDrop(
     };
   });
 
-  const machineId =
-    visit.machines.length === 1 ? visit.machines[0].machineId : null;
+  const machineId = null;
 
   return saveClientDelivery({
     sourceVisitId: delivery.sourceVisitId,
